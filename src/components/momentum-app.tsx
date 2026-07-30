@@ -39,7 +39,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { SNAPSHOT_DASHBOARD } from "@/lib/snapshot";
 import { TICKERS } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
 import type {
@@ -1275,11 +1274,15 @@ function NumberField({
   );
 }
 
-export function MomentumApp() {
+export function MomentumApp({
+  initialDashboard,
+}: {
+  initialDashboard: DashboardPayload;
+}) {
   const [view, setView] = useState<View>("overview");
-  const [data, setData] = useState<DashboardPayload>(SNAPSHOT_DASHBOARD);
+  const [data, setData] = useState<DashboardPayload>(initialDashboard);
   const [config, setConfig] = useState<StrategyConfig>(
-    SNAPSHOT_DASHBOARD.config,
+    initialDashboard.config,
   );
   const [holdings, setHoldings] = useState<HoldingMap>({});
   const [histories, setHistories] = useState<Record<string, PricePoint[]> | null>(
@@ -1354,8 +1357,8 @@ export function MomentumApp() {
         window.localStorage.removeItem("momentum-strategy");
       }
     }
-    void refresh(SNAPSHOT_DASHBOARD.config);
-  }, [refresh]);
+    void refresh(initialDashboard.config);
+  }, [initialDashboard.config, refresh]);
 
   function changeView(next: View) {
     setView(next);
