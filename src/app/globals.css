@@ -24,27 +24,6 @@
   --sidebar-width: 224px;
 }
 
-:root[data-theme="dark"] {
-  --bg: #111613;
-  --surface: #171d19;
-  --surface-2: #1d251f;
-  --surface-3: #263028;
-  --text: #edf2ed;
-  --text-soft: #bbc6bd;
-  --text-muted: #8c9a8f;
-  --line: #2a342c;
-  --line-strong: #3a463d;
-  --accent: #58c48a;
-  --accent-strong: #77d59f;
-  --accent-soft: #1d3c2b;
-  --danger: #ef837a;
-  --danger-soft: #3c2523;
-  --warning: #e6b85f;
-  --warning-soft: #3a3020;
-  --cash: #abb7ae;
-  --shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -53,10 +32,6 @@ html {
   background: var(--bg);
   color-scheme: light;
   scroll-behavior: smooth;
-}
-
-html[data-theme="dark"] {
-  color-scheme: dark;
 }
 
 body {
@@ -291,7 +266,6 @@ main {
   color: var(--warning);
 }
 
-.icon-button,
 .mobile-menu {
   align-items: center;
   background: var(--surface);
@@ -303,13 +277,11 @@ main {
   width: 38px;
 }
 
-.icon-button:hover,
 .mobile-menu:hover {
   border-color: var(--line-strong);
   background: var(--surface-2);
 }
 
-.icon-button svg,
 .mobile-menu svg {
   height: 18px;
   width: 18px;

@@ -149,6 +149,8 @@ export const SNAPSHOT_DASHBOARD: DashboardPayload = {
     qqq: 738.31,
     ma10: null,
     qqqScore: 0.1864,
+    allocationStatus: "Invest",
+    selectedCount: 10,
   },
   momentum,
   portfolio,

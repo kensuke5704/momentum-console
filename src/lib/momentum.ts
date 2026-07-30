@@ -315,9 +315,17 @@ export function buildDashboard(
     throw new Error("Unable to calculate the current signal");
   }
 
-  const selectedSymbols = new Set(
+  const allocationStatus =
+    current.state === "Cash"
+      ? "CashMarket"
+      : current.selected.length < config.topN
+        ? "CashInsufficient"
+        : "Invest";
+  const allocationCandidates = new Set(
     current.selected.map((candidate) => candidate.symbol),
   );
+  const selectedSymbols =
+    allocationStatus === "Invest" ? allocationCandidates : new Set<string>();
   const candidateMap = new Map(
     current.candidates.map((candidate, index) => [
       candidate.symbol,
@@ -351,7 +359,12 @@ export function buildDashboard(
       } else if (score !== null && score <= current.qqqScore) {
         reason = "QQQスコア以下";
       } else if (ranked) {
-        reason = selected ? "採用" : "テーマ上限または順位";
+        reason = selected
+          ? "採用"
+          : allocationStatus === "CashInsufficient" &&
+              allocationCandidates.has(ticker.symbol)
+            ? "候補不足のため現金"
+            : "テーマ上限または順位";
       }
 
       return {
@@ -418,7 +431,7 @@ export function buildDashboard(
         entryDate: null,
         exitDate: toMonthEnd(qqqMonths[index + 1].key),
         market: "Not enough candidates",
-        picks: result.selected.map((item) => item.symbol),
+        picks: [],
         monthlyReturn: 0,
         equity,
       });
@@ -467,6 +480,8 @@ export function buildDashboard(
       qqq: current.qqq,
       ma10: current.ma10,
       qqqScore: current.qqqScore,
+      allocationStatus,
+      selectedCount: current.selected.length,
     },
     momentum,
     portfolio,

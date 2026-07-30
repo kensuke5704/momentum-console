@@ -1,4 +1,5 @@
 export type MarketState = "RiskOn" | "Cash" | "Unknown";
+export type AllocationStatus = "Invest" | "CashMarket" | "CashInsufficient";
 
 export type PricePoint = {
   date: string;
@@ -76,6 +77,8 @@ export type DashboardPayload = {
     qqq: number | null;
     ma10: number | null;
     qqqScore: number | null;
+    allocationStatus: AllocationStatus;
+    selectedCount: number;
   };
   momentum: MomentumRow[];
   portfolio: PortfolioRow[];

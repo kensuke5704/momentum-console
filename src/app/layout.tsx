@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "Momentum Console",
   description:
     "モメンタム戦略の市場判定、銘柄選定、配分、バックテストを一元管理します。",
+  icons: {
+    icon: "./icon.svg",
+    shortcut: "./icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -9,9 +9,7 @@ import {
   GearSixIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
-  MoonIcon,
   SlidersHorizontalIcon,
-  SunIcon,
   TargetIcon,
   TrendDownIcon,
   TrendUpIcon,
@@ -50,7 +48,6 @@ import type {
 
 type View = "overview" | "screener" | "portfolio" | "backtest" | "settings";
 type HoldingMap = Record<string, number>;
-type Theme = "light" | "dark";
 type MarketDataFile = {
   generatedAt: string;
   histories: Record<string, PricePoint[]>;
@@ -161,19 +158,37 @@ function Overview({
   loading: boolean;
   onNavigate: (view: View) => void;
 }) {
+  const allocationIsCash = data.market.allocationStatus !== "Invest";
+  const insufficient =
+    data.market.allocationStatus === "CashInsufficient";
+  const allocationLabel = allocationIsCash ? "Cash" : "RiskOn";
   const chartData = data.backtest.rows
     .filter((row) => typeof row.equity === "number")
     .map((row) => ({
       date: row.signalMonth.slice(0, 7),
       equity: (row.equity ?? 1) * 100,
     }));
-  const latestReturns = data.backtest.rows
-    .filter((row) => typeof row.monthlyReturn === "number")
-    .slice(-8)
-    .map((row) => ({
-      date: row.signalMonth.slice(2, 7).replace("-", "/"),
-      value: (row.monthlyReturn ?? 0) * 100,
-    }));
+  const recentReturnRows = data.backtest.rows
+    .filter(
+      (row) =>
+        typeof row.monthlyReturn === "number" &&
+        !row.provisional,
+    )
+    .slice(-8);
+  let cumulativeValue = 1;
+  const latestReturns = [
+    {
+      date: recentReturnRows[0]?.signalMonth.slice(2, 7).replace("-", "/") ?? "",
+      value: cumulativeValue,
+    },
+    ...recentReturnRows.map((row) => {
+      cumulativeValue *= 1 + (row.monthlyReturn ?? 0);
+      return {
+        date: (row.exitDate ?? row.signalMonth).slice(2, 7).replace("-", "/"),
+        value: cumulativeValue,
+      };
+    }),
+  ];
 
   return (
     <div className="view-stack">
@@ -186,23 +201,25 @@ function Overview({
 
       <section className="market-panel">
         <div className="market-copy">
-          <div className="section-label">現在の市場判定</div>
+          <div className="section-label">現在の配分判定</div>
           <div className="market-state-row">
             <div
-              className={`market-icon ${data.market.state === "RiskOn" ? "risk-on" : "cash"}`}
+              className={`market-icon ${allocationIsCash ? "cash" : "risk-on"}`}
             >
-              {data.market.state === "RiskOn" ? (
-                <TrendUpIcon weight="bold" />
-              ) : (
+              {allocationIsCash ? (
                 <TrendDownIcon weight="bold" />
+              ) : (
+                <TrendUpIcon weight="bold" />
               )}
             </div>
             <div>
-              <h1>{data.market.state}</h1>
+              <h1>{allocationLabel}</h1>
               <p>
-                {data.market.state === "RiskOn"
-                  ? "QQQは10か月移動平均を上回っています。選定銘柄への配分シグナルです。"
-                  : "QQQは10か月移動平均以下です。新規配分を停止するシグナルです。"}
+                {insufficient
+                  ? `QQQはRiskOnですが、採用候補が${data.market.selectedCount}/${data.config.topN}銘柄のため、ルールにより全額現金です。`
+                  : data.market.state === "RiskOn"
+                    ? "QQQは10か月移動平均を上回っています。選定銘柄への配分シグナルです。"
+                    : "QQQは10か月移動平均以下です。新規配分を停止するシグナルです。"}
               </p>
             </div>
           </div>
@@ -234,8 +251,8 @@ function Overview({
         <div className="return-visual">
           <div className="visual-head">
             <div>
-              <span>直近8か月</span>
-              <strong>月次リターン</strong>
+              <span>8か月前 = 1.00</span>
+              <strong>月次リターン累積</strong>
             </div>
             {loading ? <LoadingLine /> : null}
           </div>
@@ -248,7 +265,7 @@ function Overview({
                     <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <ReferenceLine y={0} stroke="var(--line-strong)" />
+                <ReferenceLine y={1} stroke="var(--line-strong)" />
                 <Area
                   type="monotone"
                   dataKey="value"
@@ -270,42 +287,44 @@ function Overview({
         </div>
       </section>
 
-      <section>
-        <div className="section-heading">
-          <div>
-            <h2>今月の採用銘柄</h2>
-            <p>
-              相対モメンタムとテーマ上限を通過した
-              {data.portfolio.length}銘柄（目標{data.config.topN}）
-            </p>
+      {!allocationIsCash ? (
+        <section>
+          <div className="section-heading">
+            <div>
+              <h2>今月の採用銘柄</h2>
+              <p>
+                相対モメンタムとテーマ上限を通過した
+                {data.portfolio.length}銘柄
+              </p>
+            </div>
+            <button className="text-button" onClick={() => onNavigate("portfolio")}>
+              配分を確認
+              <ArrowUpIcon className="arrow-right" />
+            </button>
           </div>
-          <button className="text-button" onClick={() => onNavigate("portfolio")}>
-            配分を確認
-            <ArrowUpIcon className="arrow-right" />
-          </button>
-        </div>
-        <div className="pick-grid">
-          {data.portfolio.map((row, index) => (
-            <article className="pick-row" key={row.symbol}>
-              <span className="pick-number">{String(index + 1).padStart(2, "0")}</span>
-              <div className="ticker-block">
-                <strong>{row.symbol}</strong>
-                <span>{row.genre}</span>
-              </div>
-              <div className="pick-price">
-                <span>現在値</span>
-                <strong>
-                  {row.current === null ? "N/A" : `$${decimal.format(row.current)}`}
-                </strong>
-              </div>
-              <div className="pick-score">
-                <span>Score</span>
-                <ScoreChange value={row.score} />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+          <div className="pick-grid">
+            {data.portfolio.map((row, index) => (
+              <article className="pick-row" key={row.symbol}>
+                <span className="pick-number">{String(index + 1).padStart(2, "0")}</span>
+                <div className="ticker-block">
+                  <strong>{row.symbol}</strong>
+                  <span>{row.genre}</span>
+                </div>
+                <div className="pick-price">
+                  <span>現在値</span>
+                  <strong>
+                    {row.current === null ? "N/A" : `$${decimal.format(row.current)}`}
+                  </strong>
+                </div>
+                <div className="pick-score">
+                  <span>Score</span>
+                  <ScoreChange value={row.score} />
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="performance-panel">
         <div className="performance-chart">
@@ -391,7 +410,7 @@ function ReturnTooltip({
   return (
     <div className="chart-tooltip">
       <span>{label}</span>
-      <strong>{decimal.format(payload[0].value ?? 0)}%</strong>
+      <strong>{decimal.format(payload[0].value ?? 1)}x</strong>
     </div>
   );
 }
@@ -636,6 +655,9 @@ function PortfolioView({
   holdings: HoldingMap;
   onHoldingChange: (symbol: string, value: number) => void;
 }) {
+  const allocationIsCash = data.market.allocationStatus !== "Invest";
+  const insufficient =
+    data.market.allocationStatus === "CashInsufficient";
   const rows = data.portfolio.map((row) => {
     const actualShares = holdings[row.symbol] ?? 0;
     const actualAmount = actualShares * (row.current ?? 0);
@@ -656,32 +678,63 @@ function PortfolioView({
         <div>
           <h1>ポートフォリオ</h1>
           <p>
-            実際の保有株数を入力すると、目標配分との差額を自動計算します。
+            {allocationIsCash
+              ? "今月は全額現金です。新規の買付配分はありません。"
+              : "実際の保有株数を入力すると、目標配分との差額を自動計算します。"}
           </p>
         </div>
       </div>
 
       <section className="portfolio-summary">
-        <Metric label="目標総額" value={`$${money.format(targetTotal)}`} />
-        <Metric
-          label="現在評価額"
-          value={`$${money.format(actualTotal)}`}
-          tone={actualTotal > 0 ? "positive" : "neutral"}
-        />
-        <Metric
-          label="調整差額"
-          value={`${difference >= 0 ? "+" : ""}$${money.format(difference)}`}
-          tone={difference >= 0 ? "positive" : "negative"}
-        />
-        <Metric
-          label="円換算"
-          value={`¥${money.format(actualTotal * data.config.usdJpy)}`}
-          detail={`USD/JPY ${decimal.format(data.config.usdJpy)}`}
-        />
+        {allocationIsCash ? (
+          <>
+            <Metric label="目標総額" value="$0" />
+            <Metric label="採用銘柄" value="0" />
+            <Metric label="現金比率" value="100%" tone="positive" />
+            <Metric
+              label="判定理由"
+              value={insufficient ? "候補不足" : "市場Cash"}
+              detail={
+                insufficient
+                  ? `${data.market.selectedCount}/${data.config.topN}銘柄`
+                  : "QQQ 10M MA"
+              }
+            />
+          </>
+        ) : (
+          <>
+            <Metric label="目標総額" value={`$${money.format(targetTotal)}`} />
+            <Metric
+              label="現在評価額"
+              value={`$${money.format(actualTotal)}`}
+              tone={actualTotal > 0 ? "positive" : "neutral"}
+            />
+            <Metric
+              label="調整差額"
+              value={`${difference >= 0 ? "+" : ""}$${money.format(difference)}`}
+              tone={difference >= 0 ? "positive" : "negative"}
+            />
+            <Metric
+              label="円換算"
+              value={`¥${money.format(actualTotal * data.config.usdJpy)}`}
+              detail={`USD/JPY ${decimal.format(data.config.usdJpy)}`}
+            />
+          </>
+        )}
       </section>
 
-      <div className="table-shell portfolio-table">
-        <table>
+      {allocationIsCash ? (
+        <EmptyState
+          title="今月は全額現金です"
+          body={
+            insufficient
+              ? `採用候補が${data.market.selectedCount}銘柄のため、目標の${data.config.topN}銘柄を満たしていません。`
+              : "QQQが10か月移動平均以下のため、配分を停止しています。"
+          }
+        />
+      ) : (
+        <div className="table-shell portfolio-table">
+          <table>
           <thead>
             <tr>
               <th>銘柄</th>
@@ -739,8 +792,9 @@ function PortfolioView({
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      )}
       <p className="fine-print">
         保有株数はこのブラウザ内だけに保存されます。売買注文は送信されません。
       </p>
@@ -1238,17 +1292,10 @@ export function MomentumApp() {
     null,
   );
   const [loading, setLoading] = useState(false);
-  const [theme, setTheme] = useState<Theme>("light");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const didInitialLoad = useRef(false);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem("momentum-theme") as Theme | null;
-    const preferredDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const nextTheme = savedTheme ?? (preferredDark ? "dark" : "light");
-    setTheme(nextTheme);
-    document.documentElement.dataset.theme = nextTheme;
-
     const savedHoldings = window.localStorage.getItem("momentum-holdings");
     if (savedHoldings) {
       try {
@@ -1322,13 +1369,6 @@ export function MomentumApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function toggleTheme() {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-    window.localStorage.setItem("momentum-theme", next);
-  }
-
   function updateHolding(symbol: string, value: number) {
     const next = { ...holdings, [symbol]: value };
     setHoldings(next);
@@ -1394,13 +1434,6 @@ export function MomentumApp() {
           </div>
           <div className="topbar-actions">
             <SourceBadge payload={data} />
-            <button
-              className="icon-button"
-              onClick={toggleTheme}
-              aria-label={theme === "light" ? "ダークモード" : "ライトモード"}
-            >
-              {theme === "light" ? <MoonIcon /> : <SunIcon />}
-            </button>
             <button
               className="refresh-button"
               onClick={() => void refresh(config, true)}
