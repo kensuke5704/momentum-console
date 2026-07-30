@@ -20,6 +20,9 @@ import {
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
+  Cell,
   CartesianGrid,
   Line,
   LineChart,
@@ -168,27 +171,17 @@ function Overview({
       date: row.signalMonth.slice(0, 7),
       equity: (row.equity ?? 1) * 100,
     }));
-  const recentReturnRows = data.backtest.rows
+  const latestReturns = data.backtest.rows
     .filter(
       (row) =>
         typeof row.monthlyReturn === "number" &&
         !row.provisional,
     )
-    .slice(-8);
-  let cumulativeValue = 1;
-  const latestReturns = [
-    {
-      date: recentReturnRows[0]?.signalMonth.slice(2, 7).replace("-", "/") ?? "",
-      value: cumulativeValue,
-    },
-    ...recentReturnRows.map((row) => {
-      cumulativeValue *= 1 + (row.monthlyReturn ?? 0);
-      return {
-        date: (row.exitDate ?? row.signalMonth).slice(2, 7).replace("-", "/"),
-        value: cumulativeValue,
-      };
-    }),
-  ];
+    .slice(-8)
+    .map((row) => ({
+      date: row.signalMonth.slice(2, 7).replace("-", "/"),
+      value: (row.monthlyReturn ?? 0) * 100,
+    }));
 
   return (
     <div className="view-stack">
@@ -251,29 +244,27 @@ function Overview({
         <div className="return-visual">
           <div className="visual-head">
             <div>
-              <span>8か月前 = 1.00</span>
-              <strong>月次リターン累積</strong>
+              <span>直近8か月</span>
+              <strong>単月リターン</strong>
             </div>
             {loading ? <LoadingLine /> : null}
           </div>
           <div className="mini-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={latestReturns}>
-                <defs>
-                  <linearGradient id="returnFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.36} />
-                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <ReferenceLine y={1} stroke="var(--line-strong)" />
-                <Area
-                  type="monotone"
+              <BarChart data={latestReturns}>
+                <ReferenceLine y={0} stroke="var(--line-strong)" />
+                <Bar
                   dataKey="value"
-                  stroke="var(--accent)"
-                  strokeWidth={2.5}
-                  fill="url(#returnFill)"
+                  radius={[4, 4, 4, 4]}
                   isAnimationActive={false}
-                />
+                >
+                  {latestReturns.map((row) => (
+                    <Cell
+                      key={row.date}
+                      fill={row.value < 0 ? "var(--danger)" : "var(--accent)"}
+                    />
+                  ))}
+                </Bar>
                 <XAxis
                   dataKey="date"
                   axisLine={false}
@@ -281,7 +272,7 @@ function Overview({
                   tick={{ fill: "var(--text-muted)", fontSize: 11 }}
                 />
                 <Tooltip content={<ReturnTooltip />} />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -410,7 +401,7 @@ function ReturnTooltip({
   return (
     <div className="chart-tooltip">
       <span>{label}</span>
-      <strong>{decimal.format(payload[0].value ?? 1)}x</strong>
+      <strong>{decimal.format(payload[0].value ?? 0)}%</strong>
     </div>
   );
 }
