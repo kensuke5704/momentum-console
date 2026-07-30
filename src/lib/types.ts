@@ -74,6 +74,7 @@ export type DashboardPayload = {
   warning?: string;
   market: {
     state: MarketState;
+    decisionDate: string;
     qqq: number | null;
     ma10: number | null;
     qqqScore: number | null;

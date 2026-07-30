@@ -146,6 +146,7 @@ export const SNAPSHOT_DASHBOARD: DashboardPayload = {
     "ライブデータを取得できなかったため、元スプレッドシートの最終確認値を表示しています。",
   market: {
     state: "RiskOn",
+    decisionDate: "2026-05-31",
     qqq: 738.31,
     ma10: null,
     qqqScore: 0.1864,

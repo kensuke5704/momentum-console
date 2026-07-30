@@ -55,6 +55,14 @@ function monthlyHistory(points: PricePoint[]): MonthPoint[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function latestCompletedMonthIndex(points: MonthPoint[]) {
+  const latestIndex = points.length - 1;
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
+  return points[latestIndex]?.key === currentMonthKey
+    ? latestIndex - 1
+    : latestIndex;
+}
+
 function priceOnOrAfter(points: PricePoint[], date: string) {
   return points.find((point) => point.date >= date) ?? null;
 }
@@ -300,7 +308,10 @@ export function buildDashboard(
     throw new Error("QQQ price history is incomplete");
   }
 
-  const latestIndex = qqqMonths.length - 1;
+  const latestIndex = latestCompletedMonthIndex(qqqMonths);
+  if (latestIndex < Math.max(config.qqqMaMonths - 1, 6)) {
+    throw new Error("QQQ completed month history is incomplete");
+  }
   const current = buildAtIndex({
     index: latestIndex,
     qqqMonths,
@@ -337,14 +348,23 @@ export function buildDashboard(
     .filter((ticker) => ticker.symbol !== "QQQ")
     .map((ticker) => {
       const ranked = candidateMap.get(ticker.symbol);
-      const months = monthlyBySymbol[ticker.symbol] ?? [];
-      const latest = months.at(-1);
-      const one = months.at(-2);
-      const three = months.at(-4);
-      const six = months.at(-7);
-      const m1 = latest && one ? latest.close / one.close - 1 : null;
-      const m3 = latest && three ? latest.close / three.close - 1 : null;
-      const m6 = latest && six ? latest.close / six.close - 1 : null;
+      const map = monthMaps[ticker.symbol];
+      const decisionClose = map?.get(qqqMonths[latestIndex].key);
+      const oneMonthClose = map?.get(qqqMonths[latestIndex - 1].key);
+      const threeMonthClose = map?.get(qqqMonths[latestIndex - 3].key);
+      const sixMonthClose = map?.get(qqqMonths[latestIndex - 6].key);
+      const m1 =
+        decisionClose && oneMonthClose
+          ? decisionClose / oneMonthClose - 1
+          : null;
+      const m3 =
+        decisionClose && threeMonthClose
+          ? decisionClose / threeMonthClose - 1
+          : null;
+      const m6 =
+        decisionClose && sixMonthClose
+          ? decisionClose / sixMonthClose - 1
+          : null;
       const score =
         m1 !== null && m3 !== null && m6 !== null
           ? config.weights.oneMonth * m1 +
@@ -370,7 +390,10 @@ export function buildDashboard(
       return {
         symbol: ticker.symbol,
         genre: ticker.genre,
-        current: latest?.close ?? null,
+        current:
+          histories[ticker.symbol]?.at(-1)?.close ??
+          decisionClose ??
+          null,
         oneMonth: m1,
         threeMonth: m3,
         sixMonth: m6,
@@ -477,6 +500,7 @@ export function buildDashboard(
     asOf: histories.QQQ.at(-1)?.date ?? qqqMonths.at(-1)?.date ?? "",
     market: {
       state: current.state,
+      decisionDate: qqqMonths[latestIndex].date,
       qqq: current.qqq,
       ma10: current.ma10,
       qqqScore: current.qqqScore,

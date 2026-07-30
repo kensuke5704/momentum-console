@@ -420,6 +420,14 @@ main {
   max-width: 53ch;
 }
 
+.market-state-row .decision-date {
+  color: var(--text-muted);
+  font-family: "Roboto Mono", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
 .market-values {
   display: grid;
   gap: 24px;

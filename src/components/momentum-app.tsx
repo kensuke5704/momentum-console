@@ -214,6 +214,9 @@ function Overview({
                     ? "QQQは10か月移動平均を上回っています。選定銘柄への配分シグナルです。"
                     : "QQQは10か月移動平均以下です。新規配分を停止するシグナルです。"}
               </p>
+              <p className="decision-date">
+                判定基準日 {compactDate(data.market.decisionDate)}（確定月末）
+              </p>
             </div>
           </div>
           <div className="market-values">
