@@ -9,6 +9,7 @@ import {
   GearSixIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
+  ScalesIcon,
   SlidersHorizontalIcon,
   TargetIcon,
   TrendDownIcon,
@@ -41,6 +42,8 @@ import {
 } from "react";
 import { TICKERS } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
+import { ComparisonView } from "@/components/comparison-view";
+import { fetchYahooHistoriesInBrowser } from "@/lib/yahoo-client";
 import type {
   BacktestRow,
   DashboardPayload,
@@ -48,13 +51,36 @@ import type {
   StrategyConfig,
 } from "@/lib/types";
 
-type View = "overview" | "screener" | "portfolio" | "backtest" | "settings";
+type View =
+  | "overview"
+  | "screener"
+  | "portfolio"
+  | "backtest"
+  | "comparison"
+  | "settings";
 type HoldingMap = Record<string, number>;
 type MarketDataFile = {
   generatedAt: string;
   histories: Record<string, PricePoint[]>;
   dashboard: DashboardPayload;
 };
+
+function mergeHistories(
+  base: Record<string, PricePoint[]>,
+  updates: Record<string, PricePoint[]>,
+) {
+  const merged = { ...base };
+  for (const [symbol, points] of Object.entries(updates)) {
+    const byDate = new Map(
+      (base[symbol] ?? []).map((point) => [point.date, point]),
+    );
+    for (const point of points) byDate.set(point.date, point);
+    merged[symbol] = [...byDate.values()].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+  }
+  return merged;
+}
 
 const views: Array<{
   id: View;
@@ -65,6 +91,7 @@ const views: Array<{
   { id: "screener", label: "銘柄分析", icon: ListChecksIcon },
   { id: "portfolio", label: "ポートフォリオ", icon: WalletIcon },
   { id: "backtest", label: "バックテスト", icon: TargetIcon },
+  { id: "comparison", label: "候補比較", icon: ScalesIcon },
   { id: "settings", label: "戦略設定", icon: GearSixIcon },
 ];
 
@@ -1310,6 +1337,7 @@ export function MomentumApp({
     setLoading(true);
     try {
       let nextHistories = histories;
+      let refreshWarnings: string[] = [];
       if (!nextHistories || forceDownload) {
         const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
         const response = await fetch(
@@ -1319,10 +1347,23 @@ export function MomentumApp({
         if (!response.ok) throw new Error("公開データの取得に失敗しました。");
         const marketData = (await response.json()) as MarketDataFile;
         nextHistories = marketData.histories;
-        setHistories(nextHistories);
+      }
+
+      if (forceDownload) {
+        const live = await fetchYahooHistoriesInBrowser(
+          TICKERS.map((ticker) => ticker.symbol),
+        );
+        nextHistories = mergeHistories(nextHistories, live.histories);
+        refreshWarnings = live.errors;
       }
 
       const payload = buildDashboard(nextHistories, TICKERS, strategy);
+      if (refreshWarnings.length) {
+        payload.warning =
+          `一部銘柄の最新価格を取得できませんでした（${refreshWarnings.length}件）。` +
+          "取得済みの価格で計算しています。";
+      }
+      setHistories(nextHistories);
       setData(payload);
       setConfig(strategy);
       window.localStorage.setItem(
@@ -1455,6 +1496,14 @@ export function MomentumApp({
             />
           ) : null}
           {view === "backtest" ? <BacktestView data={data} /> : null}
+          {view === "comparison" ? (
+            <ComparisonView
+              data={data}
+              histories={histories}
+              loading={loading}
+              onLoadData={() => void refresh(config, true)}
+            />
+          ) : null}
           {view === "settings" ? (
             <SettingsView
               config={config}
