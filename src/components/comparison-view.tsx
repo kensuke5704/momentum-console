@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { TICKERS } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
+import { MaintenancePanel } from "@/components/maintenance-panel";
 import type {
   DashboardPayload,
   PricePoint,
@@ -414,6 +415,8 @@ export function ComparisonView({
           {data.config.backtestStart.replaceAll("-", ".")} - 最新
         </div>
       </div>
+
+      <MaintenancePanel data={data} />
 
       <section className="comparison-builder">
         <div className="universe-panel">
