@@ -11,6 +11,10 @@ function doGet(event) {
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (String(event.parameter.mode || "") === "trending") {
+    return fetchTrending_(callback);
+  }
+
   const symbols = String(event.parameter.symbols || "")
     .split(",")
     .map((value) => value.trim().toUpperCase())
@@ -86,6 +90,99 @@ function doGet(event) {
               : `${symbol}: market data request failed`,
         },
       },
+    });
+  }
+}
+
+function fetchTrending_(callback) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = "yahoo-trending-us-v1";
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return jsonpTextResponse_(callback, cached);
+  }
+
+  const screeners = [
+    { id: "most_actives", source: "active" },
+    { id: "day_gainers", source: "gainer" },
+  ];
+  const requests = screeners.map((item) => ({
+    url:
+      "https://query2.finance.yahoo.com/v1/finance/screener/predefined/saved" +
+      `?formatted=false&scrIds=${item.id}&count=25`,
+    method: "get",
+    muteHttpExceptions: true,
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "Mozilla/5.0 MomentumConsole/1.0",
+    },
+  }));
+
+  try {
+    const responses = UrlFetchApp.fetchAll(requests);
+    const lists = { active: [], gainer: [] };
+    const errors = [];
+
+    responses.forEach((response, index) => {
+      const source = screeners[index].source;
+      const status = response.getResponseCode();
+      if (status < 200 || status >= 300) {
+        errors.push(`${screeners[index].id}: Yahoo Finance request failed (${status})`);
+        return;
+      }
+
+      try {
+        const body = JSON.parse(response.getContentText());
+        const result =
+          body.finance &&
+          body.finance.result &&
+          body.finance.result[0];
+        const quotes = (result && result.quotes) || [];
+        lists[source] = quotes
+          .filter((quote) =>
+            quote &&
+            quote.quoteType === "EQUITY" &&
+            typeof quote.symbol === "string" &&
+            typeof quote.regularMarketPrice === "number",
+          )
+          .map((quote) => ({
+            symbol: quote.symbol,
+            name: quote.shortName || quote.longName || quote.symbol,
+            price: quote.regularMarketPrice,
+            changePercent:
+              typeof quote.regularMarketChangePercent === "number"
+                ? quote.regularMarketChangePercent
+                : 0,
+            volume:
+              typeof quote.regularMarketVolume === "number"
+                ? quote.regularMarketVolume
+                : 0,
+            averageVolume:
+              typeof quote.averageDailyVolume3Month === "number"
+                ? quote.averageDailyVolume3Month
+                : 0,
+            marketState: quote.marketState || "CLOSED",
+            sources: [source],
+          }));
+      } catch (error) {
+        errors.push(`${screeners[index].id}: invalid Yahoo Finance response`);
+      }
+    });
+
+    const result = JSON.stringify({
+      asOf: new Date().toISOString(),
+      active: lists.active,
+      gainers: lists.gainer,
+      errors,
+    });
+    cache.put(cacheKey, result, 180);
+    return jsonpTextResponse_(callback, result);
+  } catch (error) {
+    return jsonpResponse_(callback, {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Yahoo Finance trending request failed",
     });
   }
 }

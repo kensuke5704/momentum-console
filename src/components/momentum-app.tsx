@@ -9,6 +9,7 @@ import {
   GearSixIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
+  BinocularsIcon,
   ScalesIcon,
   SlidersHorizontalIcon,
   TargetIcon,
@@ -43,6 +44,7 @@ import {
 import { TICKERS } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
 import { ComparisonView } from "@/components/comparison-view";
+import { ResearchView } from "@/components/research-view";
 import { fetchYahooHistoriesInBrowser } from "@/lib/yahoo-client";
 import type {
   BacktestRow,
@@ -56,6 +58,7 @@ type View =
   | "screener"
   | "portfolio"
   | "backtest"
+  | "research"
   | "comparison"
   | "settings";
 type HoldingMap = Record<string, number>;
@@ -91,6 +94,7 @@ const views: Array<{
   { id: "screener", label: "銘柄分析", icon: ListChecksIcon },
   { id: "portfolio", label: "ポートフォリオ", icon: WalletIcon },
   { id: "backtest", label: "バックテスト", icon: TargetIcon },
+  { id: "research", label: "調査", icon: BinocularsIcon },
   { id: "comparison", label: "候補比較", icon: ScalesIcon },
   { id: "settings", label: "戦略設定", icon: GearSixIcon },
 ];
@@ -1423,6 +1427,7 @@ export function MomentumApp({
             />
           ) : null}
           {view === "backtest" ? <BacktestView data={data} /> : null}
+          {view === "research" ? <ResearchView data={data} /> : null}
           {view === "comparison" ? (
             <ComparisonView
               data={data}
