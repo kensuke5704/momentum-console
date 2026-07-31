@@ -9,7 +9,7 @@ import {
   TrashIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -136,11 +136,25 @@ export function ComparisonView({
   const [scenario, setScenario] = useState<DashboardPayload | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const resultsRef = useRef<HTMLElement>(null);
+  const revealResultsRef = useRef(false);
 
   useEffect(() => {
     setIncludedSymbols(initialUniverse);
     setScenario(null);
   }, [initialUniverse]);
+
+  useEffect(() => {
+    if (!scenario || !revealResultsRef.current || !resultsRef.current) return;
+    revealResultsRef.current = false;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    resultsRef.current.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [scenario]);
 
   const filteredTickers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -244,16 +258,14 @@ export function ComparisonView({
   }
 
   function toggleTicker(symbol: string) {
-    setIncludedSymbols((current) => {
-      const next = new Set(current);
-      if (next.has(symbol)) {
-        next.delete(symbol);
-      } else {
-        next.add(symbol);
-      }
-      return next;
-    });
-    markDirty();
+    const next = new Set(includedSymbols);
+    if (next.has(symbol)) {
+      next.delete(symbol);
+    } else {
+      next.add(symbol);
+    }
+    setIncludedSymbols(next);
+    runComparison(next, true);
   }
 
   async function loadCustomTicker(symbol: string) {
@@ -339,7 +351,10 @@ export function ComparisonView({
     markDirty();
   }
 
-  function runComparison() {
+  function runComparison(
+    comparisonUniverse = includedSymbols,
+    revealResults = false,
+  ) {
     setMessage(null);
     if (!histories) {
       setMessage("比較には価格履歴の読み込みが必要です。");
@@ -356,7 +371,7 @@ export function ComparisonView({
         ...TICKERS.filter(
           (ticker) =>
             ticker.symbol === "QQQ" ||
-            includedSymbols.has(ticker.symbol),
+            comparisonUniverse.has(ticker.symbol),
         ),
         ...readyCustomTickers.map((ticker) => ({
           symbol: ticker.symbol,
@@ -380,6 +395,7 @@ export function ComparisonView({
           excludedTickers: [],
         },
       );
+      revealResultsRef.current = revealResults;
       setScenario(next);
       setMessage("変更後のバックテストを計算しました。");
     } catch (error) {
@@ -416,7 +432,11 @@ export function ComparisonView({
         </div>
       </div>
 
-      <MaintenancePanel data={data} />
+      <MaintenancePanel
+        data={data}
+        includedSymbols={includedSymbols}
+        onToggle={toggleTicker}
+      />
 
       <section className="comparison-builder">
         <div className="universe-panel">
@@ -612,7 +632,7 @@ export function ComparisonView({
           <button
             type="button"
             className="primary-button full-width compare-run-button"
-            onClick={runComparison}
+            onClick={() => runComparison()}
             disabled={running || loading || hasUnresolvedCustom || !histories}
           >
             <ScalesIcon />
@@ -643,7 +663,7 @@ export function ComparisonView({
 
       {scenario && scenarioStats ? (
         <>
-          <section>
+          <section ref={resultsRef}>
             <div className="section-heading">
               <div>
                 <h2>結果の差</h2>

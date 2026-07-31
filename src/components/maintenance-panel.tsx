@@ -1,6 +1,14 @@
 import type { DashboardPayload } from "@/lib/types";
 
-export function MaintenancePanel({ data }: { data: DashboardPayload }) {
+export function MaintenancePanel({
+  data,
+  includedSymbols,
+  onToggle,
+}: {
+  data: DashboardPayload;
+  includedSymbols: ReadonlySet<string>;
+  onToggle: (symbol: string) => void;
+}) {
   const recentRows = data.backtest.rows.slice(-24);
   const candidates = data.momentum
     .filter((row) => !row.selected)
@@ -46,8 +54,20 @@ export function MaintenancePanel({ data }: { data: DashboardPayload }) {
         </div>
       </div>
       <div className="maintenance-grid">
-        {candidates.map((row) => (
-          <article key={row.symbol}>
+        {candidates.map((row) => {
+          const isIncluded = includedSymbols.has(row.symbol);
+          return (
+          <article
+            className={isIncluded ? "is-included" : "is-excluded"}
+            key={row.symbol}
+          >
+            <button
+              type="button"
+              className="maintenance-card-button"
+              aria-label={`${row.symbol}を${isIncluded ? "外して" : "入れて"}比較`}
+              aria-pressed={!isIncluded}
+              onClick={() => onToggle(row.symbol)}
+            />
             <div>
               <strong>{row.symbol}</strong>
               <span>{row.genre}</span>
@@ -65,8 +85,12 @@ export function MaintenancePanel({ data }: { data: DashboardPayload }) {
             <span className={`review-tag priority-${row.priority}`}>
               {row.judge}
             </span>
+            <small className="maintenance-card-hint">
+              クリックで{isIncluded ? "除外" : "追加"}して比較
+            </small>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

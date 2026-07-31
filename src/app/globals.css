@@ -978,6 +978,44 @@ tbody tr.selected-row {
   border-top: 1px solid var(--line);
   min-width: 0;
   padding: 17px 18px 17px 0;
+  position: relative;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.maintenance-grid article:hover {
+  background: var(--surface-2);
+}
+
+.maintenance-grid article:active {
+  transform: translateY(1px);
+}
+
+.maintenance-grid article.is-excluded {
+  background: var(--accent-soft);
+}
+
+.maintenance-card-button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  inset: 0;
+  position: absolute;
+  z-index: 1;
+}
+
+.maintenance-card-button:focus-visible {
+  border-radius: calc(var(--radius-card) / 2);
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.maintenance-card-hint {
+  color: var(--text-muted);
+  display: block;
+  font-size: 9px;
+  margin-top: 9px;
 }
 
 .maintenance-grid article:nth-child(4n) {
