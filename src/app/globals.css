@@ -3776,6 +3776,61 @@ tbody tr:hover {
   background: #f0f3ed;
 }
 
+/* Keep focus treatment inside the exact control boundary. */
+.input-wrap input:focus-visible,
+.input-wrap select:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.inline-number input:focus-visible,
+.new-symbol-field input:focus-visible,
+.comparison-search:focus-visible,
+.custom-ticker-input input:focus-visible,
+.search-field input:focus-visible,
+.select-field select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  outline: none;
+}
+
+.input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.input-wrap.readonly:focus-within {
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+/* Separate table content and supporting copy so neither touches a row rule. */
+.fine-print {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+  line-height: 1.55;
+  margin: 0;
+  padding: 14px 18px 16px;
+  position: relative;
+}
+
+/* Center the maintenance title and description within their header frame. */
+.maintenance-panel > .section-heading.compact {
+  align-items: center;
+  min-height: 64px;
+}
+
+.maintenance-panel > .section-heading > div {
+  align-items: center;
+}
+
+.maintenance-panel > .section-heading h2,
+.maintenance-panel > .section-heading p {
+  line-height: 1.4;
+  margin-block: 0;
+}
+
 @media (max-width: 1180px) {
   :root {
     --sidebar-width: 230px;
