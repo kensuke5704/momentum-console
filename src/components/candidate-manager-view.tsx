@@ -217,12 +217,14 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
             </div>
           </div>
 
-          <label className="custom-ticker-input">
+          <label className="new-symbol-field">
             <span>銘柄コード</span>
             <div>
               <input
                 value={newSymbol}
-                onChange={(event) => setNewSymbol(event.target.value)}
+                onChange={(event) =>
+                  setNewSymbol(normalizeSymbol(event.target.value))
+                }
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -242,6 +244,7 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
                 追加
               </button>
             </div>
+            <small>入力した銘柄コードはこのブラウザに保存されます。</small>
           </label>
 
           {message ? <p className="comparison-message">{message}</p> : null}
