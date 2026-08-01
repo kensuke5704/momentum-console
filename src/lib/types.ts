@@ -25,7 +25,7 @@ export type StrategyConfig = {
   frontierGenres: string[];
   excludedTickers: string[];
   backtestStart: string;
-  targetAmountUsd: number;
+  targetTotalJpy: number;
   usdJpy: number;
 };
 

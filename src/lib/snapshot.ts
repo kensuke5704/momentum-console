@@ -1,4 +1,4 @@
-import { DEFAULT_STRATEGY } from "./config";
+import { DEFAULT_STRATEGY, getTargetAmountUsd } from "./config";
 import type {
   BacktestRow,
   DashboardPayload,
@@ -75,10 +75,10 @@ const portfolio: PortfolioRow[] = momentum
   .sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999))
   .map((row) => ({
     ...row,
-    targetAmount: DEFAULT_STRATEGY.targetAmountUsd,
+    targetAmount: getTargetAmountUsd(DEFAULT_STRATEGY),
     targetShares:
       row.current && row.current > 0
-        ? DEFAULT_STRATEGY.targetAmountUsd / row.current
+        ? getTargetAmountUsd(DEFAULT_STRATEGY) / row.current
         : null,
   }));
 

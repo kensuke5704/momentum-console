@@ -2494,6 +2494,20 @@ tbody tr.selected-row {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+.input-wrap.readonly {
+  background: var(--surface-3);
+}
+
+.input-wrap.readonly:focus-within {
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.input-wrap.readonly input {
+  color: var(--text-soft);
+  cursor: default;
+}
+
 .input-wrap input {
   background: transparent;
   border: 0;

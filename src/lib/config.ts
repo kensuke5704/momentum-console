@@ -59,6 +59,52 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   frontierGenres: ["Quantum", "Space", "Nuclear", "Crypto"],
   excludedTickers: [],
   backtestStart: "2023-01-01",
-  targetAmountUsd: 650,
+  targetTotalJpy: 1000000,
   usdJpy: 163.6375,
 };
+
+type LegacyStrategyConfig = Partial<StrategyConfig> & {
+  targetAmountUsd?: number;
+};
+
+export function normalizeStrategyConfig(
+  value: LegacyStrategyConfig,
+): StrategyConfig {
+  const {
+    targetAmountUsd: legacyTargetAmountUsd,
+    weights,
+    genreLimits,
+    ...current
+  } = value;
+  const topN =
+    typeof current.topN === "number" && current.topN > 0
+      ? current.topN
+      : DEFAULT_STRATEGY.topN;
+  const usdJpy =
+    typeof current.usdJpy === "number" && current.usdJpy > 0
+      ? current.usdJpy
+      : DEFAULT_STRATEGY.usdJpy;
+  const legacyTotal =
+    typeof legacyTargetAmountUsd === "number" && legacyTargetAmountUsd > 0
+      ? legacyTargetAmountUsd * usdJpy * topN
+      : undefined;
+
+  return {
+    ...DEFAULT_STRATEGY,
+    ...current,
+    topN,
+    usdJpy,
+    targetTotalJpy:
+      typeof current.targetTotalJpy === "number" &&
+      current.targetTotalJpy > 0
+        ? current.targetTotalJpy
+        : legacyTotal ?? DEFAULT_STRATEGY.targetTotalJpy,
+    weights: { ...DEFAULT_STRATEGY.weights, ...weights },
+    genreLimits: { ...DEFAULT_STRATEGY.genreLimits, ...genreLimits },
+  };
+}
+
+export function getTargetAmountUsd(config: StrategyConfig) {
+  if (config.topN <= 0 || config.usdJpy <= 0) return 0;
+  return config.targetTotalJpy / config.usdJpy / config.topN;
+}

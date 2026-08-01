@@ -41,7 +41,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { TICKERS } from "@/lib/config";
+import {
+  getTargetAmountUsd,
+  normalizeStrategyConfig,
+  TICKERS,
+} from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
 import { ComparisonView } from "@/components/comparison-view";
 import { ResearchView } from "@/components/research-view";
@@ -80,9 +84,9 @@ function withLatestUsdJpy(
 ) {
   const latest = priceHistories[USD_JPY_SYMBOL]?.at(-1)?.close;
   if (typeof latest !== "number" || !Number.isFinite(latest) || latest <= 0) {
-    return strategy;
+    return normalizeStrategyConfig(strategy);
   }
-  return { ...strategy, usdJpy: latest };
+  return normalizeStrategyConfig({ ...strategy, usdJpy: latest });
 }
 
 function mergeHistories(
@@ -1013,6 +1017,7 @@ function SettingsView({
     draft.weights.threeMonth +
     draft.weights.sixMonth;
   const isValid = Math.abs(weightTotal - 1) < 0.001;
+  const derivedTargetAmountUsd = getTargetAmountUsd(draft);
 
   return (
     <div className="view-stack">
@@ -1192,24 +1197,36 @@ function SettingsView({
             <WalletIcon size={22} />
             <div>
               <h2>配分と換算</h2>
-              <p>1銘柄の目標額と参考為替</p>
+              <p>合計の円建て目標額から1銘柄のドル額を自動算出</p>
             </div>
           </div>
           <div className="form-grid three">
             <NumberField
-              label="1銘柄の目標額"
-              value={draft.targetAmountUsd}
-              step={50}
-              min={1}
-              max={1000000}
-              prefix="$"
+              label="合計の目標額"
+              value={draft.targetTotalJpy}
+              step={10000}
+              min={10000}
+              max={1000000000}
+              prefix="¥"
               onChange={(value) =>
                 setDraft((current) => ({
                   ...current,
-                  targetAmountUsd: value,
+                  targetTotalJpy: value,
                 }))
               }
             />
+            <label className="field">
+              <span>1銘柄の目標額（自動）</span>
+              <div className="input-wrap readonly">
+                <i>$</i>
+                <input
+                  type="text"
+                  value={decimal.format(derivedTargetAmountUsd)}
+                  readOnly
+                  aria-label="1銘柄のドル建て目標額"
+                />
+              </div>
+            </label>
             <NumberField
               label="USD / JPY"
               value={draft.usdJpy}
@@ -1308,7 +1325,7 @@ export function MomentumApp({
   const [view, setView] = useState<View>("overview");
   const [data, setData] = useState<DashboardPayload>(initialDashboard);
   const [config, setConfig] = useState<StrategyConfig>(
-    initialDashboard.config,
+    normalizeStrategyConfig(initialDashboard.config),
   );
   const [holdings, setHoldings] = useState<HoldingMap>({});
   const [histories, setHistories] = useState<Record<string, PricePoint[]> | null>(
@@ -1335,6 +1352,7 @@ export function MomentumApp({
   ) => {
     setLoading(true);
     try {
+      const normalizedStrategy = normalizeStrategyConfig(strategy);
       let nextHistories = histories;
       let refreshWarnings: string[] = [];
       if (!nextHistories || forceDownload) {
@@ -1356,7 +1374,10 @@ export function MomentumApp({
         refreshWarnings = live.errors;
       }
 
-      const nextStrategy = withLatestUsdJpy(strategy, nextHistories);
+      const nextStrategy = withLatestUsdJpy(
+        normalizedStrategy,
+        nextHistories,
+      );
       const payload = buildDashboard(nextHistories, TICKERS, nextStrategy);
       if (refreshWarnings.length) {
         payload.warning =
@@ -1400,14 +1421,29 @@ export function MomentumApp({
           : current,
       );
       setConfig((current) => {
-        const next = { ...current, usdJpy: latest };
+        const next = normalizeStrategyConfig({ ...current, usdJpy: latest });
         window.localStorage.setItem("momentum-strategy", JSON.stringify(next));
         return next;
       });
-      setData((current) => ({
-        ...current,
-        config: { ...current.config, usdJpy: latest },
-      }));
+      setData((current) => {
+        const nextConfig = normalizeStrategyConfig({
+          ...current.config,
+          usdJpy: latest,
+        });
+        const targetAmount = getTargetAmountUsd(nextConfig);
+        return {
+          ...current,
+          config: nextConfig,
+          portfolio: current.portfolio.map((row) => ({
+            ...row,
+            targetAmount,
+            targetShares:
+              row.current && row.current > 0
+                ? targetAmount / row.current
+                : null,
+          })),
+        };
+      });
     } catch {
       // Keep the most recently acquired rate when a periodic refresh fails.
     }
@@ -1420,7 +1456,9 @@ export function MomentumApp({
     const savedConfig = window.localStorage.getItem("momentum-strategy");
     if (savedConfig) {
       try {
-        const parsed = JSON.parse(savedConfig) as StrategyConfig;
+        const parsed = normalizeStrategyConfig(
+          JSON.parse(savedConfig) as StrategyConfig,
+        );
         setConfig(parsed);
         void refresh(parsed);
         return;

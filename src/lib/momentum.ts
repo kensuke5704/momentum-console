@@ -9,6 +9,7 @@ import type {
   StrategyConfig,
   TickerConfig,
 } from "./types";
+import { getTargetAmountUsd } from "./config";
 
 type MonthPoint = {
   key: string;
@@ -406,14 +407,15 @@ export function buildDashboard(
     })
     .sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999));
 
+  const targetAmountUsd = getTargetAmountUsd(config);
   const portfolio: PortfolioRow[] = momentum
     .filter((row) => row.selected)
     .map((row) => ({
       ...row,
-      targetAmount: config.targetAmountUsd,
+      targetAmount: targetAmountUsd,
       targetShares:
         row.current && row.current > 0
-          ? config.targetAmountUsd / row.current
+          ? targetAmountUsd / row.current
           : null,
     }));
 
