@@ -37,6 +37,7 @@ import {
   useState,
 } from "react";
 import {
+  DEFAULT_STRATEGY,
   getTargetAmountUsd,
   normalizeStrategyConfig,
   TICKERS,
@@ -70,6 +71,9 @@ type MarketDataFile = {
 
 const USD_JPY_SYMBOL = "JPY=X";
 const USD_JPY_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+const STRATEGY_STORAGE_KEY = "momentum-strategy";
+const STRATEGY_STORAGE_VERSION_KEY = "momentum-strategy-version";
+const STRATEGY_STORAGE_VERSION = "2026-08-universe-limits-v1";
 
 function withLatestUsdJpy(
   strategy: StrategyConfig,
@@ -1109,7 +1113,7 @@ function SettingsView({
             </div>
           </div>
           <div className="form-grid three">
-            {["Quantum", "AI Semi", "Space"].map((genre) => (
+            {Object.keys(DEFAULT_STRATEGY.genreLimits).map((genre) => (
               <NumberField
                 key={genre}
                 label={`${genre} 上限`}
@@ -1416,7 +1420,7 @@ export function MomentumApp({
       setData(payload);
       setConfig(nextStrategy);
       window.localStorage.setItem(
-        "momentum-strategy",
+        STRATEGY_STORAGE_KEY,
         JSON.stringify(nextStrategy),
       );
     } catch (error) {
@@ -1450,7 +1454,7 @@ export function MomentumApp({
       );
       setConfig((current) => {
         const next = normalizeStrategyConfig({ ...current, usdJpy: latest });
-        window.localStorage.setItem("momentum-strategy", JSON.stringify(next));
+        window.localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(next));
         return next;
       });
       setData((current) => {
@@ -1481,19 +1485,42 @@ export function MomentumApp({
     if (didInitialLoad.current) return;
     didInitialLoad.current = true;
 
-    const savedConfig = window.localStorage.getItem("momentum-strategy");
+    const savedConfig = window.localStorage.getItem(STRATEGY_STORAGE_KEY);
     if (savedConfig) {
       try {
+        const savedVersion = window.localStorage.getItem(
+          STRATEGY_STORAGE_VERSION_KEY,
+        );
+        const stored = JSON.parse(savedConfig) as StrategyConfig;
         const parsed = normalizeStrategyConfig(
-          JSON.parse(savedConfig) as StrategyConfig,
+          savedVersion === STRATEGY_STORAGE_VERSION
+            ? stored
+            : {
+                ...stored,
+                frontierMax: DEFAULT_STRATEGY.frontierMax,
+                genreLimits: { ...DEFAULT_STRATEGY.genreLimits },
+              },
+        );
+        window.localStorage.setItem(
+          STRATEGY_STORAGE_KEY,
+          JSON.stringify(parsed),
+        );
+        window.localStorage.setItem(
+          STRATEGY_STORAGE_VERSION_KEY,
+          STRATEGY_STORAGE_VERSION,
         );
         setConfig(parsed);
         void refresh(parsed);
         return;
       } catch {
-        window.localStorage.removeItem("momentum-strategy");
+        window.localStorage.removeItem(STRATEGY_STORAGE_KEY);
+        window.localStorage.removeItem(STRATEGY_STORAGE_VERSION_KEY);
       }
     }
+    window.localStorage.setItem(
+      STRATEGY_STORAGE_VERSION_KEY,
+      STRATEGY_STORAGE_VERSION,
+    );
     void refresh(initialDashboard.config);
   }, [initialDashboard.config, refresh]);
 
