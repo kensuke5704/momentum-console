@@ -12,15 +12,11 @@ import {
   ScalesIcon,
   SlidersHorizontalIcon,
   TargetIcon,
-  TrendDownIcon,
-  TrendUpIcon,
   WarningCircleIcon,
   WalletIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   Cell,
@@ -250,32 +246,23 @@ function Overview({
       ) : null}
 
       <section className="market-panel">
+        <div className="decision-strip">
+          <span>現在の配分判定</span>
+          <strong>{allocationLabel}</strong>
+          <p>
+            {insufficient
+              ? `QQQはRiskOnですが、採用候補が${decimal.format(data.market.selectedCount)}/${decimal.format(data.config.topN)}銘柄のため、ルールにより全額現金です。`
+              : data.market.state === "RiskOn"
+                ? "QQQは10か月移動平均を上回っています。選定銘柄への配分シグナルです。"
+                : "QQQは10か月移動平均以下です。新規配分を停止するシグナルです。"}
+          </p>
+          <span className="decision-date">
+            判定基準日: {compactDate(data.market.decisionDate)}（確定月末）
+          </span>
+        </div>
+
         <div className="market-copy">
-          <div className="section-label">現在の配分判定</div>
-          <div className="market-state-row">
-            <div
-              className={`market-icon ${allocationIsCash ? "cash" : "risk-on"}`}
-            >
-              {allocationIsCash ? (
-                <TrendDownIcon weight="bold" />
-              ) : (
-                <TrendUpIcon weight="bold" />
-              )}
-            </div>
-            <div>
-              <h1>{allocationLabel}</h1>
-              <p>
-                {insufficient
-                  ? `QQQはRiskOnですが、採用候補が${decimal.format(data.market.selectedCount)}/${decimal.format(data.config.topN)}銘柄のため、ルールにより全額現金です。`
-                  : data.market.state === "RiskOn"
-                    ? "QQQは10か月移動平均を上回っています。選定銘柄への配分シグナルです。"
-                    : "QQQは10か月移動平均以下です。新規配分を停止するシグナルです。"}
-              </p>
-              <p className="decision-date">
-                判定基準日 {compactDate(data.market.decisionDate)}（確定月末）
-              </p>
-            </div>
-          </div>
+          <div className="section-label">EVIDENCE</div>
           <div className="market-values">
             <Metric
               label="QQQ"
@@ -339,7 +326,7 @@ function Overview({
       </section>
 
       {!allocationIsCash ? (
-        <section>
+        <section className="pick-section">
           <div className="section-heading">
             <div>
               <h2>
@@ -358,6 +345,15 @@ function Overview({
               <ArrowUpIcon className="arrow-right" />
             </button>
           </div>
+          <div className="pick-table-head" aria-hidden="true">
+            <span>RANK</span>
+            <span>TICKER / THEME</span>
+            <span>現在値</span>
+            <span>1M</span>
+            <span>3M</span>
+            <span>6M</span>
+            <span>SCORE</span>
+          </div>
           <div className="pick-grid">
             {data.portfolio.map((row, index) => (
               <article className="pick-row" key={row.symbol}>
@@ -367,13 +363,20 @@ function Overview({
                   <span>{row.genre}</span>
                 </div>
                 <div className="pick-price">
-                  <span>現在値</span>
                   <strong>
                     {row.current === null ? "N/A" : `$${decimal.format(row.current)}`}
                   </strong>
                 </div>
+                <span className={(row.oneMonth ?? 0) < 0 ? "negative" : ""}>
+                  {percent(row.oneMonth)}
+                </span>
+                <span className={(row.threeMonth ?? 0) < 0 ? "negative" : ""}>
+                  {percent(row.threeMonth)}
+                </span>
+                <span className={(row.sixMonth ?? 0) < 0 ? "negative" : ""}>
+                  {percent(row.sixMonth)}
+                </span>
                 <div className="pick-score">
-                  <span>Score</span>
                   <ScoreChange value={row.score} />
                 </div>
               </article>
@@ -858,13 +861,7 @@ function BacktestView({ data }: { data: DashboardPayload }) {
         </div>
         <div className="large-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <defs>
-                <linearGradient id="equityFill" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <LineChart data={chartData}>
               <CartesianGrid
                 vertical={false}
                 stroke="var(--line)"
@@ -885,15 +882,15 @@ function BacktestView({ data }: { data: DashboardPayload }) {
                 tickFormatter={(value) => decimal.format(Number(value))}
               />
               <Tooltip content={<EquityTooltip />} />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="equity"
                 stroke="var(--accent)"
-                strokeWidth={2.5}
-                fill="url(#equityFill)"
+                strokeWidth={2}
+                dot={false}
                 isAnimationActive={false}
               />
-            </AreaChart>
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </section>
@@ -1530,12 +1527,9 @@ export function MomentumApp({
     <div className="app-shell">
       <aside className={`sidebar ${mobileNavOpen ? "open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">
-            <ChartLineUpIcon weight="bold" />
-          </div>
-          <div>
-            <strong>Momentum</strong>
-            <span>Console</span>
+          <div className="brand-terminal">
+            <strong>MOMENTUM CONSOLE</strong>
+            <span>OPERATIONAL TERMINAL</span>
           </div>
         </div>
         <nav aria-label="メインナビゲーション">
@@ -1577,9 +1571,9 @@ export function MomentumApp({
           >
             <SlidersHorizontalIcon />
           </button>
-          <div>
-            <span>Momentum Console</span>
-            <strong>{activeLabel}</strong>
+          <div className="terminal-meta">
+            <span>DATA: EOD {compactDate(data.asOf)}</span>
+            <span>USD/JPY: {decimal.format(config.usdJpy)}</span>
           </div>
           <div className="topbar-actions">
             <SourceBadge payload={data} />
@@ -1593,6 +1587,10 @@ export function MomentumApp({
             </button>
           </div>
         </header>
+
+        <div className="workspace-header">
+          <strong>{activeLabel}</strong>
+        </div>
 
         <div className="content">
           {view === "overview" ? (
