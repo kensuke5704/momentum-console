@@ -151,38 +151,53 @@ export async function fetchYahooHistoriesInBrowser(
   ].filter(Boolean);
   if (!normalizedSymbols.length) return { histories: {}, errors: [] };
 
-  let body: YahooBatchResponse | undefined;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      body = await loadJsonp<YahooBatchResponse>(
-        new URLSearchParams({ symbols: normalizedSymbols.join(",") }),
-        60000,
-        "Yahoo Financeから最新価格を取得できませんでした。",
-      );
-      break;
-    } catch (error) {
-      lastError = error;
-      if (attempt === 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, 750));
-      }
-    }
+  const chunks: string[][] = [];
+  for (let index = 0; index < normalizedSymbols.length; index += 10) {
+    chunks.push(normalizedSymbols.slice(index, index + 10));
   }
 
-  if (!body) {
+  async function loadChunk(chunk: string[]) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await loadJsonp<YahooBatchResponse>(
+          new URLSearchParams({ symbols: chunk.join(",") }),
+          60000,
+          "Yahoo Financeから最新価格を取得できませんでした。",
+        );
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, 750));
+        }
+      }
+    }
     throw lastError instanceof Error
       ? lastError
       : new Error("Yahoo Financeから最新価格を取得できませんでした。");
   }
-  if (body.error) throw new Error(body.error);
 
-  const histories = Object.fromEntries(
-    Object.entries(body.histories ?? {}).filter(([, points]) =>
-      Array.isArray(points) && points.length >= 12
-    ),
-  );
-  const errors = body.errors ?? [];
+  const results = await Promise.allSettled(chunks.map(loadChunk));
+  const histories: Record<string, PricePoint[]> = {};
+  const errors: string[] = [];
+  results.forEach((result) => {
+    if (result.status === "rejected") {
+      errors.push(
+        result.reason instanceof Error
+          ? result.reason.message
+          : "一部銘柄の取得に失敗しました。",
+      );
+      return;
+    }
+    if (result.value.error) errors.push(result.value.error);
+    errors.push(...(result.value.errors ?? []));
+    Object.entries(result.value.histories ?? {}).forEach(([symbol, points]) => {
+      if (Array.isArray(points) && points.length >= 12) {
+        histories[symbol] = points;
+      }
+    });
+  });
+
   if (!Object.keys(histories).length) {
     throw new Error(
       errors[0] ?? "Yahoo Financeから価格履歴を取得できませんでした。",
