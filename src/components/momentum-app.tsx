@@ -686,7 +686,11 @@ function PortfolioView({
           </>
         ) : (
           <>
-            <Metric label="目標総額" value={`$${money.format(targetTotal)}`} />
+            <Metric
+              label="目標総額"
+              value={`$${money.format(targetTotal)}`}
+              detail={`¥${money.format(targetTotal * data.config.usdJpy)}`}
+            />
             <Metric
               label="現在評価額"
               value={`$${money.format(actualTotal)}`}
@@ -695,6 +699,7 @@ function PortfolioView({
             <Metric
               label="調整差額"
               value={`${difference >= 0 ? "+" : ""}$${money.format(difference)}`}
+              detail={`${difference >= 0 ? "+" : ""}¥${money.format(difference * data.config.usdJpy)}`}
               tone={difference >= 0 ? "positive" : "negative"}
             />
             <Metric
