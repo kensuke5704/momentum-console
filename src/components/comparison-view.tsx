@@ -433,12 +433,7 @@ export function ComparisonView({
 
   return (
     <div className="view-stack comparison-view">
-      <div className="page-intro">
-        <div>
-          <p>
-            候補ユニバースだけを変更し、現在の戦略設定と同じ条件で結果を比較します。
-          </p>
-        </div>
+      <div className="page-meta-row">
         <div className="date-range">
           {data.config.backtestStart.replaceAll("-", ".")} - 最新
         </div>

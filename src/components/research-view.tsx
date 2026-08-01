@@ -212,10 +212,7 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
 
   return (
     <div className="view-stack research-view">
-      <div className="page-intro">
-        <div>
-          <p>米国市場の売買活況と急上昇から、話題銘柄を抽出します。</p>
-        </div>
+      <div className="page-meta-row">
         <div className="research-live-meta">
           <span>{active[0] ? marketStatus(active[0].marketState) : "市場データ"}</span>
           <strong>{formattedAsOf}</strong>

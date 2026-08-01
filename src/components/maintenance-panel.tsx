@@ -64,7 +64,7 @@ export function MaintenancePanel({
             <button
               type="button"
               className="maintenance-card-button"
-              aria-label={`${row.symbol}を${isIncluded ? "外して" : "入れて"}比較`}
+              aria-label={`${row.symbol}を候補から${isIncluded ? "外す" : "戻す"}`}
               aria-pressed={!isIncluded}
               onClick={() => onToggle(row.symbol)}
             />
@@ -86,7 +86,7 @@ export function MaintenancePanel({
               {row.judge}
             </span>
             <small className="maintenance-card-hint">
-              クリックで{isIncluded ? "除外" : "追加"}して比較
+              クリックで候補から{isIncluded ? "除外" : "復帰"}
             </small>
           </article>
           );

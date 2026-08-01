@@ -533,8 +533,7 @@ main {
   font-size: 12px;
 }
 
-.section-heading,
-.page-intro {
+.section-heading {
   align-items: flex-end;
   display: flex;
   justify-content: space-between;
@@ -552,7 +551,6 @@ main {
 }
 
 .section-heading p,
-.page-intro p,
 .setting-heading p {
   color: var(--text-muted);
   margin: 5px 0 0;
@@ -718,13 +716,11 @@ main {
   font-size: 20px;
 }
 
-.page-intro {
-  padding: 8px 0 2px;
-}
-
-.page-intro p {
-  font-size: 14px;
-  margin-top: 0;
+.page-meta-row {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -22px;
 }
 
 .summary-count {
@@ -2851,13 +2847,11 @@ tbody tr.selected-row {
     min-height: 190px;
   }
 
-  .section-heading,
-  .page-intro {
+  .section-heading {
     align-items: flex-start;
   }
 
-  .section-heading p,
-  .page-intro p {
+  .section-heading p {
     max-width: 44ch;
   }
 

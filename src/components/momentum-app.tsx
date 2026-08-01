@@ -9,7 +9,6 @@ import {
   GearSixIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
-  BinocularsIcon,
   ScalesIcon,
   SlidersHorizontalIcon,
   TargetIcon,
@@ -47,8 +46,7 @@ import {
   TICKERS,
 } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
-import { ComparisonView } from "@/components/comparison-view";
-import { ResearchView } from "@/components/research-view";
+import { CandidateManagerView } from "@/components/candidate-manager-view";
 import {
   fetchYahooHistoriesInBrowser,
   fetchYahooHistoryInBrowser,
@@ -65,7 +63,6 @@ type View =
   | "screener"
   | "portfolio"
   | "backtest"
-  | "research"
   | "comparison"
   | "settings";
 type HoldingMap = Record<string, number>;
@@ -115,8 +112,7 @@ const views: Array<{
   { id: "screener", label: "銘柄分析", icon: ListChecksIcon },
   { id: "portfolio", label: "ポートフォリオ", icon: WalletIcon },
   { id: "backtest", label: "バックテスト", icon: TargetIcon },
-  { id: "research", label: "調査", icon: BinocularsIcon },
-  { id: "comparison", label: "候補比較", icon: ScalesIcon },
+  { id: "comparison", label: "候補組み替え", icon: ScalesIcon },
   { id: "settings", label: "戦略設定", icon: GearSixIcon },
 ];
 
@@ -520,12 +516,7 @@ function Screener({ data }: { data: DashboardPayload }) {
 
   return (
     <div className="view-stack">
-      <div className="page-intro">
-        <div>
-          <p>
-            モメンタム、QQQ比較、テーマ制限を一つの表で確認できます。
-          </p>
-        </div>
+      <div className="page-meta-row">
         <div className="summary-count">
           <strong>{decimal.format(filtered.length)}</strong>
           <span>銘柄</span>
@@ -661,16 +652,6 @@ function PortfolioView({
 
   return (
     <div className="view-stack">
-      <div className="page-intro">
-        <div>
-          <p>
-            {allocationIsCash
-              ? "今月は全額現金です。新規の買付配分はありません。"
-              : "実際の保有株数を入力すると、目標配分との差額を自動計算します。"}
-          </p>
-        </div>
-      </div>
-
       <section className="portfolio-summary">
         {allocationIsCash ? (
           <>
@@ -834,12 +815,7 @@ function BacktestView({ data }: { data: DashboardPayload }) {
 
   return (
     <div className="view-stack">
-      <div className="page-intro">
-        <div>
-          <p>
-            月末シグナル後の翌営業日に約定し、翌月末の翌営業日に決済して検証します。
-          </p>
-        </div>
+      <div className="page-meta-row">
         <div className="date-range">
           {data.config.backtestStart.replaceAll("-", ".")} - 最新
         </div>
@@ -926,7 +902,9 @@ function BacktestView({ data }: { data: DashboardPayload }) {
         <div className="section-heading">
           <div>
             <h2>月次シグナル</h2>
-            <p>採用銘柄と実績リターン</p>
+            <p>
+              月末判定後の翌営業日に約定し、翌月末の翌営業日に決済
+            </p>
           </div>
           <button className="text-button" onClick={() => setShowAll(!showAll)}>
             {showAll ? "直近12か月" : "全期間を表示"}
@@ -1017,14 +995,6 @@ function SettingsView({
 
   return (
     <div className="view-stack">
-      <div className="page-intro">
-        <div>
-          <p>
-            Apps Script本番版の条件を初期値として移植しています。
-          </p>
-        </div>
-      </div>
-
       <form
         className="settings-grid"
         onSubmit={(event) => {
@@ -1637,14 +1607,8 @@ export function MomentumApp({
             />
           ) : null}
           {view === "backtest" ? <BacktestView data={data} /> : null}
-          {view === "research" ? <ResearchView data={data} /> : null}
           {view === "comparison" ? (
-            <ComparisonView
-              data={data}
-              histories={histories}
-              loading={loading}
-              onLoadData={() => void refresh(config, true)}
-            />
+            <CandidateManagerView data={data} />
           ) : null}
           {view === "settings" ? (
             <SettingsView
