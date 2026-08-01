@@ -3454,6 +3454,10 @@ main {
   padding: 9px 18px;
 }
 
+.performance-chart > .section-heading.compact {
+  align-items: center;
+}
+
 .section-heading > div {
   align-items: baseline;
   display: flex;
@@ -3691,6 +3695,20 @@ tbody tr:hover {
   background: var(--surface);
   border: 0;
   border-bottom: 1px solid var(--line-strong);
+}
+
+.portfolio-summary.invested {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .portfolio-summary.invested .metric:nth-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  .portfolio-summary.invested .metric:nth-child(2) {
+    border-right: 1px solid var(--line);
+  }
 }
 
 .portfolio-summary .metric,
@@ -3984,6 +4002,15 @@ tbody tr:hover {
   .market-copy {
     border-bottom: 1px solid var(--line-strong);
     border-right: 0;
+  }
+
+  .portfolio-summary.invested {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .portfolio-summary.invested .metric:last-child {
+    border-right: 0;
+    grid-column: 1 / -1;
   }
 
   .pick-table-head {

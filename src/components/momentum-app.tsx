@@ -658,7 +658,9 @@ function PortfolioView({
 
   return (
     <div className="view-stack">
-      <section className="portfolio-summary">
+      <section
+        className={`portfolio-summary${allocationIsCash ? "" : " invested"}`}
+      >
         {allocationIsCash ? (
           <>
             <Metric label="目標総額" value="$0" />
@@ -684,6 +686,7 @@ function PortfolioView({
             <Metric
               label="現在評価額"
               value={`$${money.format(actualTotal)}`}
+              detail={`¥${money.format(actualTotal * data.config.usdJpy)}`}
               tone={actualTotal > 0 ? "positive" : "neutral"}
             />
             <Metric
@@ -691,11 +694,6 @@ function PortfolioView({
               value={`${difference >= 0 ? "+" : ""}$${money.format(difference)}`}
               detail={`${difference >= 0 ? "+" : ""}¥${money.format(difference * data.config.usdJpy)}`}
               tone={difference >= 0 ? "positive" : "negative"}
-            />
-            <Metric
-              label="円換算"
-              value={`¥${money.format(actualTotal * data.config.usdJpy)}`}
-              detail={`USD/JPY ${decimal.format(data.config.usdJpy)}`}
             />
           </>
         )}
