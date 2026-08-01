@@ -1,3 +1,7 @@
+"use client";
+
+import { CheckIcon, CopySimpleIcon } from "@phosphor-icons/react";
+import { useState } from "react";
 import type { DashboardPayload } from "@/lib/types";
 
 export function MaintenancePanel({
@@ -9,6 +13,9 @@ export function MaintenancePanel({
   includedSymbols: ReadonlySet<string>;
   onToggle: (symbol: string) => void;
 }) {
+  const [copyStatus, setCopyStatus] = useState<
+    "idle" | "copied" | "error"
+  >("idle");
   const recentRows = data.backtest.rows.slice(-24);
   const candidates = data.momentum
     .filter((row) => !row.selected)
@@ -45,6 +52,38 @@ export function MaintenancePanel({
     )
     .slice(0, 8);
 
+  async function copyCandidates() {
+    const text = candidates.map((row) => row.symbol).join(", ");
+    if (!text) return;
+
+    try {
+      let copied = false;
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        } catch {
+          // Fall back to the selection-based copy below.
+        }
+      }
+      if (!copied) {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand("copy");
+        textarea.remove();
+        if (!copied) throw new Error("Clipboard copy failed");
+      }
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 2000);
+    } catch {
+      setCopyStatus("error");
+    }
+  }
+
   return (
     <section className="maintenance-panel">
       <div className="section-heading compact">
@@ -52,6 +91,19 @@ export function MaintenancePanel({
           <h2>整理候補</h2>
           <p>直近24か月の採用履歴と現在の適格判定から抽出</p>
         </div>
+        <button
+          type="button"
+          className="icon-text-button"
+          onClick={() => void copyCandidates()}
+          disabled={!candidates.length}
+        >
+          {copyStatus === "copied" ? <CheckIcon /> : <CopySimpleIcon />}
+          {copyStatus === "copied"
+            ? "コピーしました"
+            : copyStatus === "error"
+              ? "コピーを再試行"
+              : "銘柄をコピー"}
+        </button>
       </div>
       <div className="maintenance-grid">
         {candidates.map((row) => {
