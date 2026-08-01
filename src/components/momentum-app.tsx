@@ -837,7 +837,7 @@ function BacktestView({ data }: { data: DashboardPayload }) {
       <div className="page-intro">
         <div>
           <p>
-            月末シグナル、3日後の約定、翌月3日後の決済で検証します。
+            月末シグナル後の翌営業日に約定し、翌月末の翌営業日に決済して検証します。
           </p>
         </div>
         <div className="date-range">

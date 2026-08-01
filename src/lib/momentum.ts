@@ -68,6 +68,10 @@ function priceOnOrAfter(points: PricePoint[], date: string) {
   return points.find((point) => point.date >= date) ?? null;
 }
 
+function priceOnNextTradingDay(points: PricePoint[], signalDate: string) {
+  return priceOnOrAfter(points, addDays(signalDate, 1));
+}
+
 function mean(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
@@ -202,9 +206,9 @@ function buildAtIndex({
     let provisional = false;
 
     if (requireTradePrices) {
-      const entry = priceOnOrAfter(histories[symbol], addDays(signalDate, 3));
+      const entry = priceOnNextTradingDay(histories[symbol], signalDate);
       const exit = exitSignalDate
-        ? priceOnOrAfter(histories[symbol], addDays(exitSignalDate, 3))
+        ? priceOnNextTradingDay(histories[symbol], exitSignalDate)
         : null;
 
       if (!entry) continue;
