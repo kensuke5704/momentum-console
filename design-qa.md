@@ -8,7 +8,7 @@
 - source pixels: 1487 × 1058, normalized to 1435 × 1024 for comparison
 - implementation pixels: 1435 × 1024 at device scale factor 1
 - density normalization: source scaled to the implementation capture dimensions; no device frame or browser chrome included
-- state: desktop, light theme, overview tab, live July 2026 market data. The implementation intentionally shows `Cash` and omits the adopted-stock table because only 9 of the required 10 candidates currently qualify.
+- state: desktop, light theme, overview tab. When the latest stored prices stop before the expected U.S. market month-end, the implementation intentionally keeps the preceding confirmed month as the decision period.
 
 ## Findings
 
@@ -18,13 +18,13 @@ No actionable P0, P1, or P2 differences remain.
 - Spacing and layout rhythm: black command bar, fixed left navigation, sharp graphite dividers, two-column evidence/return region, compact decision strip, and dense chart modules match the target composition. No desktop overflow was found.
 - Colors and visual tokens: off-white workspace, near-black chrome, graphite rules, and restrained financial green/red match the source. Decorative gradients and elevated card shadows were removed.
 - Image quality and asset fidelity: the target contains no raster product imagery. Navigation uses the existing Phosphor outline icon library; no placeholder art, emoji, handcrafted SVG, or CSS illustration was introduced.
-- Copy and content: labels remain coherent with the live product. Differences from the mock values and adopted-stock section are dynamic data/rule outcomes, not design drift.
+- Copy and content: labels remain coherent with the live product. Differences from the mock values are dynamic data/rule outcomes, not design drift.
 - Icons: all six navigation tabs have distinct, consistently sized outline icons and no numeric prefixes.
 - Accessibility and interaction: active state, hover/focus treatment, semantic buttons and labels remain present. All six tabs, the screener search, and desktop layouts were exercised.
 
 ## Full-view comparison evidence
 
-The combined comparison confirms the same major proportions and hierarchy: black top bar, pale left rail, sharp page rule, decision strip, evidence metrics, red/green monthly bars, and flat lower data region. The source shows a 10-stock table while the implementation shows the backtest panel because the current candidate count is below 10; this is the required live application behavior.
+The combined comparison confirms the same major proportions and hierarchy: black top bar, pale left rail, sharp page rule, decision strip, evidence metrics, red/green monthly bars, and a flat lower data region. Whether the adopted-stock table is shown remains governed by the live 10-candidate rule.
 
 ## Focused region comparison evidence
 

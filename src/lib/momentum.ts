@@ -56,12 +56,95 @@ function monthlyHistory(points: PricePoint[]): MonthPoint[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function observedHoliday(year: number, month: number, day: number) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.getUTCDay();
+  if (weekday === 6) date.setUTCDate(date.getUTCDate() - 1);
+  if (weekday === 0) date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function nthWeekdayOfMonth(
+  year: number,
+  month: number,
+  weekday: number,
+  occurrence: number,
+) {
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  const offset = (weekday - date.getUTCDay() + 7) % 7;
+  date.setUTCDate(1 + offset + (occurrence - 1) * 7);
+  return date.toISOString().slice(0, 10);
+}
+
+function lastWeekdayOfMonth(year: number, month: number, weekday: number) {
+  const date = new Date(Date.UTC(year, month, 0));
+  const offset = (date.getUTCDay() - weekday + 7) % 7;
+  date.setUTCDate(date.getUTCDate() - offset);
+  return date.toISOString().slice(0, 10);
+}
+
+function easterSunday(year: number) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function nyseHolidays(year: number) {
+  const goodFriday = easterSunday(year);
+  goodFriday.setUTCDate(goodFriday.getUTCDate() - 2);
+
+  return new Set([
+    observedHoliday(year, 1, 1),
+    nthWeekdayOfMonth(year, 1, 1, 3),
+    nthWeekdayOfMonth(year, 2, 1, 3),
+    goodFriday.toISOString().slice(0, 10),
+    lastWeekdayOfMonth(year, 5, 1),
+    observedHoliday(year, 6, 19),
+    observedHoliday(year, 7, 4),
+    nthWeekdayOfMonth(year, 9, 1, 1),
+    nthWeekdayOfMonth(year, 11, 4, 4),
+    observedHoliday(year, 12, 25),
+  ]);
+}
+
+function expectedLastTradingDay(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const holidays = nyseHolidays(year);
+  const date = new Date(Date.UTC(year, month, 0));
+
+  while (
+    date.getUTCDay() === 0 ||
+    date.getUTCDay() === 6 ||
+    holidays.has(date.toISOString().slice(0, 10))
+  ) {
+    date.setUTCDate(date.getUTCDate() - 1);
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
 function latestCompletedMonthIndex(points: MonthPoint[]) {
   const latestIndex = points.length - 1;
   const currentMonthKey = new Date().toISOString().slice(0, 7);
-  return points[latestIndex]?.key === currentMonthKey
-    ? latestIndex - 1
-    : latestIndex;
+  const latest = points[latestIndex];
+  if (!latest) return -1;
+  if (latest.key === currentMonthKey) return latestIndex - 1;
+
+  return latest.date >= expectedLastTradingDay(latest.key)
+    ? latestIndex
+    : latestIndex - 1;
 }
 
 function priceOnOrAfter(points: PricePoint[], date: string) {
