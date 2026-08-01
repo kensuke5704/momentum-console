@@ -5,11 +5,22 @@ import { buildDashboard } from "../src/lib/momentum";
 import { fetchHistories } from "../src/lib/yahoo";
 
 async function main() {
-  const symbols = [...new Set(TICKERS.map((ticker) => ticker.symbol))];
+  const symbols = [
+    ...new Set([...TICKERS.map((ticker) => ticker.symbol), "JPY=X"]),
+  ];
   console.log(`Fetching ${symbols.length} symbols...`);
 
   const histories = await fetchHistories(symbols);
-  const dashboard = buildDashboard(histories, TICKERS, DEFAULT_STRATEGY);
+  const usdJpyPoints = histories["JPY=X"] ?? [];
+  const latestUsdJpy = usdJpyPoints.at(-1)?.close;
+  const strategy = {
+    ...DEFAULT_STRATEGY,
+    usdJpy:
+      typeof latestUsdJpy === "number" && Number.isFinite(latestUsdJpy)
+        ? latestUsdJpy
+        : DEFAULT_STRATEGY.usdJpy,
+  };
+  const dashboard = buildDashboard(histories, TICKERS, strategy);
   const generatedAt = new Date().toISOString();
   const outputPath = resolve("public/data/market-data.json");
 

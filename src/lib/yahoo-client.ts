@@ -151,11 +151,30 @@ export async function fetchYahooHistoriesInBrowser(
   ].filter(Boolean);
   if (!normalizedSymbols.length) return { histories: {}, errors: [] };
 
-  const body = await loadJsonp<YahooBatchResponse>(
-    new URLSearchParams({ symbols: normalizedSymbols.join(",") }),
-    45000,
-    "Yahoo Financeから最新価格を取得できませんでした。",
-  );
+  let body: YahooBatchResponse | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      body = await loadJsonp<YahooBatchResponse>(
+        new URLSearchParams({ symbols: normalizedSymbols.join(",") }),
+        60000,
+        "Yahoo Financeから最新価格を取得できませんでした。",
+      );
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+      }
+    }
+  }
+
+  if (!body) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Yahoo Financeから最新価格を取得できませんでした。");
+  }
   if (body.error) throw new Error(body.error);
 
   const histories = Object.fromEntries(

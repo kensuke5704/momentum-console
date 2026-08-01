@@ -45,7 +45,10 @@ import { TICKERS } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
 import { ComparisonView } from "@/components/comparison-view";
 import { ResearchView } from "@/components/research-view";
-import { fetchYahooHistoriesInBrowser } from "@/lib/yahoo-client";
+import {
+  fetchYahooHistoriesInBrowser,
+  fetchYahooHistoryInBrowser,
+} from "@/lib/yahoo-client";
 import type {
   BacktestRow,
   DashboardPayload,
@@ -67,6 +70,20 @@ type MarketDataFile = {
   histories: Record<string, PricePoint[]>;
   dashboard: DashboardPayload;
 };
+
+const USD_JPY_SYMBOL = "JPY=X";
+const USD_JPY_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+
+function withLatestUsdJpy(
+  strategy: StrategyConfig,
+  priceHistories: Record<string, PricePoint[]>,
+) {
+  const latest = priceHistories[USD_JPY_SYMBOL]?.at(-1)?.close;
+  if (typeof latest !== "number" || !Number.isFinite(latest) || latest <= 0) {
+    return strategy;
+  }
+  return { ...strategy, usdJpy: latest };
+}
 
 function mergeHistories(
   base: Record<string, PricePoint[]>,
@@ -117,6 +134,16 @@ function percent(value: number | null, digits = 1) {
 
 function compactDate(value: string) {
   return value ? value.replaceAll("-", ".") : "未取得";
+}
+
+function allocationMonth(value: string) {
+  const [yearText, monthText] = value.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return "";
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  return `${nextYear}.${String(nextMonth).padStart(2, "0")}`;
 }
 
 function Metric({
@@ -315,7 +342,12 @@ function Overview({
         <section>
           <div className="section-heading">
             <div>
-              <h2>今月の採用銘柄</h2>
+              <h2>
+                今月の採用銘柄
+                {allocationMonth(data.market.decisionDate)
+                  ? `（${allocationMonth(data.market.decisionDate)}）`
+                  : ""}
+              </h2>
               <p>
                 相対モメンタムとテーマ上限を通過した
                 {data.portfolio.length}銘柄
@@ -707,9 +739,25 @@ function PortfolioView({
                   </div>
                 </td>
                 <td className="numeric">
-                  {row.current === null ? "N/A" : `$${decimal.format(row.current)}`}
+                  {row.current === null ? (
+                    "N/A"
+                  ) : (
+                    <span className="currency-pair">
+                      <span>${decimal.format(row.current)}</span>
+                      <small>
+                        ¥{money.format(row.current * data.config.usdJpy)}
+                      </small>
+                    </span>
+                  )}
                 </td>
-                <td className="numeric">${money.format(row.targetAmount)}</td>
+                <td className="numeric">
+                  <span className="currency-pair">
+                    <span>${money.format(row.targetAmount)}</span>
+                    <small>
+                      ¥{money.format(row.targetAmount * data.config.usdJpy)}
+                    </small>
+                  </span>
+                </td>
                 <td className="numeric">
                   {row.targetShares === null
                     ? "N/A"
@@ -733,12 +781,27 @@ function PortfolioView({
                     />
                   </label>
                 </td>
-                <td className="numeric">${money.format(row.actualAmount)}</td>
+                <td className="numeric">
+                  <span className="currency-pair">
+                    <span>${money.format(row.actualAmount)}</span>
+                    <small>
+                      ¥{money.format(row.actualAmount * data.config.usdJpy)}
+                    </small>
+                  </span>
+                </td>
                 <td
                   className={`numeric difference ${row.difference >= 0 ? "positive" : "negative"}`}
                 >
-                  {row.difference >= 0 ? "+" : ""}$
-                  {money.format(row.difference)}
+                  <span className="currency-pair">
+                    <span>
+                      {row.difference >= 0 ? "+" : ""}$
+                      {money.format(row.difference)}
+                    </span>
+                    <small>
+                      {row.difference >= 0 ? "+" : ""}¥
+                      {money.format(row.difference * data.config.usdJpy)}
+                    </small>
+                  </span>
                 </td>
               </tr>
             ))}
@@ -1282,13 +1345,14 @@ export function MomentumApp({
 
       if (forceDownload) {
         const live = await fetchYahooHistoriesInBrowser(
-          TICKERS.map((ticker) => ticker.symbol),
+          [...TICKERS.map((ticker) => ticker.symbol), USD_JPY_SYMBOL],
         );
         nextHistories = mergeHistories(nextHistories, live.histories);
         refreshWarnings = live.errors;
       }
 
-      const payload = buildDashboard(nextHistories, TICKERS, strategy);
+      const nextStrategy = withLatestUsdJpy(strategy, nextHistories);
+      const payload = buildDashboard(nextHistories, TICKERS, nextStrategy);
       if (refreshWarnings.length) {
         payload.warning =
           `一部銘柄の最新価格を取得できませんでした（${refreshWarnings.length}件）。` +
@@ -1296,10 +1360,10 @@ export function MomentumApp({
       }
       setHistories(nextHistories);
       setData(payload);
-      setConfig(strategy);
+      setConfig(nextStrategy);
       window.localStorage.setItem(
         "momentum-strategy",
-        JSON.stringify(strategy),
+        JSON.stringify(nextStrategy),
       );
     } catch (error) {
       setData((current) => ({
@@ -1313,6 +1377,36 @@ export function MomentumApp({
       setLoading(false);
     }
   }, [histories]);
+
+  const refreshUsdJpy = useCallback(async () => {
+    try {
+      const points = await fetchYahooHistoryInBrowser(USD_JPY_SYMBOL);
+      const latest = points.at(-1)?.close;
+      if (
+        typeof latest !== "number" ||
+        !Number.isFinite(latest) ||
+        latest <= 0
+      ) {
+        return;
+      }
+      setHistories((current) =>
+        current
+          ? mergeHistories(current, { [USD_JPY_SYMBOL]: points })
+          : current,
+      );
+      setConfig((current) => {
+        const next = { ...current, usdJpy: latest };
+        window.localStorage.setItem("momentum-strategy", JSON.stringify(next));
+        return next;
+      });
+      setData((current) => ({
+        ...current,
+        config: { ...current.config, usdJpy: latest },
+      }));
+    } catch {
+      // Keep the most recently acquired rate when a periodic refresh fails.
+    }
+  }, []);
 
   useEffect(() => {
     if (didInitialLoad.current) return;
@@ -1331,6 +1425,15 @@ export function MomentumApp({
     }
     void refresh(initialDashboard.config);
   }, [initialDashboard.config, refresh]);
+
+  useEffect(() => {
+    void refreshUsdJpy();
+    const interval = window.setInterval(
+      () => void refreshUsdJpy(),
+      USD_JPY_REFRESH_INTERVAL_MS,
+    );
+    return () => window.clearInterval(interval);
+  }, [refreshUsdJpy]);
 
   function changeView(next: View) {
     setView(next);
