@@ -3295,7 +3295,6 @@ main {
   box-shadow: none;
   display: grid;
   grid-template-columns: minmax(390px, 0.82fr) minmax(500px, 1.18fr);
-  min-height: 0;
 }
 
 .decision-strip {
@@ -3336,12 +3335,8 @@ main {
 }
 
 .market-copy {
-  align-content: center;
   border-right: 1px solid var(--line-strong);
-  display: grid;
-  gap: 14px;
-  grid-template-rows: auto auto;
-  padding: 16px 20px;
+  padding: 17px 18px 18px;
 }
 
 .section-label,
@@ -3358,31 +3353,28 @@ main {
 }
 
 .market-values {
-  align-items: stretch;
   border-top: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 0;
+  margin-top: 12px;
   padding-top: 0;
 }
 
 .market-values .metric {
   border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 88px;
+  min-height: 112px;
   min-width: 0;
-  padding: 12px 20px;
+  padding: 18px 20px 14px;
+  text-align: center;
 }
 
 .market-values .metric:first-child {
-  padding-left: 0;
+  padding-left: 20px;
 }
 
 .market-values .metric:last-child {
   border-right: 0;
-  padding-right: 0;
+  padding-right: 20px;
 }
 
 .metric p {
@@ -3391,15 +3383,11 @@ main {
   letter-spacing: 0.02em;
 }
 
-.market-values .metric p {
-  margin: 0;
-}
-
 .market-values .metric-value {
   display: block;
   font-size: clamp(21px, 1.9vw, 29px);
   letter-spacing: -0.045em;
-  margin-top: 10px;
+  margin-top: 18px;
   white-space: nowrap;
 }
 
@@ -3422,7 +3410,7 @@ main {
 }
 
 .mini-chart {
-  height: 152px;
+  height: 176px;
   margin-top: 6px;
 }
 
@@ -3702,7 +3690,8 @@ tbody tr:hover {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 126px;
+  min-height: 96px;
+  padding-block: 12px;
 }
 
 .backtest-stats .metric p {
