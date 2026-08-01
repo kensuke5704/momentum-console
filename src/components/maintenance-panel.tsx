@@ -75,7 +75,7 @@ export function MaintenancePanel({
             <dl>
               <div>
                 <dt>採用回数</dt>
-                <dd>{row.pickCount}</dd>
+                <dd>{row.pickCount.toLocaleString("ja-JP")}</dd>
               </div>
               <div>
                 <dt>最終採用</dt>

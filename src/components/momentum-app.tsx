@@ -270,7 +270,7 @@ function Overview({
               <h1>{allocationLabel}</h1>
               <p>
                 {insufficient
-                  ? `QQQはRiskOnですが、採用候補が${data.market.selectedCount}/${data.config.topN}銘柄のため、ルールにより全額現金です。`
+                  ? `QQQはRiskOnですが、採用候補が${decimal.format(data.market.selectedCount)}/${decimal.format(data.config.topN)}銘柄のため、ルールにより全額現金です。`
                   : data.market.state === "RiskOn"
                     ? "QQQは10か月移動平均を上回っています。選定銘柄への配分シグナルです。"
                     : "QQQは10か月移動平均以下です。新規配分を停止するシグナルです。"}
@@ -354,7 +354,7 @@ function Overview({
               </h2>
               <p>
                 相対モメンタムとテーマ上限を通過した
-                {data.portfolio.length}銘柄
+                {decimal.format(data.portfolio.length)}銘柄
               </p>
             </div>
             <button className="text-button" onClick={() => onNavigate("portfolio")}>
@@ -417,6 +417,7 @@ function Overview({
                   tickLine={false}
                   width={46}
                   tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                  tickFormatter={(value) => decimal.format(Number(value))}
                 />
                 <Tooltip content={<EquityTooltip />} />
                 <Line
@@ -527,7 +528,7 @@ function Screener({ data }: { data: DashboardPayload }) {
           </p>
         </div>
         <div className="summary-count">
-          <strong>{filtered.length}</strong>
+          <strong>{decimal.format(filtered.length)}</strong>
           <span>銘柄</span>
         </div>
       </div>
@@ -683,7 +684,7 @@ function PortfolioView({
               value={insufficient ? "候補不足" : "市場Cash"}
               detail={
                 insufficient
-                  ? `${data.market.selectedCount}/${data.config.topN}銘柄`
+                  ? `${decimal.format(data.market.selectedCount)}/${decimal.format(data.config.topN)}銘柄`
                   : "QQQ 10M MA"
               }
             />
@@ -720,7 +721,7 @@ function PortfolioView({
           title="今月は全額現金です"
           body={
             insufficient
-              ? `採用候補が${data.market.selectedCount}銘柄のため、目標の${data.config.topN}銘柄を満たしていません。`
+              ? `採用候補が${decimal.format(data.market.selectedCount)}銘柄のため、目標の${decimal.format(data.config.topN)}銘柄を満たしていません。`
               : "QQQが10か月移動平均以下のため、配分を停止しています。"
           }
         />
@@ -775,18 +776,15 @@ function PortfolioView({
                 <td>
                   <label className="inline-number">
                     <span className="sr-only">{row.symbol}の保有株数</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      value={row.actualShares || ""}
+                    <FormattedNumberInput
+                      ariaLabel={`${row.symbol}の保有株数`}
+                      min={0}
+                      max={1000000000}
+                      maximumFractionDigits={3}
+                      value={row.actualShares}
                       placeholder="0"
-                      onChange={(event) =>
-                        onHoldingChange(
-                          row.symbol,
-                          Math.max(0, Number(event.target.value) || 0),
-                        )
-                      }
+                      emptyWhenZero
+                      onChange={(value) => onHoldingChange(row.symbol, value)}
                     />
                   </label>
                 </td>
@@ -911,6 +909,7 @@ function BacktestView({ data }: { data: DashboardPayload }) {
                 tickLine={false}
                 width={52}
                 tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                tickFormatter={(value) => decimal.format(Number(value))}
               />
               <Tooltip content={<EquityTooltip />} />
               <Area
@@ -1277,6 +1276,71 @@ function SettingsView({
   );
 }
 
+function FormattedNumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  maximumFractionDigits = 4,
+  placeholder,
+  ariaLabel,
+  emptyWhenZero = false,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  maximumFractionDigits?: number;
+  placeholder?: string;
+  ariaLabel?: string;
+  emptyWhenZero?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [editingValue, setEditingValue] = useState("");
+  const formatter = useMemo(
+    () =>
+      new Intl.NumberFormat("ja-JP", {
+        maximumFractionDigits,
+        useGrouping: true,
+      }),
+    [maximumFractionDigits],
+  );
+  const plainValue = Number(value.toFixed(maximumFractionDigits)).toString();
+  const formattedValue =
+    emptyWhenZero && value === 0 ? "" : formatter.format(value);
+
+  return (
+    <input
+      type="text"
+      role="spinbutton"
+      inputMode="decimal"
+      value={focused ? editingValue : formattedValue}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      onFocus={() => {
+        setEditingValue(emptyWhenZero && value === 0 ? "" : plainValue);
+        setFocused(true);
+      }}
+      onChange={(event) => {
+        const raw = event.target.value.replaceAll(",", "");
+        setEditingValue(raw);
+        if (raw.trim() === "") return;
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed)) onChange(parsed);
+      }}
+      onBlur={() => {
+        const parsed = Number(editingValue.replaceAll(",", ""));
+        const next = Number.isFinite(parsed) ? parsed : value;
+        onChange(Math.min(max, Math.max(min, next)));
+        setFocused(false);
+      }}
+    />
+  );
+}
+
 function NumberField({
   label,
   value,
@@ -1301,15 +1365,12 @@ function NumberField({
       <span>{label}</span>
       <div className="input-wrap">
         {prefix ? <i>{prefix}</i> : null}
-        <input
-          type="number"
-          value={Number((value * displayMultiplier).toFixed(4))}
-          onChange={(event) =>
-            onChange(Number(event.target.value) / displayMultiplier)
-          }
-          step={inputProps.step * displayMultiplier}
+        <FormattedNumberInput
+          value={value * displayMultiplier}
+          onChange={(next) => onChange(next / displayMultiplier)}
           min={inputProps.min * displayMultiplier}
           max={inputProps.max * displayMultiplier}
+          maximumFractionDigits={4}
         />
         {suffix ? <i>{suffix}</i> : null}
       </div>
@@ -1381,7 +1442,7 @@ export function MomentumApp({
       const payload = buildDashboard(nextHistories, TICKERS, nextStrategy);
       if (refreshWarnings.length) {
         payload.warning =
-          `一部銘柄の最新価格を取得できませんでした（${refreshWarnings.length}件）。` +
+          `一部銘柄の最新価格を取得できませんでした（${decimal.format(refreshWarnings.length)}件）。` +
           "取得済みの価格で計算しています。";
       }
       setHistories(nextHistories);

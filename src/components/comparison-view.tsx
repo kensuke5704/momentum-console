@@ -50,12 +50,19 @@ const number = new Intl.NumberFormat("ja-JP", {
 
 function percent(value: number | null, digits = 1) {
   if (value === null || !Number.isFinite(value)) return "N/A";
-  return `${(value * 100).toFixed(digits)}%`;
+  return `${new Intl.NumberFormat("ja-JP", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value * 100)}%`;
 }
 
 function signed(value: number, suffix: string, digits = 1) {
   const prefix = value > 0 ? "+" : "";
-  return `${prefix}${value.toFixed(digits)}${suffix}`;
+  const formatted = new Intl.NumberFormat("ja-JP", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+  return `${prefix}${formatted}${suffix}`;
 }
 
 function normalizeSymbol(value: string) {
@@ -444,7 +451,7 @@ export function ComparisonView({
             <div>
               <h2>既存銘柄</h2>
               <p>
-                {includedSymbols.size} / {TICKERS.length - 1}銘柄を候補に設定
+                {number.format(includedSymbols.size)} / {number.format(TICKERS.length - 1)}銘柄を候補に設定
               </p>
             </div>
             <div className="comparison-actions">
@@ -600,17 +607,17 @@ export function ComparisonView({
           <div className="change-summary">
             <div>
               <span>外した既存銘柄</span>
-              <strong>{removedSymbols.length}</strong>
+              <strong>{number.format(removedSymbols.length)}</strong>
               <small>{removedSymbols.join(", ") || "なし"}</small>
             </div>
             <div>
               <span>戻した既存銘柄</span>
-              <strong>{restoredSymbols.length}</strong>
+              <strong>{number.format(restoredSymbols.length)}</strong>
               <small>{restoredSymbols.join(", ") || "なし"}</small>
             </div>
             <div>
               <span>追加した新規銘柄</span>
-              <strong>{customTickers.length}</strong>
+              <strong>{number.format(customTickers.length)}</strong>
               <small>
                 {customTickers.map((ticker) => ticker.symbol).join(", ") ||
                   "なし"}
@@ -745,6 +752,7 @@ export function ComparisonView({
                     tickLine={false}
                     width={52}
                     tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+                    tickFormatter={(value) => number.format(Number(value))}
                   />
                   <Tooltip
                     formatter={(value, name) => [

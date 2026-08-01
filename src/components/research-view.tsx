@@ -30,9 +30,8 @@ const TRENDING_CACHE_KEY = "momentum-research-trending";
 const decimal = new Intl.NumberFormat("ja-JP", {
   maximumFractionDigits: 2,
 });
-const compact = new Intl.NumberFormat("ja-JP", {
-  notation: "compact",
-  maximumFractionDigits: 1,
+const integer = new Intl.NumberFormat("ja-JP", {
+  maximumFractionDigits: 0,
 });
 
 function percent(value: number) {
@@ -354,7 +353,7 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
                           {percent(row.changePercent)}
                         </span>
                       </td>
-                      <td className="numeric">{compact.format(row.volume)}</td>
+                      <td className="numeric">{integer.format(row.volume)}</td>
                       <td className="numeric">
                         {volumeRatio === null
                           ? "N/A"
@@ -425,7 +424,7 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
             <h2>調査リスト</h2>
             <p>保存した銘柄をYahoo Financeで再確認</p>
           </div>
-          <strong>{watchlist.length}</strong>
+          <strong>{integer.format(watchlist.length)}</strong>
         </div>
         {watchlist.length ? (
           <div className="research-watch-grid">
