@@ -390,7 +390,6 @@ function Overview({
           <div className="section-heading compact">
             <div>
               <h2>バックテスト資産推移</h2>
-              <p>初期資産を100として表示</p>
             </div>
             <button className="text-button" onClick={() => onNavigate("backtest")}>
               詳細を見る
@@ -828,7 +827,6 @@ function BacktestView({ data }: { data: DashboardPayload }) {
         <Metric
           label="最終資産"
           value={`${decimal.format(data.backtest.stats.finalEquity)}x`}
-          detail="初期資産 1.00"
           tone="positive"
         />
         <Metric
@@ -856,7 +854,6 @@ function BacktestView({ data }: { data: DashboardPayload }) {
         <div className="section-heading compact">
           <div>
             <h2>資産曲線</h2>
-            <p>初期資産を100として指数化</p>
           </div>
         </div>
         <div className="large-chart">
@@ -1547,11 +1544,6 @@ export function MomentumApp({
             );
           })}
         </nav>
-        <div className="sidebar-foot">
-          <SourceBadge payload={data} />
-          <p>データ基準日</p>
-          <strong>{compactDate(data.asOf)}</strong>
-        </div>
       </aside>
 
       {mobileNavOpen ? (

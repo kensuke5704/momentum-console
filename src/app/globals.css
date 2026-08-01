@@ -3295,6 +3295,7 @@ main {
   box-shadow: none;
   display: grid;
   grid-template-columns: minmax(390px, 0.82fr) minmax(500px, 1.18fr);
+  min-height: 0;
 }
 
 .decision-strip {
@@ -3335,8 +3336,12 @@ main {
 }
 
 .market-copy {
+  align-content: center;
   border-right: 1px solid var(--line-strong);
-  padding: 17px 18px 18px;
+  display: grid;
+  gap: 14px;
+  grid-template-rows: auto auto;
+  padding: 16px 20px;
 }
 
 .section-label,
@@ -3353,18 +3358,22 @@ main {
 }
 
 .market-values {
+  align-items: stretch;
   border-top: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 12px;
+  margin-top: 0;
   padding-top: 0;
 }
 
 .market-values .metric {
   border-right: 1px solid var(--line);
-  min-height: 112px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 88px;
   min-width: 0;
-  padding: 18px 20px 14px;
+  padding: 12px 20px;
 }
 
 .market-values .metric:first-child {
@@ -3382,11 +3391,15 @@ main {
   letter-spacing: 0.02em;
 }
 
+.market-values .metric p {
+  margin: 0;
+}
+
 .market-values .metric-value {
   display: block;
   font-size: clamp(21px, 1.9vw, 29px);
   letter-spacing: -0.045em;
-  margin-top: 18px;
+  margin-top: 10px;
   white-space: nowrap;
 }
 
@@ -3409,7 +3422,7 @@ main {
 }
 
 .mini-chart {
-  height: 176px;
+  height: 152px;
   margin-top: 6px;
 }
 
@@ -3478,7 +3491,7 @@ main {
   font-family: "Roboto Mono", monospace;
   font-size: 9px;
   min-height: 38px;
-  padding: 0 18px;
+  padding: 0 24px;
 }
 
 .pick-grid {
@@ -3493,7 +3506,7 @@ main {
   border-radius: 0;
   gap: 0;
   min-height: 47px;
-  padding: 5px 18px;
+  padding: 5px 24px;
 }
 
 .pick-row:last-child {
@@ -3523,12 +3536,22 @@ main {
 }
 
 .pick-score {
-  justify-self: end;
+  justify-self: stretch;
+  text-align: center;
 }
 
 .pick-table-head > span:nth-child(n + 3),
 .pick-row > span:not(.pick-number) {
-  text-align: right;
+  text-align: center;
+}
+
+.pick-price {
+  text-align: center;
+}
+
+.pick-score .change {
+  justify-content: center;
+  min-width: 72px;
 }
 
 .performance-panel {
@@ -3673,6 +3696,17 @@ tbody tr:hover {
 .backtest-stats .metric {
   border-right: 1px solid var(--line);
   padding: 17px 18px;
+}
+
+.backtest-stats .metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 126px;
+}
+
+.backtest-stats .metric p {
+  margin: 0 0 8px;
 }
 
 .large-chart-panel {
