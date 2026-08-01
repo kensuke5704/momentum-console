@@ -188,6 +188,12 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
   }
 
   function toggleWatchlist(symbol: string) {
+    if (
+      watchlist.includes(symbol) &&
+      !window.confirm(`${symbol}を調査リストから削除しますか？`)
+    ) {
+      return;
+    }
     saveWatchlist(
       watchlist.includes(symbol)
         ? watchlist.filter((item) => item !== symbol)

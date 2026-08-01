@@ -267,6 +267,9 @@ export function ComparisonView({
   function toggleTicker(symbol: string) {
     const next = new Set(includedSymbols);
     if (next.has(symbol)) {
+      if (!window.confirm(`${symbol}を候補から外しますか？`)) {
+        return;
+      }
       next.delete(symbol);
     } else {
       next.add(symbol);
@@ -352,6 +355,9 @@ export function ComparisonView({
   }
 
   function removeCustomTicker(symbol: string) {
+    if (!window.confirm(`${symbol}を追加銘柄から削除しますか？`)) {
+      return;
+    }
     setCustomTickers((current) =>
       current.filter((ticker) => ticker.symbol !== symbol),
     );

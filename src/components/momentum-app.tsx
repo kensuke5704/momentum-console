@@ -1264,7 +1264,14 @@ function SettingsView({
             type="button"
             disabled={!isValid || loading}
             onClick={() => {
-              if (isValid) onApply(draft);
+              if (
+                isValid &&
+                window.confirm(
+                  "この設定を適用しますか？\n全シグナルとバックテスト結果を再計算します。",
+                )
+              ) {
+                onApply(draft);
+              }
             }}
           >
             {loading ? <LoadingLine /> : <ArrowClockwiseIcon />}
