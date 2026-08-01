@@ -3336,7 +3336,7 @@ main {
 
 .market-copy {
   border-right: 1px solid var(--line-strong);
-  padding: 17px 18px 18px;
+  padding: 22px 18px 13px;
 }
 
 .section-label,
@@ -3354,17 +3354,18 @@ main {
 
 .market-values {
   border-top: 0;
-  display: grid;
+  display: flex;
   gap: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 12px;
+  margin-inline: -18px;
+  margin-top: 43px;
   max-width: none;
   padding-top: 0;
-  width: 100%;
+  width: calc(100% + 36px);
 }
 
 .market-values .metric {
   border-right: 1px solid var(--line);
+  flex: 1 0 auto;
   min-height: 112px;
   min-width: 0;
   padding: 18px 20px 14px;
@@ -3390,8 +3391,17 @@ main {
   display: block;
   font-size: clamp(21px, 1.9vw, 29px);
   letter-spacing: -0.045em;
+  margin-inline: auto;
   margin-top: 18px;
   white-space: nowrap;
+  width: max-content;
+}
+
+.market-values .metric p {
+  margin-inline: auto;
+  text-align: center;
+  white-space: nowrap;
+  width: max-content;
 }
 
 .return-visual {
