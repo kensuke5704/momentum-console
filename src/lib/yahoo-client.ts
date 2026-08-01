@@ -122,7 +122,9 @@ function loadJsonp<T>(
     );
 
     params.set("callback", callbackName);
+    params.set("requestId", `${Date.now()}`);
     script.async = true;
+    script.referrerPolicy = "no-referrer";
     script.onerror = () => fail(errorMessage);
     script.src = `${YAHOO_PROXY_URL}?${params.toString()}`;
     document.head.appendChild(script);
@@ -176,11 +178,30 @@ export async function fetchYahooTrendingInBrowser(): Promise<{
   active: YahooTrendingQuote[];
   gainers: YahooTrendingQuote[];
 }> {
-  const body = await loadJsonp<YahooTrendingResponse>(
-    new URLSearchParams({ mode: "trending" }),
-    30000,
-    "Yahoo Financeから話題銘柄を取得できませんでした。",
-  );
+  let body: YahooTrendingResponse | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      body = await loadJsonp<YahooTrendingResponse>(
+        new URLSearchParams({ mode: "trending" }),
+        60000,
+        "Yahoo Financeから話題銘柄を取得できませんでした。",
+      );
+      break;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+      }
+    }
+  }
+
+  if (!body) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Yahoo Financeから話題銘柄を取得できませんでした。");
+  }
   if (body.error) throw new Error(body.error);
   const active = Array.isArray(body.active) ? body.active : [];
   const gainers = Array.isArray(body.gainers) ? body.gainers : [];

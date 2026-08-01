@@ -19,6 +19,14 @@ import type { DashboardPayload } from "@/lib/types";
 
 type Ranking = "attention" | "active" | "gainers";
 
+type CachedTrending = {
+  asOf: string;
+  active: YahooTrendingQuote[];
+  gainers: YahooTrendingQuote[];
+};
+
+const TRENDING_CACHE_KEY = "momentum-research-trending";
+
 const decimal = new Intl.NumberFormat("ja-JP", {
   maximumFractionDigits: 2,
 });
@@ -99,6 +107,26 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
     }
   }, []);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem(TRENDING_CACHE_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as CachedTrending;
+      if (
+        typeof parsed.asOf === "string" &&
+        Array.isArray(parsed.active) &&
+        Array.isArray(parsed.gainers) &&
+        (parsed.active.length > 0 || parsed.gainers.length > 0)
+      ) {
+        setActive(parsed.active);
+        setGainers(parsed.gainers);
+        setAsOf(parsed.asOf);
+      }
+    } catch {
+      window.localStorage.removeItem(TRENDING_CACHE_KEY);
+    }
+  }, []);
+
   const loadTrending = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -107,11 +135,20 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
       setActive(result.active);
       setGainers(result.gainers);
       setAsOf(result.asOf);
+      window.localStorage.setItem(
+        TRENDING_CACHE_KEY,
+        JSON.stringify(result satisfies CachedTrending),
+      );
     } catch (loadError) {
+      const hasCachedData = Boolean(
+        window.localStorage.getItem(TRENDING_CACHE_KEY),
+      );
       setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "話題銘柄を取得できませんでした。",
+        hasCachedData
+          ? "最新データの取得に失敗したため、前回取得したデータを表示しています。"
+          : loadError instanceof Error
+            ? loadError.message
+            : "話題銘柄を取得できませんでした。",
       );
     } finally {
       setLoading(false);
@@ -196,6 +233,15 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
           <button type="button" onClick={() => void loadTrending()}>
             再取得
           </button>
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="warning-banner" role="status">
+          <ArrowClockwiseIcon className="spinning" size={20} />
+          <span>
+            Yahoo Financeから取得中です。初回は30秒ほどかかる場合があります。
+          </span>
         </div>
       ) : null}
 
