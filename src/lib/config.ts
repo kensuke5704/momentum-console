@@ -86,7 +86,12 @@ export function normalizeStrategyConfig(
       : DEFAULT_STRATEGY.usdJpy;
   const legacyTotal =
     typeof legacyTargetAmountUsd === "number" && legacyTargetAmountUsd > 0
-      ? legacyTargetAmountUsd * usdJpy * topN
+      ? Math.round(legacyTargetAmountUsd * usdJpy * topN)
+      : undefined;
+  const requestedTotal =
+    typeof current.targetTotalJpy === "number" &&
+    current.targetTotalJpy > 0
+      ? Math.round(current.targetTotalJpy)
       : undefined;
 
   return {
@@ -95,10 +100,7 @@ export function normalizeStrategyConfig(
     topN,
     usdJpy,
     targetTotalJpy:
-      typeof current.targetTotalJpy === "number" &&
-      current.targetTotalJpy > 0
-        ? current.targetTotalJpy
-        : legacyTotal ?? DEFAULT_STRATEGY.targetTotalJpy,
+      requestedTotal ?? legacyTotal ?? DEFAULT_STRATEGY.targetTotalJpy,
     weights: { ...DEFAULT_STRATEGY.weights, ...weights },
     genreLimits: { ...DEFAULT_STRATEGY.genreLimits, ...genreLimits },
   };
