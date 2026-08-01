@@ -8,7 +8,6 @@ export const TICKERS: TickerConfig[] = [
   { symbol: "RKLB", genre: "Space" },
   { symbol: "LUNR", genre: "Space" },
   { symbol: "IONQ", genre: "Quantum" },
-  { symbol: "RGTI", genre: "Quantum" },
   { symbol: "QBTS", genre: "Quantum" },
   { symbol: "UPST", genre: "AI Fintech" },
   { symbol: "AFRM", genre: "AI Fintech" },
