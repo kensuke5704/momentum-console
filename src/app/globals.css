@@ -3348,18 +3348,23 @@ main {
   letter-spacing: 0.04em;
 }
 
+.market-copy .section-label {
+  margin-bottom: 0;
+}
+
 .market-values {
   border-top: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  margin-top: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 12px;
   padding-top: 0;
 }
 
 .market-values .metric {
   border-right: 1px solid var(--line);
-  min-height: 124px;
-  padding: 21px 14px 12px;
+  min-height: 112px;
+  min-width: 0;
+  padding: 18px 20px 14px;
 }
 
 .market-values .metric:first-child {
@@ -3378,9 +3383,11 @@ main {
 }
 
 .market-values .metric-value {
-  font-size: clamp(23px, 2.25vw, 32px);
-  letter-spacing: -0.035em;
-  margin-top: 22px;
+  display: block;
+  font-size: clamp(21px, 1.9vw, 29px);
+  letter-spacing: -0.045em;
+  margin-top: 18px;
+  white-space: nowrap;
 }
 
 .return-visual {
@@ -3460,7 +3467,7 @@ main {
 .pick-table-head,
 .pick-row {
   display: grid;
-  grid-template-columns: 56px minmax(185px, 1.6fr) 105px 72px 72px 72px 104px;
+  grid-template-columns: 56px minmax(190px, 2fr) repeat(5, minmax(84px, 1fr));
 }
 
 .pick-table-head {
@@ -3511,12 +3518,17 @@ main {
 }
 
 .pick-price span,
-.pick-score > span {
+.pick-score > span:not(.change) {
   display: none;
 }
 
 .pick-score {
-  justify-self: start;
+  justify-self: end;
+}
+
+.pick-table-head > span:nth-child(n + 3),
+.pick-row > span:not(.pick-number) {
+  text-align: right;
 }
 
 .performance-panel {
@@ -3563,20 +3575,40 @@ main {
 }
 
 .filters {
-  align-items: end;
+  align-items: stretch;
   background: var(--surface);
   border: 0;
   border-bottom: 1px solid var(--line-strong);
   gap: 0;
+  min-height: 64px;
   padding: 0;
 }
 
 .search-field,
 .select-field,
-.checkbox-field {
+.check-filter {
   border-right: 1px solid var(--line);
   min-height: 64px;
   padding: 10px 14px;
+}
+
+.search-field {
+  align-self: stretch;
+  max-width: 520px;
+}
+
+.search-field input {
+  padding-block: 0;
+}
+
+.select-field {
+  align-content: center;
+}
+
+.check-filter {
+  align-self: stretch;
+  background: var(--surface);
+  border-radius: 0;
 }
 
 .search-field,
@@ -3825,6 +3857,15 @@ tbody tr:hover {
   align-items: center;
 }
 
+/* The status badge appears on both dark and light surfaces. */
+.sidebar-foot .source-badge.live {
+  color: var(--accent-strong) !important;
+}
+
+.sidebar-foot .source-badge.snapshot {
+  color: var(--warning) !important;
+}
+
 .maintenance-panel > .section-heading h2,
 .maintenance-panel > .section-heading p {
   line-height: 1.4;
@@ -3852,7 +3893,7 @@ tbody tr:hover {
 
   .pick-table-head,
   .pick-row {
-    grid-template-columns: 46px minmax(150px, 1.4fr) 92px 64px 64px 64px 92px;
+    grid-template-columns: 46px minmax(150px, 1.5fr) repeat(5, minmax(76px, 1fr));
   }
 }
 
