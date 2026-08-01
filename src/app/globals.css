@@ -542,7 +542,6 @@ main {
 }
 
 .section-heading h2,
-.page-intro h1,
 .setting-heading h2 {
   letter-spacing: -0.035em;
   margin: 0;
@@ -723,12 +722,9 @@ main {
   padding: 8px 0 2px;
 }
 
-.page-intro h1 {
-  font-size: clamp(28px, 3vw, 40px);
-}
-
 .page-intro p {
   font-size: 14px;
+  margin-top: 0;
 }
 
 .summary-count {

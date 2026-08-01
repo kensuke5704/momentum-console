@@ -435,7 +435,6 @@ export function ComparisonView({
     <div className="view-stack comparison-view">
       <div className="page-intro">
         <div>
-          <h1>候補銘柄の比較検証</h1>
           <p>
             候補ユニバースだけを変更し、現在の戦略設定と同じ条件で結果を比較します。
           </p>

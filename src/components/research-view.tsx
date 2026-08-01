@@ -214,7 +214,6 @@ export function ResearchView({ data }: { data: DashboardPayload }) {
     <div className="view-stack research-view">
       <div className="page-intro">
         <div>
-          <h1>調査</h1>
           <p>米国市場の売買活況と急上昇から、話題銘柄を抽出します。</p>
         </div>
         <div className="research-live-meta">

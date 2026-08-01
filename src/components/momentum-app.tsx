@@ -522,7 +522,6 @@ function Screener({ data }: { data: DashboardPayload }) {
     <div className="view-stack">
       <div className="page-intro">
         <div>
-          <h1>銘柄分析</h1>
           <p>
             モメンタム、QQQ比較、テーマ制限を一つの表で確認できます。
           </p>
@@ -664,7 +663,6 @@ function PortfolioView({
     <div className="view-stack">
       <div className="page-intro">
         <div>
-          <h1>ポートフォリオ</h1>
           <p>
             {allocationIsCash
               ? "今月は全額現金です。新規の買付配分はありません。"
@@ -838,7 +836,6 @@ function BacktestView({ data }: { data: DashboardPayload }) {
     <div className="view-stack">
       <div className="page-intro">
         <div>
-          <h1>バックテスト</h1>
           <p>
             月末シグナル、3日後の約定、翌月3日後の決済で検証します。
           </p>
@@ -1022,7 +1019,6 @@ function SettingsView({
     <div className="view-stack">
       <div className="page-intro">
         <div>
-          <h1>戦略設定</h1>
           <p>
             Apps Script本番版の条件を初期値として移植しています。
           </p>
