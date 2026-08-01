@@ -3810,6 +3810,25 @@ tbody tr:hover {
   padding: 17px 18px;
 }
 
+@media (min-width: 621px) and (max-width: 1100px) {
+  .maintenance-grid article,
+  .maintenance-grid article:nth-child(4n),
+  .maintenance-grid article:nth-child(4n + 2),
+  .maintenance-grid article:nth-child(4n + 3),
+  .maintenance-grid article:nth-child(2n) {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .maintenance-grid article:nth-child(odd) {
+    border-right: 1px solid var(--line);
+  }
+
+  .maintenance-grid article:nth-child(even) {
+    border-right: 0;
+  }
+}
+
 .icon-button,
 .icon-text-button,
 .secondary-button {
