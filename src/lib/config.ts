@@ -54,15 +54,8 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   },
   surgeLimit: 0.8,
   qqqMaMonths: 10,
-  frontierMax: 3,
-  genreLimits: {
-    Quantum: 1,
-    "AI Semi": 2,
-    Space: 2,
-    Nuclear: 2,
-    "Energy Infrastructure": 3,
-    Defense: 1,
-  },
+  genreMax: 2,
+  frontierMax: 2,
   frontierGenres: ["Quantum", "Space", "Nuclear", "Crypto"],
   excludedTickers: [],
   backtestStart: "2023-01-01",
@@ -72,17 +65,18 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
 
 type LegacyStrategyConfig = Partial<StrategyConfig> & {
   targetAmountUsd?: number;
+  genreLimits?: Record<string, number>;
 };
 
 export function normalizeStrategyConfig(
   value: LegacyStrategyConfig,
 ): StrategyConfig {
-  const {
-    targetAmountUsd: legacyTargetAmountUsd,
-    weights,
-    genreLimits,
-    ...current
-  } = value;
+  const current = { ...value };
+  const legacyTargetAmountUsd = current.targetAmountUsd;
+  const weights = current.weights;
+  delete current.targetAmountUsd;
+  delete current.genreLimits;
+  delete current.weights;
   const topN =
     typeof current.topN === "number" && current.topN > 0
       ? current.topN
@@ -109,7 +103,6 @@ export function normalizeStrategyConfig(
     targetTotalJpy:
       requestedTotal ?? legacyTotal ?? DEFAULT_STRATEGY.targetTotalJpy,
     weights: { ...DEFAULT_STRATEGY.weights, ...weights },
-    genreLimits: { ...DEFAULT_STRATEGY.genreLimits, ...genreLimits },
   };
 }
 

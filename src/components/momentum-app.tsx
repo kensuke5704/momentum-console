@@ -73,7 +73,7 @@ const USD_JPY_SYMBOL = "JPY=X";
 const USD_JPY_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 const STRATEGY_STORAGE_KEY = "momentum-strategy";
 const STRATEGY_STORAGE_VERSION_KEY = "momentum-strategy-version";
-const STRATEGY_STORAGE_VERSION = "2026-08-genre-limits-v2";
+const STRATEGY_STORAGE_VERSION = "2026-08-common-genre-cap-v3";
 
 function withLatestUsdJpy(
   strategy: StrategyConfig,
@@ -1111,26 +1111,17 @@ function SettingsView({
             </div>
           </div>
           <div className="form-grid three">
-            {Object.keys(DEFAULT_STRATEGY.genreLimits).map((genre) => (
-              <NumberField
-                key={genre}
-                label={`${genre} 上限`}
-                value={draft.genreLimits[genre] ?? 0}
-                step={1}
-                min={0}
-                max={20}
-                suffix="銘柄"
-                onChange={(value) =>
-                  setDraft((current) => ({
-                    ...current,
-                    genreLimits: {
-                      ...current.genreLimits,
-                      [genre]: value,
-                    },
-                  }))
-                }
-              />
-            ))}
+            <NumberField
+              label="Genre共通上限"
+              value={draft.genreMax}
+              step={1}
+              min={1}
+              max={20}
+              suffix="銘柄"
+              onChange={(value) =>
+                setDraft((current) => ({ ...current, genreMax: value }))
+              }
+            />
           </div>
           <label className="field excluded-field">
             <span>除外Ticker</span>
@@ -1495,8 +1486,8 @@ export function MomentumApp({
             ? stored
             : {
                 ...stored,
+                genreMax: DEFAULT_STRATEGY.genreMax,
                 frontierMax: DEFAULT_STRATEGY.frontierMax,
-                genreLimits: { ...DEFAULT_STRATEGY.genreLimits },
               },
         );
         window.localStorage.setItem(

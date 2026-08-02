@@ -178,10 +178,9 @@ function selectWithLimits(
   const frontierGenres = new Set(config.frontierGenres);
 
   for (const candidate of candidates) {
-    const genreLimit = config.genreLimits[candidate.genre];
     const currentGenreCount = genreCounts.get(candidate.genre) ?? 0;
 
-    if (genreLimit !== undefined && currentGenreCount >= genreLimit) {
+    if (currentGenreCount >= config.genreMax) {
       continue;
     }
 
