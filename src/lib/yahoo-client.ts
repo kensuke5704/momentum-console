@@ -26,24 +26,6 @@ export type YahooBatchResult = {
   errors: string[];
 };
 
-export type YahooTrendingQuote = {
-  symbol: string;
-  name: string;
-  price: number;
-  changePercent: number;
-  volume: number;
-  averageVolume: number;
-  marketState: string;
-  sources: Array<"active" | "gainer">;
-};
-
-type YahooTrendingResponse = {
-  asOf?: string;
-  active?: YahooTrendingQuote[];
-  gainers?: YahooTrendingQuote[];
-  error?: string;
-};
-
 const YAHOO_PROXY_URL =
   "https://script.google.com/macros/s/AKfycbxdoPfdFumjndzTE67Meu-rNZqBDhU0ja63ZsLjOiNHaQvwgfsKEHzR92yTiAkueKhv/exec";
 
@@ -205,46 +187,4 @@ export async function fetchYahooHistoriesInBrowser(
   }
 
   return { histories, errors };
-}
-
-export async function fetchYahooTrendingInBrowser(): Promise<{
-  asOf: string;
-  active: YahooTrendingQuote[];
-  gainers: YahooTrendingQuote[];
-}> {
-  let body: YahooTrendingResponse | undefined;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      body = await loadJsonp<YahooTrendingResponse>(
-        new URLSearchParams({ mode: "trending" }),
-        60000,
-        "Yahoo Financeから話題銘柄を取得できませんでした。",
-      );
-      break;
-    } catch (error) {
-      lastError = error;
-      if (attempt === 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, 750));
-      }
-    }
-  }
-
-  if (!body) {
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("Yahoo Financeから話題銘柄を取得できませんでした。");
-  }
-  if (body.error) throw new Error(body.error);
-  const active = Array.isArray(body.active) ? body.active : [];
-  const gainers = Array.isArray(body.gainers) ? body.gainers : [];
-  if (!active.length && !gainers.length) {
-    throw new Error("Yahoo Financeから話題銘柄が返されませんでした。");
-  }
-  return {
-    asOf: body.asOf ?? new Date().toISOString(),
-    active,
-    gainers,
-  };
 }
