@@ -56,11 +56,12 @@ export const DEFAULT_STRATEGY: StrategyConfig = {
   qqqMaMonths: 10,
   frontierMax: 3,
   genreLimits: {
-    Quantum: 2,
+    Quantum: 1,
     "AI Semi": 2,
     Space: 2,
     Nuclear: 2,
     "Energy Infrastructure": 3,
+    Defense: 1,
   },
   frontierGenres: ["Quantum", "Space", "Nuclear", "Crypto"],
   excludedTickers: [],
