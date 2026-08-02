@@ -73,7 +73,7 @@ const USD_JPY_SYMBOL = "JPY=X";
 const USD_JPY_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 const STRATEGY_STORAGE_KEY = "momentum-strategy";
 const STRATEGY_STORAGE_VERSION_KEY = "momentum-strategy-version";
-const STRATEGY_STORAGE_VERSION = "2026-08-universe-limits-v1";
+const STRATEGY_STORAGE_VERSION = "2026-08-genre-limits-v2";
 
 function withLatestUsdJpy(
   strategy: StrategyConfig,
