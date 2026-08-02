@@ -1,0 +1,29 @@
+name: ChatGPT Parameter Search
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run parameter search
+        run: node --import tsx scripts/chatgpt-parameter-search.ts
+      - name: Upload parameter search results
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-parameter-search-results
+          path: artifacts/parameter-search-results.json
+          if-no-files-found: error
