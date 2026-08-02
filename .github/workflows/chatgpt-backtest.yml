@@ -1,0 +1,29 @@
+name: ChatGPT Backtest
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run Momentum Console backtest
+        run: node --import tsx scripts/chatgpt-backtest.ts
+      - name: Upload backtest results
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-backtest-results
+          path: artifacts/backtest-results.json
+          if-no-files-found: error
