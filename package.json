@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit --incremental false",
+    "check": "npm run typecheck && npm run lint && npm run build",
     "sync:data": "node --import tsx scripts/sync-data.ts"
   },
   "dependencies": {

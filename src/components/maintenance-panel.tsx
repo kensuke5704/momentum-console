@@ -109,38 +109,40 @@ export function MaintenancePanel({
         {candidates.map((row) => {
           const isIncluded = includedSymbols.has(row.symbol);
           return (
-          <article
-            className={isIncluded ? "is-included" : "is-excluded"}
-            key={row.symbol}
-          >
-            <button
-              type="button"
-              className="maintenance-card-button"
-              aria-label={`${row.symbol}を候補から${isIncluded ? "外す" : "戻す"}`}
-              aria-pressed={!isIncluded}
-              onClick={() => onToggle(row.symbol)}
-            />
-            <div>
-              <strong>{row.symbol}</strong>
-              <span>{row.genre}</span>
-            </div>
-            <dl>
+            <article
+              className={isIncluded ? "is-included" : "is-excluded"}
+              key={row.symbol}
+            >
+              <button
+                type="button"
+                className="maintenance-card-button"
+                aria-label={`${row.symbol}を候補から${isIncluded ? "外す" : "戻す"}`}
+                aria-pressed={!isIncluded}
+                onClick={() => onToggle(row.symbol)}
+              />
               <div>
-                <dt>採用回数</dt>
-                <dd>{row.pickCount.toLocaleString("ja-JP")}</dd>
+                <strong>{row.symbol}</strong>
+                <span>{row.genre}</span>
               </div>
-              <div>
-                <dt>最終採用</dt>
-                <dd>{row.lastPicked ? row.lastPicked.slice(0, 7) : "なし"}</dd>
-              </div>
-            </dl>
-            <span className={`review-tag priority-${row.priority}`}>
-              {row.judge}
-            </span>
-            <small className="maintenance-card-hint">
-              クリックで候補から{isIncluded ? "除外" : "復帰"}
-            </small>
-          </article>
+              <dl>
+                <div>
+                  <dt>採用回数</dt>
+                  <dd>{row.pickCount.toLocaleString("ja-JP")}</dd>
+                </div>
+                <div>
+                  <dt>最終採用</dt>
+                  <dd>
+                    {row.lastPicked ? row.lastPicked.slice(0, 7) : "なし"}
+                  </dd>
+                </div>
+              </dl>
+              <span className={`review-tag priority-${row.priority}`}>
+                {row.judge}
+              </span>
+              <small className="maintenance-card-hint">
+                クリックで候補から{isIncluded ? "除外" : "復帰"}
+              </small>
+            </article>
           );
         })}
       </div>

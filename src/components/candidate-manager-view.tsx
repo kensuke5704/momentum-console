@@ -153,16 +153,16 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
   ).map((ticker) => ticker.symbol);
 
   return (
-    <div className="view-stack comparison-view">
+    <div className="view-stack candidate-manager-view">
       <MaintenancePanel
         data={data}
         includedSymbols={includedSymbols}
         onToggle={toggleTicker}
       />
 
-      <section className="comparison-builder">
+      <section className="candidate-manager-grid">
         <div className="universe-panel">
-          <div className="comparison-section-heading">
+          <div className="candidate-section-heading">
             <div>
               <h2>既存銘柄</h2>
               <p>
@@ -172,7 +172,7 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
             </div>
           </div>
 
-          <label className="comparison-search">
+          <label className="candidate-search">
             <span className="sr-only">既存銘柄を検索</span>
             <MagnifyingGlassIcon size={16} />
             <input
@@ -210,7 +210,7 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
         </div>
 
         <div className="custom-panel">
-          <div className="comparison-section-heading">
+          <div className="candidate-section-heading">
             <div>
               <h2>新規銘柄</h2>
               <p>銘柄コードで候補を追加</p>
@@ -247,7 +247,7 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
             <small>入力した銘柄コードはこのブラウザに保存されます。</small>
           </label>
 
-          {message ? <p className="comparison-message">{message}</p> : null}
+          {message ? <p className="candidate-message">{message}</p> : null}
 
           <div className="custom-ticker-list">
             {customSymbols.length ? (
@@ -268,7 +268,7 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
                 </article>
               ))
             ) : (
-              <div className="comparison-empty">
+              <div className="candidate-empty">
                 <ScalesIcon />
                 <p>追加した銘柄がここに表示されます。</p>
               </div>
