@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { buildDashboard } from "../src/lib/momentum";
 import { TICKERS, DEFAULT_STRATEGY } from "../src/lib/config";
 import { fetchHistories } from "../src/lib/yahoo";
-import type { DashboardPayload, StrategyConfig, TickerConfig } from "../src/lib/types";
+import type { DashboardPayload, StrategyConfig } from "../src/lib/types";
 
 type ScenarioResult = {
   name: string;
@@ -39,17 +39,12 @@ function rowsByMonth(dashboard: DashboardPayload) {
   return new Map(dashboard.backtest.rows.map((row) => [row.signalMonth, row]));
 }
 
-function summarizeScenario(
-  name: string,
-  dashboard: DashboardPayload,
-  baseline: DashboardPayload,
-): ScenarioResult {
+function summarizeScenario(name: string, dashboard: DashboardPayload, baseline: DashboardPayload): ScenarioResult {
   const stats = dashboard.backtest.stats;
   const baselineRows = rowsByMonth(baseline);
   const scenarioRows = rowsByMonth(dashboard);
   const months = [...new Set([...baselineRows.keys(), ...scenarioRows.keys()])].sort();
   const changes: ScenarioResult["changes"] = [];
-
   for (const month of months) {
     const a = baselineRows.get(month);
     const b = scenarioRows.get(month);
@@ -58,8 +53,7 @@ function summarizeScenario(
     const samePicks = ap.length === bp.length && ap.every((v, i) => v === bp[i]);
     const ar = typeof a?.monthlyReturn === "number" ? a.monthlyReturn : null;
     const br = typeof b?.monthlyReturn === "number" ? b.monthlyReturn : null;
-    const sameReturn = ar === br;
-    if (samePicks && sameReturn) continue;
+    if (samePicks && ar === br) continue;
     changes.push({
       month,
       baselinePicks: ap,
@@ -71,7 +65,6 @@ function summarizeScenario(
       added: bp.filter((x) => !ap.includes(x)),
     });
   }
-
   return {
     name,
     cagr: stats.cagr,
@@ -125,13 +118,7 @@ async function main() {
     if (ticker.symbol === "QQQ") continue;
     const tickers = TICKERS.filter((item) => item.symbol !== ticker.symbol);
     const dashboard = buildDashboard(histories, tickers, cloneStrategy());
-    loo.push({
-      ...summarizeScenario(`Remove ${ticker.symbol}`, dashboard, baseline),
-      removed: ticker.symbol,
-      genre: ticker.genre,
-      selectionCount: selection.counts[ticker.symbol] ?? 0,
-      selectionMonths: selection.months[ticker.symbol] ?? [],
-    });
+    loo.push({ ...summarizeScenario(`Remove ${ticker.symbol}`, dashboard, baseline), removed: ticker.symbol, genre: ticker.genre, selectionCount: selection.counts[ticker.symbol] ?? 0, selectionMonths: selection.months[ticker.symbol] ?? [] });
   }
   loo.sort((a, b) => b.cagr - a.cagr);
 
@@ -161,11 +148,23 @@ async function main() {
     frontierTests.push({ ...summarizeScenario(`Frontier max ${frontierMax}`, dashboard, baseline), frontierMax });
   }
 
-  const positiveLoo = loo
-    .filter((x) => x.cagr > baselineSummary.cagr)
-    .sort((a, b) => b.cagr - a.cagr)
-    .slice(0, 8)
-    .map((x) => x.removed);
+  const capDefinitions = [
+    { key: "frontier2", apply: (s: StrategyConfig) => { s.frontierMax = 2; } },
+    { key: "defense1", apply: (s: StrategyConfig) => { s.genreLimits.Defense = 1; } },
+    { key: "quantum1", apply: (s: StrategyConfig) => { s.genreLimits.Quantum = 1; } },
+    { key: "optical1", apply: (s: StrategyConfig) => { s.genreLimits["Optical Networking"] = 1; } },
+  ];
+  const capCombos: Array<ScenarioResult & { rules: string[] }> = [];
+  for (const combo of combinations(capDefinitions, 1, capDefinitions.length)) {
+    const strategy = cloneStrategy();
+    combo.forEach((rule) => rule.apply(strategy));
+    const rules = combo.map((rule) => rule.key);
+    const dashboard = buildDashboard(histories, TICKERS, strategy);
+    capCombos.push({ ...summarizeScenario(`Caps ${rules.join("+")}`, dashboard, baseline), rules });
+  }
+  capCombos.sort((a, b) => b.calmar - a.calmar || b.cagr - a.cagr);
+
+  const positiveLoo = loo.filter((x) => x.cagr > baselineSummary.cagr).sort((a, b) => b.cagr - a.cagr).slice(0, 8).map((x) => x.removed);
   const removalCombos: Array<ScenarioResult & { removed: string[] }> = [];
   for (const combo of combinations(positiveLoo, 2, Math.min(4, positiveLoo.length))) {
     const set = new Set(combo);
@@ -180,16 +179,13 @@ async function main() {
     source: "Yahoo Finance via src/lib/yahoo.ts fetchHistories/fetchYahooHistory",
     strategy: baselineStrategy,
     tickers: TICKERS,
-    historyRange: Object.fromEntries(Object.entries(histories).map(([symbol, points]) => [symbol, {
-      first: points[0]?.date ?? null,
-      last: points.at(-1)?.date ?? null,
-      count: points.length,
-    }])),
+    historyRange: Object.fromEntries(Object.entries(histories).map(([symbol, points]) => [symbol, { first: points[0]?.date ?? null, last: points.at(-1)?.date ?? null, count: points.length }])),
     baseline: baselineSummary,
     baselineSelection: selection,
     leaveOneOut: loo,
     genreTests,
     frontierTests,
+    capCombos,
     positiveLooCandidates: positiveLoo,
     removalCombos,
   };
@@ -201,6 +197,7 @@ async function main() {
   console.log("TOP_LOO", JSON.stringify(loo.slice(0, 12).map((x) => ({ removed: x.removed, genre: x.genre, cagr: x.cagr, maxDrawdown: x.maxDrawdown, vol: x.annualizedVolatility, finalEquity: x.finalEquity, changedMonths: x.changedMonths }))));
   console.log("TOP_GENRE", JSON.stringify([...genreTests].sort((a, b) => b.cagr - a.cagr).slice(0, 12).map((x) => ({ genre: x.genre, limit: x.limit, cagr: x.cagr, maxDrawdown: x.maxDrawdown, vol: x.annualizedVolatility, finalEquity: x.finalEquity, changedMonths: x.changedMonths }))));
   console.log("FRONTIER", JSON.stringify(frontierTests.map((x) => ({ frontierMax: x.frontierMax, cagr: x.cagr, maxDrawdown: x.maxDrawdown, vol: x.annualizedVolatility, finalEquity: x.finalEquity, changedMonths: x.changedMonths }))));
+  console.log("TOP_CAP_COMBOS", JSON.stringify(capCombos.slice(0, 15).map((x) => ({ rules: x.rules, cagr: x.cagr, maxDrawdown: x.maxDrawdown, vol: x.annualizedVolatility, calmar: x.calmar, finalEquity: x.finalEquity, changedMonths: x.changedMonths }))));
   console.log("TOP_COMBOS", JSON.stringify(removalCombos.slice(0, 20).map((x) => ({ removed: x.removed, cagr: x.cagr, maxDrawdown: x.maxDrawdown, vol: x.annualizedVolatility, finalEquity: x.finalEquity, changedMonths: x.changedMonths }))));
 }
 
