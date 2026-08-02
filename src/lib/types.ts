@@ -20,8 +20,8 @@ export type StrategyConfig = {
   };
   surgeLimit: number;
   qqqMaMonths: number;
+  genreMax: number;
   frontierMax: number;
-  genreLimits: Record<string, number>;
   frontierGenres: string[];
   excludedTickers: string[];
   backtestStart: string;
