@@ -2577,6 +2577,13 @@ main {
   padding: 5px 24px;
 }
 
+.pick-row:nth-child(odd),
+.pick-row:nth-child(even) {
+  border-right: 0;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
 .pick-row:last-child {
   border-bottom: 0;
 }
@@ -2605,20 +2612,20 @@ main {
 
 .pick-score {
   justify-self: stretch;
-  text-align: center;
+  text-align: left;
 }
 
 .pick-table-head > span:nth-child(n + 3),
 .pick-row > span:not(.pick-number) {
-  text-align: center;
+  text-align: left;
 }
 
 .pick-price {
-  text-align: center;
+  text-align: left;
 }
 
 .pick-score .change {
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 72px;
 }
 
