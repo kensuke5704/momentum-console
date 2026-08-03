@@ -2625,8 +2625,9 @@ main {
 }
 
 .pick-score .change {
-  justify-content: flex-start;
-  min-width: 72px;
+  display: inline-flex;
+  font-size: 12px;
+  margin-top: 0;
 }
 
 .performance-panel {
