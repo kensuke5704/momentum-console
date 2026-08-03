@@ -2628,6 +2628,12 @@ main {
   display: inline-flex;
   font-size: 11px;
   margin-top: 0;
+  vertical-align: middle;
+}
+
+.pick-score .change svg {
+  height: 11px;
+  width: 11px;
 }
 
 .performance-panel {
