@@ -44,6 +44,7 @@ import {
 } from "@/lib/config";
 import { buildDashboard } from "@/lib/momentum";
 import { CandidateManagerView } from "@/components/candidate-manager-view";
+import { OperationScheduleSection } from "@/components/operation-schedule-section";
 import {
   fetchYahooHistoriesInBrowser,
   fetchYahooHistoryInBrowser,
@@ -1207,6 +1208,8 @@ function SettingsView({
             </label>
           </div>
         </section>
+
+        <OperationScheduleSection />
 
         <div className="settings-actions span-full">
           <p>

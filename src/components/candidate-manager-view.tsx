@@ -8,7 +8,6 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
-import { MaintenancePanel } from "@/components/maintenance-panel";
 import { TICKERS } from "@/lib/config";
 import type { DashboardPayload } from "@/lib/types";
 
@@ -154,12 +153,6 @@ export function CandidateManagerView({ data }: { data: DashboardPayload }) {
 
   return (
     <div className="view-stack candidate-manager-view">
-      <MaintenancePanel
-        data={data}
-        includedSymbols={includedSymbols}
-        onToggle={toggleTicker}
-      />
-
       <section className="candidate-manager-grid">
         <div className="universe-panel">
           <div className="candidate-section-heading">
