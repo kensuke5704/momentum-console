@@ -3403,3 +3403,207 @@ tbody tr:hover {
     padding: 16px;
   }
 }
+
+/* Mobile data views: keep desktop tables unchanged and reflow dense rows into cards. */
+@media (max-width: 760px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .topbar .refresh-button {
+    min-width: 42px;
+    padding: 0;
+    width: 42px;
+  }
+
+  .topbar .refresh-button svg {
+    height: 22px;
+    width: 22px;
+  }
+
+  .table-shell,
+  .large-chart-panel,
+  .large-chart {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .analysis-table,
+  .portfolio-table,
+  .backtest-table {
+    overflow: visible;
+  }
+
+  .analysis-table table,
+  .portfolio-table table,
+  .backtest-table table,
+  .analysis-table tbody,
+  .portfolio-table tbody,
+  .backtest-table tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .analysis-table thead,
+  .portfolio-table thead,
+  .backtest-table thead {
+    display: none;
+  }
+
+  .analysis-table tr,
+  .portfolio-table tr,
+  .backtest-table tr {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    position: relative;
+    width: 100%;
+  }
+
+  .analysis-table td,
+  .portfolio-table td,
+  .backtest-table td {
+    border: 0;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .analysis-table td::before,
+  .portfolio-table td::before,
+  .backtest-table td::before {
+    color: var(--text-muted);
+    content: attr(data-label);
+    display: block;
+    font-family: "Roboto Mono", monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+
+  .analysis-table tr {
+    display: grid;
+    gap: 14px 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 15px 14px;
+  }
+
+  .analysis-table .rank-cell {
+    left: 14px;
+    position: absolute;
+    top: 17px;
+  }
+
+  .analysis-table .rank-cell::before,
+  .analysis-table .ticker-data::before,
+  .analysis-table .decision-cell::before {
+    display: none;
+  }
+
+  .analysis-table .ticker-data {
+    grid-column: 1 / 3;
+    padding-left: 28px;
+  }
+
+  .analysis-table .decision-cell {
+    align-self: start;
+    grid-column: 3;
+    justify-self: end;
+    text-align: right;
+  }
+
+  .analysis-table .current-cell {
+    grid-column: 1;
+  }
+
+  .analysis-table .score-cell {
+    grid-column: 2 / 4;
+  }
+
+  .analysis-table .score-cell .change {
+    justify-content: flex-start;
+  }
+
+  .portfolio-table tr {
+    display: grid;
+    gap: 16px 20px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 16px 14px 18px;
+  }
+
+  .portfolio-table .ticker-data {
+    grid-column: 1 / -1;
+  }
+
+  .portfolio-table .ticker-data::before {
+    display: none;
+  }
+
+  .portfolio-table .currency-pair {
+    justify-items: start;
+  }
+
+  .portfolio-table .inline-number,
+  .portfolio-table .inline-number input {
+    max-width: none;
+    width: 100%;
+  }
+
+  .fine-print {
+    margin: 0;
+    padding: 14px;
+  }
+
+  .backtest-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .backtest-stats .metric,
+  .backtest-stats .metric:nth-child(-n + 4) {
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+
+  .backtest-stats .metric:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .backtest-stats .metric:last-child {
+    border-bottom: 0;
+    border-right: 0;
+    grid-column: 1 / -1;
+  }
+
+  .large-chart-panel {
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .large-chart {
+    height: 300px;
+    margin-top: 0;
+    padding: 12px 8px 10px;
+  }
+
+  .backtest-table tr {
+    display: grid;
+    gap: 14px 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 16px 14px;
+  }
+
+  .backtest-table .picks-cell {
+    grid-column: 1 / -1;
+  }
+
+  .backtest-table .ticker-list {
+    min-width: 0;
+  }
+}
