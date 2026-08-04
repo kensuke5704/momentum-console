@@ -21,9 +21,13 @@ jobs:
       - run: npm ci
       - name: Run robustness search
         run: node --import tsx scripts/chatgpt-robustness-search.ts
+      - name: Run targeted TopN robustness
+        run: node --import tsx scripts/chatgpt-topn-robustness.ts
       - name: Upload robustness search results
         uses: actions/upload-artifact@v4
         with:
           name: chatgpt-robustness-search-results
-          path: artifacts/robustness-search.json
+          path: |
+            artifacts/robustness-search.json
+            artifacts/topn-robustness.json
           if-no-files-found: error
