@@ -1,0 +1,73 @@
+{
+  "generatedAt": "2026-08-04T02:59:18.397Z",
+  "frozen": {
+    "id": "momentum-2026-08-v1",
+    "frozenAt": "2026-08-04",
+    "firstSignalMonth": "2026-07",
+    "firstHoldingMonth": "2026-08",
+    "strategy": {
+      "topN": 9,
+      "weights": {
+        "oneMonth": 0.1,
+        "threeMonth": 0.4,
+        "sixMonth": 0.5
+      },
+      "surgeLimit": 0.8,
+      "qqqMaMonths": 10,
+      "genreMax": 2,
+      "frontierMax": 2,
+      "frontierGenres": [
+        "Quantum",
+        "Space",
+        "Nuclear",
+        "Crypto"
+      ],
+      "excludedTickers": [],
+      "backtestStart": "2023-01-01",
+      "targetTotalJpy": 1000000,
+      "usdJpy": 163.6375
+    }
+  },
+  "integrity": {
+    "defaultStrategyMatchesFrozen": false,
+    "mismatches": [
+      "topN current=10 frozen=9",
+      "weights.oneMonth current=0.2 frozen=0.1",
+      "weights.sixMonth current=0.4 frozen=0.5"
+    ]
+  },
+  "summary": {
+    "completedMonths": 0,
+    "pendingMonths": 1,
+    "cumulativeReturn": null,
+    "equity": 1,
+    "cagr": null,
+    "averageMonthlyReturn": null,
+    "annualizedVolatility": null,
+    "maxDrawdown": null,
+    "wins": 0,
+    "losses": 0
+  },
+  "rows": [
+    {
+      "signalMonth": "2026-07-31",
+      "entryDate": "2026-08-03",
+      "exitDate": null,
+      "market": "RiskOn",
+      "picks": [
+        "DDOG",
+        "PANW",
+        "MU",
+        "CRWD",
+        "NET",
+        "SOXL",
+        "LITE",
+        "FIX",
+        "RIOT"
+      ],
+      "monthlyReturn": null,
+      "equity": null,
+      "provisional": true
+    }
+  ]
+}
