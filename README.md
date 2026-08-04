@@ -15,6 +15,10 @@ Google スプレッドシートと Apps Script で運用していたモメンタ
 - 直近24か月の採用履歴による整理候補の抽出
 - 戦略条件の変更とブラウザ内再計算
 
+## Universe ガバナンス
+
+新規銘柄の追加、既存銘柄の監査・除外については、過去CAGR最大化を避けるための共通ルールを [`docs/universe-governance.md`](docs/universe-governance.md) に定義しています。
+
 ## データ更新
 
 GitHub Actionsが米国市場営業日の朝にYahoo Financeの公開データを取得し、静的データファイルを再生成してGitHub Pagesへデプロイします。Actions画面から手動実行することもできます。
