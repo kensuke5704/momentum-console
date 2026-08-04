@@ -567,7 +567,7 @@ function Screener({ data }: { data: DashboardPayload }) {
       </div>
 
       {filtered.length ? (
-        <div className="table-shell">
+        <div className="table-shell analysis-table">
           <table>
             <thead>
               <tr>
@@ -584,31 +584,40 @@ function Screener({ data }: { data: DashboardPayload }) {
             <tbody>
               {filtered.map((row) => (
                 <tr key={row.symbol} className={row.selected ? "selected-row" : ""}>
-                  <td className="rank-cell">
+                  <td className="rank-cell" data-label="Rank">
                     {row.rank === null ? <span className="muted">-</span> : row.rank}
                   </td>
-                  <td>
+                  <td className="ticker-data" data-label="銘柄">
                     <div className="ticker-cell">
                       <strong>{row.symbol}</strong>
                       <span>{row.genre}</span>
                     </div>
                   </td>
-                  <td className="numeric">
+                  <td className="numeric current-cell" data-label="現在値">
                     {row.current === null ? "N/A" : `$${decimal.format(row.current)}`}
                   </td>
-                  <td className={`numeric ${(row.oneMonth ?? 0) < 0 ? "negative" : ""}`}>
+                  <td
+                    className={`numeric return-cell ${(row.oneMonth ?? 0) < 0 ? "negative" : ""}`}
+                    data-label="1M"
+                  >
                     {percent(row.oneMonth)}
                   </td>
-                  <td className={`numeric ${(row.threeMonth ?? 0) < 0 ? "negative" : ""}`}>
+                  <td
+                    className={`numeric return-cell ${(row.threeMonth ?? 0) < 0 ? "negative" : ""}`}
+                    data-label="3M"
+                  >
                     {percent(row.threeMonth)}
                   </td>
-                  <td className={`numeric ${(row.sixMonth ?? 0) < 0 ? "negative" : ""}`}>
+                  <td
+                    className={`numeric return-cell ${(row.sixMonth ?? 0) < 0 ? "negative" : ""}`}
+                    data-label="6M"
+                  >
                     {percent(row.sixMonth)}
                   </td>
-                  <td>
+                  <td className="score-cell" data-label="Score">
                     <ScoreChange value={row.score} />
                   </td>
-                  <td>
+                  <td className="decision-cell" data-label="判定">
                     <span
                       className={`decision ${row.selected ? "selected" : row.eligible ? "eligible" : "excluded"}`}
                     >
@@ -726,13 +735,13 @@ function PortfolioView({
           <tbody>
             {rows.map((row) => (
               <tr key={row.symbol}>
-                <td>
+                <td className="ticker-data" data-label="銘柄">
                   <div className="ticker-cell">
                     <strong>{row.symbol}</strong>
                     <span>{row.genre}</span>
                   </div>
                 </td>
-                <td className="numeric">
+                <td className="numeric" data-label="現在値">
                   {row.current === null ? (
                     "N/A"
                   ) : (
@@ -744,7 +753,7 @@ function PortfolioView({
                     </span>
                   )}
                 </td>
-                <td className="numeric">
+                <td className="numeric" data-label="目標額">
                   <span className="currency-pair">
                     <span>${money.format(row.targetAmount)}</span>
                     <small>
@@ -752,12 +761,12 @@ function PortfolioView({
                     </small>
                   </span>
                 </td>
-                <td className="numeric">
+                <td className="numeric" data-label="目標株数">
                   {row.targetShares === null
                     ? "N/A"
                     : decimal.format(row.targetShares)}
                 </td>
-                <td>
+                <td data-label="実保有株数">
                   <label className="inline-number">
                     <span className="sr-only">{row.symbol}の保有株数</span>
                     <FormattedNumberInput
@@ -772,7 +781,7 @@ function PortfolioView({
                     />
                   </label>
                 </td>
-                <td className="numeric">
+                <td className="numeric" data-label="現在評価額">
                   <span className="currency-pair">
                     <span>${money.format(row.actualAmount)}</span>
                     <small>
@@ -782,6 +791,7 @@ function PortfolioView({
                 </td>
                 <td
                   className={`numeric difference ${row.difference >= 0 ? "positive" : "negative"}`}
+                  data-label="差額"
                 >
                   <span className="currency-pair">
                     <span>
@@ -907,7 +917,7 @@ function BacktestView({ data }: { data: DashboardPayload }) {
             {showAll ? "直近12か月" : "全期間を表示"}
           </button>
         </div>
-        <div className="table-shell">
+        <div className="table-shell backtest-table">
           <table>
             <thead>
               <tr>
@@ -933,15 +943,17 @@ function BacktestView({ data }: { data: DashboardPayload }) {
 function BacktestTableRow({ row }: { row: BacktestRow }) {
   return (
     <tr>
-      <td className="numeric">{compactDate(row.signalMonth)}</td>
-      <td>
+      <td className="numeric" data-label="シグナル月">
+        {compactDate(row.signalMonth)}
+      </td>
+      <td data-label="市場">
         <span
           className={`market-tag ${row.market === "RiskOn" ? "risk-on" : "cash"}`}
         >
           {row.market}
         </span>
       </td>
-      <td>
+      <td className="picks-cell" data-label="採用銘柄">
         {row.picks.length ? (
           <div className="ticker-list">
             {row.picks.map((pick) => (
@@ -954,10 +966,11 @@ function BacktestTableRow({ row }: { row: BacktestRow }) {
       </td>
       <td
         className={`numeric ${(row.monthlyReturn ?? 0) < 0 ? "negative" : "positive"}`}
+        data-label="月次"
       >
         {row.provisional ? "暫定" : percent(row.monthlyReturn)}
       </td>
-      <td className="numeric">
+      <td className="numeric" data-label="資産">
         {row.equity === null ? "暫定" : `${decimal.format(row.equity)}x`}
       </td>
     </tr>
@@ -1594,6 +1607,7 @@ export function MomentumApp({
               className="refresh-button"
               onClick={() => void refresh(config, true)}
               disabled={loading}
+              aria-label={loading ? "価格を更新中" : "価格を更新"}
             >
               {loading ? <LoadingLine /> : <ArrowClockwiseIcon />}
               <span>{loading ? "更新中" : "価格を更新"}</span>
