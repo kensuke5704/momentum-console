@@ -10,7 +10,7 @@ const AUDIT_START = "2020-01-01";
 const AUDIT_END = "2022-12-31";
 const OUTPUT = resolve("artifacts/legacy-universe-audit.json");
 
-type AuditClass = "A" | "B" | "C" | "BENCHMARK";
+type AuditClass = "A" | "B" | "C" | "D" | "BENCHMARK";
 
 type SelectionObservation = {
   signalMonth: string;
@@ -30,9 +30,9 @@ function monthlyMap(points: PricePoint[]) {
 }
 
 function monthlyKeys(points: PricePoint[]) {
-  const map = new Map<string, string>();
-  for (const point of points) map.set(monthKey(point.date), point.date);
-  return [...map.keys()].sort();
+  const set = new Set<string>();
+  for (const point of points) set.add(monthKey(point.date));
+  return [...set].sort();
 }
 
 function addDays(date: string, days: number) {
@@ -64,14 +64,11 @@ function stdev(values: number[]) {
   );
 }
 
-function stats(rows: BacktestRow[]) {
-  const returns = rows
-    .filter(
-      (row) =>
-        typeof row.monthlyReturn === "number" && !row.provisional,
-    )
-    .map((row) => row.monthlyReturn as number);
-
+function periodStats(rows: BacktestRow[]) {
+  const completed = rows.filter(
+    (row) => typeof row.monthlyReturn === "number" && !row.provisional,
+  );
+  const returns = completed.map((row) => row.monthlyReturn as number);
   let equity = 1;
   let peak = 1;
   let maxDrawdown = 0;
@@ -82,11 +79,10 @@ function stats(rows: BacktestRow[]) {
   }
 
   const annualReturns: Record<string, number> = {};
-  for (const row of rows) {
-    if (typeof row.monthlyReturn !== "number" || row.provisional) continue;
+  for (const row of completed) {
     const year = row.signalMonth.slice(0, 4);
     annualReturns[year] =
-      (1 + (annualReturns[year] ?? 0)) * (1 + row.monthlyReturn) - 1;
+      (1 + (annualReturns[year] ?? 0)) * (1 + (row.monthlyReturn as number)) - 1;
   }
 
   return {
@@ -102,44 +98,25 @@ function stats(rows: BacktestRow[]) {
 }
 
 function qqqBenchmark(rows: BacktestRow[], qqq: PricePoint[]) {
-  const values: Array<{ signalMonth: string; monthlyReturn: number }> = [];
+  const benchmarkRows: BacktestRow[] = [];
+  let equity = 1;
   for (const row of rows) {
     const entry = priceOnOrAfter(qqq, addDays(row.signalMonth, 1));
     const exit = priceOnOrAfter(qqq, addDays(nextMonthEnd(row.signalMonth), 1));
     if (!entry || !exit) continue;
-    values.push({
+    const monthlyReturn = exit.close / entry.close - 1;
+    equity *= 1 + monthlyReturn;
+    benchmarkRows.push({
       signalMonth: row.signalMonth,
-      monthlyReturn: exit.close / entry.close - 1,
+      entryDate: entry.date,
+      exitDate: exit.date,
+      market: "RiskOn",
+      picks: ["QQQ"],
+      monthlyReturn,
+      equity,
     });
   }
-
-  const returns = values.map((item) => item.monthlyReturn);
-  let equity = 1;
-  let peak = 1;
-  let maxDrawdown = 0;
-  for (const value of returns) {
-    equity *= 1 + value;
-    peak = Math.max(peak, equity);
-    maxDrawdown = Math.min(maxDrawdown, equity / peak - 1);
-  }
-
-  const annualReturns: Record<string, number> = {};
-  for (const item of values) {
-    const year = item.signalMonth.slice(0, 4);
-    annualReturns[year] =
-      (1 + (annualReturns[year] ?? 0)) * (1 + item.monthlyReturn) - 1;
-  }
-
-  return {
-    completedMonths: returns.length,
-    finalEquity: equity,
-    cumulativeReturn: equity - 1,
-    cagr: returns.length ? equity ** (12 / returns.length) - 1 : null,
-    averageMonthlyReturn: mean(returns),
-    annualizedVolatility: stdev(returns) * Math.sqrt(12),
-    maxDrawdown,
-    annualReturns,
-  };
+  return periodStats(benchmarkRows);
 }
 
 function selectionObservation(
@@ -208,19 +185,23 @@ async function main() {
       rationale = "Insufficient usable pre-2023 history for the required 1M/3M/6M lookbacks.";
     } else if (
       observations.length >= 3 &&
-      avg !== null &&
-      avg > 0 &&
-      winRate !== null &&
-      winRate >= 0.5
+      avg !== null && avg > 0 &&
+      winRate !== null && winRate >= 0.5
     ) {
       classification = "A";
       rationale = "Selected at least 3 times with positive average selected-month return and win rate >= 50%.";
+    } else if (
+      observations.length >= 3 &&
+      avg !== null && avg < 0 &&
+      winRate !== null && winRate < 0.5
+    ) {
+      classification = "D";
+      rationale = "Selected at least 3 times with negative average selected-month return and win rate < 50%; review only, no automatic removal.";
     } else {
       classification = "B";
-      rationale =
-        observations.length < 3
-          ? "Usable pre-2023 history exists, but fewer than 3 completed selections provide limited evidence."
-          : "Usable pre-2023 history exists, but selected-month outcomes are mixed and do not meet the A definition.";
+      rationale = observations.length < 3
+        ? "Usable pre-2023 history exists, but fewer than 3 completed selections provide limited evidence."
+        : "Usable pre-2023 history exists, but selected-month outcomes are mixed and meet neither A nor D.";
     }
 
     return {
@@ -237,13 +218,8 @@ async function main() {
       losses: holdingReturns.length - wins,
       winRate,
       averageSelectedHoldingReturn: avg,
-      medianSelectedHoldingReturn: holdingReturns.length
-        ? [...holdingReturns].sort((a, b) => a - b)[
-            Math.floor(holdingReturns.length / 2)
-          ]
-        : null,
       cumulativeSelectedReturn: holdingReturns.reduce(
-        (equity, value) => equity * (1 + value),
+        (equityValue, value) => equityValue * (1 + value),
         1,
       ) - 1,
       observations,
@@ -281,25 +257,25 @@ async function main() {
   const result = {
     generatedAt: new Date().toISOString(),
     purpose:
-      "Diagnostic legacy Universe audit only. This report must not be used to optimize removals or change strategy parameters on the same sample.",
+      "Diagnostic legacy Universe audit only. Do not optimize removals or strategy parameters on this sample.",
     policy: {
       A: "At least 3 completed pre-2023 selections, positive average selected-month holding return, win rate >= 50%.",
-      B: "Usable pre-2023 history exists but evidence is limited or mixed; does not meet A.",
+      B: "Usable pre-2023 history exists but evidence is limited or mixed; meets neither A nor D.",
       C: "Insufficient usable pre-2023 history for required momentum lookbacks.",
-      D: "Reserved policy label for adverse evidence; no ticker is auto-removed. In this implementation adverse repeated evidence remains visible in B details rather than triggering a mechanical removal decision.",
+      D: "At least 3 completed pre-2023 selections, negative average selected-month holding return, win rate < 50%. Review only; no automatic removal.",
       note: "No classification triggers automatic removal.",
     },
     methodology: {
       dataSource: "src/lib/yahoo.ts via fetchHistories",
       strategyEngine: "src/lib/momentum.ts via buildDashboard",
       frozenStrategy: FROZEN_STRATEGY,
-      auditStrategy: { ...auditStrategy },
+      auditStrategy,
       requestedWindow: { start: AUDIT_START, end: AUDIT_END },
       effectiveFirstSignal: auditRows.at(0)?.signalMonth ?? null,
       effectiveLastSignal: auditRows.at(-1)?.signalMonth ?? null,
       note: "Yahoo history begins 2020-01-01 and the strategy requires MA/lookback warm-up, so early 2020 cannot generate a valid signal.",
     },
-    portfolioAudit: stats(auditRows),
+    portfolioAudit: periodStats(auditRows),
     qqqBenchmark: qqqBenchmark(auditRows, histories.QQQ ?? []),
     rowCounts: {
       totalAuditRows: auditRows.length,
