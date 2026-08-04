@@ -111,3 +111,27 @@ Every Universe research report should distinguish:
 - final action: reject, watch, adopt, or review
 
 When evidence is insufficient, prefer `watch` over `adopt` or `remove`.
+
+## Repository source of truth
+
+The canonical persistent research state is `data/universe-watchlist.json`.
+
+It contains both:
+
+- prospective candidates that are not yet members of the production Universe
+- existing Universe members under focused legacy review
+
+The file records the discovery/review date, genre, status, rationale, retrospective sanity-check or legacy-audit evidence, and forward-evidence counters.
+
+The watchlist is research state only. Editing it must not directly change `TICKERS`, `DEFAULT_STRATEGY`, or `FROZEN_STRATEGY`.
+
+Use the following status semantics:
+
+- candidate `watch`: monitor prospectively; not in production Universe
+- candidate `adopted`: separately approved and added to the production Universe
+- candidate `rejected`: research closed without adoption
+- legacy `review`: production Universe member under focused forward review
+- legacy `cleared`: review completed with no removal action
+- legacy `removed`: removed from production Universe through a separate governed decision
+
+Run `npm run check:watchlist` after any edit to the file. The validator enforces unique symbols, schema correctness, candidate/Universe separation, and consistency between legacy-review genres and the production Universe.
