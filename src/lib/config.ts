@@ -46,11 +46,11 @@ export const TICKERS: TickerConfig[] = [
 ];
 
 export const DEFAULT_STRATEGY: StrategyConfig = {
-  topN: 10,
+  topN: 9,
   weights: {
-    oneMonth: 0.2,
+    oneMonth: 0.1,
     threeMonth: 0.4,
-    sixMonth: 0.4,
+    sixMonth: 0.5,
   },
   surgeLimit: 0.8,
   qqqMaMonths: 10,
