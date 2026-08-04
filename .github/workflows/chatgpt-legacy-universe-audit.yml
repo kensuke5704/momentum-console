@@ -1,0 +1,29 @@
+name: ChatGPT Legacy Universe Audit
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run legacy Universe audit
+        run: node --import tsx scripts/chatgpt-legacy-universe-audit.ts
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-universe-audit
+          path: artifacts/legacy-universe-audit.json
+          if-no-files-found: error
