@@ -1,8 +1,41 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { DEFAULT_STRATEGY, TICKERS } from "../src/lib/config";
 import { buildDashboard } from "../src/lib/momentum";
+import type { PricePoint } from "../src/lib/types";
 import { fetchHistories } from "../src/lib/yahoo";
+
+type MarketDataFile = {
+  histories?: Record<string, PricePoint[]>;
+};
+
+function mergeHistories(
+  existing: Record<string, PricePoint[]>,
+  fetched: Record<string, PricePoint[]>,
+  symbols: string[],
+) {
+  const merged: Record<string, PricePoint[]> = {};
+
+  symbols.forEach((symbol) => {
+    const byDate = new Map<string, PricePoint>();
+    (existing[symbol] ?? []).forEach((point) => byDate.set(point.date, point));
+    (fetched[symbol] ?? []).forEach((point) => byDate.set(point.date, point));
+    merged[symbol] = [...byDate.values()].sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
+  });
+
+  return merged;
+}
+
+async function readExistingHistories(outputPath: string) {
+  try {
+    const body = JSON.parse(await readFile(outputPath, "utf8")) as MarketDataFile;
+    return body.histories ?? {};
+  } catch {
+    return {};
+  }
+}
 
 async function main() {
   const symbols = [
@@ -10,7 +43,10 @@ async function main() {
   ];
   console.log(`Fetching ${symbols.length} symbols...`);
 
-  const histories = await fetchHistories(symbols);
+  const fetchedHistories = await fetchHistories(symbols);
+  const outputPath = resolve("public/data/market-data.json");
+  const existingHistories = await readExistingHistories(outputPath);
+  const histories = mergeHistories(existingHistories, fetchedHistories, symbols);
   const usdJpyPoints = histories["JPY=X"] ?? [];
   const latestUsdJpy = usdJpyPoints.at(-1)?.close;
   const strategy = {
@@ -22,8 +58,6 @@ async function main() {
   };
   const dashboard = buildDashboard(histories, TICKERS, strategy);
   const generatedAt = new Date().toISOString();
-  const outputPath = resolve("public/data/market-data.json");
-
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(
     outputPath,
