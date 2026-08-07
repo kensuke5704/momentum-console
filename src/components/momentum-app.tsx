@@ -240,6 +240,15 @@ function Overview({
       date: row.signalMonth.slice(2, 7).replace("-", "/"),
       value: (row.monthlyReturn ?? 0) * 100,
     }));
+  const monthToDateValues = data.portfolio
+    .map((row) => row.monthToDate)
+    .filter((value): value is number => typeof value === "number");
+  const averageMonthToDate =
+    monthToDateValues.length === data.portfolio.length &&
+    monthToDateValues.length > 0
+      ? monthToDateValues.reduce((sum, value) => sum + value, 0) /
+        monthToDateValues.length
+      : null;
 
   return (
     <div className="view-stack">
@@ -340,10 +349,6 @@ function Overview({
                   ? `（${allocationMonth(data.market.decisionDate)}）`
                   : ""}
               </h2>
-              <p>
-                相対モメンタムとテーマ上限を通過した
-                {decimal.format(data.portfolio.length)}銘柄
-              </p>
             </div>
             <button className="text-button" onClick={() => onNavigate("portfolio")}>
               配分を確認
@@ -392,6 +397,22 @@ function Overview({
                 </div>
               </article>
             ))}
+            <article className="pick-row pick-summary-row">
+              <span className="pick-number" aria-hidden="true" />
+              <div className="ticker-block">
+                <strong>合計</strong>
+              </div>
+              <div className="pick-price" aria-hidden="true" />
+              <span
+                className={`pick-month-to-date ${(averageMonthToDate ?? 0) < 0 ? "negative" : ""}`}
+              >
+                {percent(averageMonthToDate)}
+              </span>
+              <span aria-hidden="true" />
+              <span aria-hidden="true" />
+              <span aria-hidden="true" />
+              <div className="pick-score" aria-hidden="true" />
+            </article>
           </div>
         </section>
       ) : null}

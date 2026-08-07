@@ -2564,6 +2564,7 @@ main {
 
 .pick-grid {
   display: block;
+  margin-top: 0;
 }
 
 .pick-row {
@@ -2586,6 +2587,11 @@ main {
 
 .pick-row:last-child {
   border-bottom: 0;
+}
+
+.pick-summary-row {
+  background: var(--surface-2);
+  border-top: 1px solid var(--line-strong);
 }
 
 .pick-number,
