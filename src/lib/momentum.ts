@@ -437,6 +437,11 @@ export function buildDashboard(
       const ranked = candidateMap.get(ticker.symbol);
       const map = monthMaps[ticker.symbol];
       const decisionClose = map?.get(qqqMonths[latestIndex].key);
+      const latestPoint = histories[ticker.symbol]?.at(-1);
+      const latestMonthKey = latestPoint
+        ? toMonthKey(latestPoint.date)
+        : null;
+      const decisionMonthKey = qqqMonths[latestIndex].key;
       const oneMonthClose = map?.get(qqqMonths[latestIndex - 1].key);
       const threeMonthClose = map?.get(qqqMonths[latestIndex - 3].key);
       const sixMonthClose = map?.get(qqqMonths[latestIndex - 6].key);
@@ -458,6 +463,14 @@ export function buildDashboard(
             config.weights.threeMonth * m3 +
             config.weights.sixMonth * m6
           : null;
+      const monthToDate =
+        latestPoint && decisionClose && latestMonthKey
+          ? latestMonthKey === decisionMonthKey
+            ? 0
+            : latestMonthKey > decisionMonthKey
+              ? latestPoint.close / decisionClose - 1
+              : null
+          : null;
       const selected = selectedSymbols.has(ticker.symbol);
 
       let reason = "データ不足";
@@ -478,9 +491,10 @@ export function buildDashboard(
         symbol: ticker.symbol,
         genre: ticker.genre,
         current:
-          histories[ticker.symbol]?.at(-1)?.close ??
+          latestPoint?.close ??
           decisionClose ??
           null,
+        monthToDate,
         oneMonth: m1,
         threeMonth: m3,
         sixMonth: m6,
