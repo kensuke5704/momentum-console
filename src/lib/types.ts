@@ -33,6 +33,7 @@ export type MomentumRow = {
   symbol: string;
   genre: string;
   current: number | null;
+  monthToDate: number | null;
   oneMonth: number | null;
   threeMonth: number | null;
   sixMonth: number | null;

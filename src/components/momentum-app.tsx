@@ -354,6 +354,7 @@ function Overview({
             <span>RANK</span>
             <span>TICKER / THEME</span>
             <span>現在値</span>
+            <span>月初来</span>
             <span>1M</span>
             <span>3M</span>
             <span>6M</span>
@@ -372,6 +373,11 @@ function Overview({
                     {row.current === null ? "N/A" : `$${decimal.format(row.current)}`}
                   </strong>
                 </div>
+                <span
+                  className={`pick-month-to-date ${(row.monthToDate ?? 0) < 0 ? "negative" : ""}`}
+                >
+                  {percent(row.monthToDate)}
+                </span>
                 <span className={(row.oneMonth ?? 0) < 0 ? "negative" : ""}>
                   {percent(row.oneMonth)}
                 </span>

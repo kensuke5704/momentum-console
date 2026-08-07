@@ -8,7 +8,7 @@ import type {
 
 type SnapshotInput = Omit<
   MomentumRow,
-  "rank" | "eligible" | "selected" | "reason"
+  "rank" | "eligible" | "selected" | "reason" | "monthToDate"
 > & {
   rank: number;
   eligible: boolean;
@@ -60,6 +60,7 @@ const selectedSymbols = new Set([
 
 const momentum: MomentumRow[] = rows.map((row) => ({
   ...row,
+  monthToDate: null,
   selected: selectedSymbols.has(row.symbol),
   reason: row.eligible
     ? selectedSymbols.has(row.symbol)
