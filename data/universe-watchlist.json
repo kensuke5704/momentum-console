@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-04",
+  "updatedAt": "2026-08-08",
   "policy": "docs/universe-governance.md",
   "purpose": "Single source of truth for prospective Universe candidates and existing Universe tickers requiring focused review. Entries do not change production Universe membership by themselves.",
   "sanityCheckContext": {
@@ -20,19 +20,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "AI infrastructure / neocloud capacity expansion candidate identified for forward monitoring.",
-      "sanityCheck": {
-        "selectedMonths": 11,
-        "changedMonths": 11,
-        "cagr": 1.3253385207700137,
-        "deltaCagr": 0.04866532115313538,
-        "maxDrawdown": -0.24035886678049523,
-        "annualizedVolatility": 0.5475047632856541,
-        "calmar": 5.513998873943613
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":11,"changedMonths":11,"cagr":1.3253385207700137,"deltaCagr":0.04866532115313538,"maxDrawdown":-0.24035886678049523,"annualizedVolatility":0.5475047632856541,"calmar":5.513998873943613},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "CRWV",
@@ -42,19 +31,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "AI cloud infrastructure candidate with strong sector relevance but limited historical strategy selection.",
-      "sanityCheck": {
-        "selectedMonths": 2,
-        "changedMonths": 2,
-        "cagr": 1.2521562609537842,
-        "deltaCagr": -0.024516938663094123,
-        "maxDrawdown": -0.21126029188871698,
-        "annualizedVolatility": 0.534841670006859,
-        "calmar": 5.927078154437878
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":2,"changedMonths":2,"cagr":1.2521562609537842,"deltaCagr":-0.024516938663094123,"maxDrawdown":-0.21126029188871698,"annualizedVolatility":0.534841670006859,"calmar":5.927078154437878},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "AUR",
@@ -64,19 +42,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "Autonomous trucking commercialization candidate; monitor forward momentum before any Universe decision.",
-      "sanityCheck": {
-        "selectedMonths": 12,
-        "changedMonths": 12,
-        "cagr": 1.2080719683328773,
-        "deltaCagr": -0.06860123128400097,
-        "maxDrawdown": -0.28627002695323867,
-        "annualizedVolatility": 0.5257239113310306,
-        "calmar": 4.220043506441603
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":12,"changedMonths":12,"cagr":1.2080719683328773,"deltaCagr":-0.06860123128400097,"maxDrawdown":-0.28627002695323867,"annualizedVolatility":0.5257239113310306,"calmar":4.220043506441603},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "KDK",
@@ -86,19 +53,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "Autonomous freight candidate with insufficient historical selection evidence; prioritize forward history accumulation.",
-      "sanityCheck": {
-        "selectedMonths": 0,
-        "changedMonths": 0,
-        "cagr": 1.2766731996168783,
-        "deltaCagr": 0,
-        "maxDrawdown": -0.2112602918887171,
-        "annualizedVolatility": 0.5348669572572358,
-        "calmar": 6.043129014937532
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":0,"changedMonths":0,"cagr":1.2766731996168783,"deltaCagr":0,"maxDrawdown":-0.2112602918887171,"annualizedVolatility":0.5348669572572358,"calmar":6.043129014937532},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "JOBY",
@@ -108,19 +64,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "Advanced air mobility commercialization candidate retained for observation, not current adoption.",
-      "sanityCheck": {
-        "selectedMonths": 6,
-        "changedMonths": 6,
-        "cagr": 1.21078984266161,
-        "deltaCagr": -0.06588335695526837,
-        "maxDrawdown": -0.2656144026850562,
-        "annualizedVolatility": 0.5423046503110625,
-        "calmar": 4.558449505832202
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":6,"changedMonths":6,"cagr":1.21078984266161,"deltaCagr":-0.06588335695526837,"maxDrawdown":-0.2656144026850562,"annualizedVolatility":0.5423046503110625,"calmar":4.558449505832202},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "ACHR",
@@ -130,19 +75,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "Advanced air mobility candidate retained for observation because retrospective strategy fit was weak.",
-      "sanityCheck": {
-        "selectedMonths": 8,
-        "changedMonths": 8,
-        "cagr": 1.1926862341923519,
-        "deltaCagr": -0.08398696542452644,
-        "maxDrawdown": -0.27370305989771093,
-        "annualizedVolatility": 0.5448927063869421,
-        "calmar": 4.3575918904161535
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":8,"changedMonths":8,"cagr":1.1926862341923519,"deltaCagr":-0.08398696542452644,"maxDrawdown":-0.27370305989771093,"annualizedVolatility":0.5448927063869421,"calmar":4.3575918904161535},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "TEM",
@@ -152,19 +86,8 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "AI healthcare candidate with no historical Frozen Strategy selections; monitor forward evidence.",
-      "sanityCheck": {
-        "selectedMonths": 0,
-        "changedMonths": 0,
-        "cagr": 1.2766731996168783,
-        "deltaCagr": 0,
-        "maxDrawdown": -0.2112602918887171,
-        "annualizedVolatility": 0.5348669572572358,
-        "calmar": 6.043129014937532
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":0,"changedMonths":0,"cagr":1.2766731996168783,"deltaCagr":0,"maxDrawdown":-0.2112602918887171,"annualizedVolatility":0.5348669572572358,"calmar":6.043129014937532},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "RXRX",
@@ -174,19 +97,88 @@
       "status": "watch",
       "discoveryDate": "2026-08-04",
       "rationale": "AI healthcare / AI drug discovery candidate with limited retrospective selection evidence.",
-      "sanityCheck": {
-        "selectedMonths": 1,
-        "changedMonths": 1,
-        "cagr": 1.2702972882507355,
-        "deltaCagr": -0.006375911366142795,
-        "maxDrawdown": -0.2112602918887171,
-        "annualizedVolatility": 0.5350074817891486,
-        "calmar": 6.012948656342262
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "sanityCheck": {"selectedMonths":1,"changedMonths":1,"cagr":1.2702972882507355,"deltaCagr":-0.006375911366142795,"maxDrawdown":-0.2112602918887171,"annualizedVolatility":0.5350074817891486,"calmar":6.012948656342262},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
+    },
+    {
+      "symbol": "GEV",
+      "genre": "Energy Infrastructure",
+      "track": "candidate",
+      "priority": "B",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "Carried forward from prior Momentum research as an AI power/grid infrastructure watch candidate. Original discovery date was not persisted in the repository.",
+      "sanityCheck": null,
+      "evidenceNote": "Current Frozen Strategy sanity check pending. Previous-period results must not be substituted for the current frozen benchmark.",
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "EME",
+      "genre": "Energy Infrastructure",
+      "track": "candidate",
+      "priority": "B",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "Carried forward from prior Momentum research as an electrical infrastructure / AI power buildout candidate. Original discovery date was not persisted in the repository.",
+      "sanityCheck": null,
+      "evidenceNote": "Current Frozen Strategy sanity check pending. Previous-period results must not be substituted for the current frozen benchmark.",
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "TER",
+      "genre": "Robotics",
+      "track": "candidate",
+      "priority": "B",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "Carried forward from prior Momentum research as a physical AI / robotics candidate. Original discovery date was not persisted in the repository.",
+      "sanityCheck": null,
+      "evidenceNote": "Current Frozen Strategy sanity check pending. Previous-period results must not be substituted for the current frozen benchmark.",
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "CRDO",
+      "genre": "Optical Networking",
+      "track": "candidate",
+      "priority": "A",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "AI data-center interconnect and optical DSP candidate; currently capable of qualifying under the frozen Momentum strategy.",
+      "sanityCheck": {"selectedMonths":19,"changedMonths":19,"cagr":1.2810457763084981,"deltaCagr":0.0043725766916198,"maxDrawdown":-0.22173154693090436,"annualizedVolatility":0.5320745193460347,"calmar":5.77746285560212},
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "COHR",
+      "genre": "Optical Networking",
+      "track": "candidate",
+      "priority": "A",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "Broad photonics and optical networking exposure across silicon photonics, lasers and high-speed data-center optics.",
+      "sanityCheck": {"selectedMonths":15,"changedMonths":15,"cagr":1.3261419324839387,"deltaCagr":0.0494687328670604,"maxDrawdown":-0.24023844823248552,"annualizedVolatility":0.5312997153026094,"calmar":5.520106969724488},
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "AAOI",
+      "genre": "Optical Networking",
+      "track": "candidate",
+      "priority": "B",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "High-beta optical transceiver candidate with 800G/1.6T hyperscaler exposure and unusually explosive selected-month behavior.",
+      "sanityCheck": {"selectedMonths":17,"changedMonths":17,"cagr":1.3590951567393015,"deltaCagr":0.0824219571224232,"maxDrawdown":-0.26461066281942147,"annualizedVolatility":0.5954568343191307,"calmar":5.136207068370447},
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "POET",
+      "genre": "Optical Networking",
+      "track": "candidate",
+      "priority": "B",
+      "status": "watch",
+      "discoveryDate": "2026-08-08",
+      "rationale": "High-risk photonics candidate centered on optical interposer and AI optical connectivity; commercial scale-up requires forward confirmation.",
+      "sanityCheck": {"selectedMonths":11,"changedMonths":11,"cagr":1.3451613288698936,"deltaCagr":0.0684881292530153,"maxDrawdown":-0.2452376377483202,"annualizedVolatility":0.5423155877809214,"calmar":5.485134097770062},
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
     },
     {
       "symbol": "IONQ",
@@ -196,20 +188,8 @@
       "status": "review",
       "reviewDate": "2026-08-04",
       "rationale": "Legacy Universe audit produced adverse pre-2023 evidence. Review only; no automatic removal.",
-      "legacyAudit": {
-        "classification": "D",
-        "effectiveWindow": {
-          "start": "2020-11-30",
-          "end": "2022-12-31"
-        },
-        "selectedMonths": 3,
-        "winRate": 0.3333333333333333,
-        "averageSelectedHoldingReturn": -0.044900117626280024
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "legacyAudit": {"classification":"D","effectiveWindow":{"start":"2020-11-30","end":"2022-12-31"},"selectedMonths":3,"winRate":0.3333333333333333,"averageSelectedHoldingReturn":-0.044900117626280024},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "RCAT",
@@ -219,20 +199,8 @@
       "status": "review",
       "reviewDate": "2026-08-04",
       "rationale": "Legacy Universe audit produced adverse pre-2023 evidence. Review only; no automatic removal.",
-      "legacyAudit": {
-        "classification": "D",
-        "effectiveWindow": {
-          "start": "2020-11-30",
-          "end": "2022-12-31"
-        },
-        "selectedMonths": 5,
-        "winRate": 0.2,
-        "averageSelectedHoldingReturn": -0.13000577902417212
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "legacyAudit": {"classification":"D","effectiveWindow":{"start":"2020-11-30","end":"2022-12-31"},"selectedMonths":5,"winRate":0.2,"averageSelectedHoldingReturn":-0.13000577902417212},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "FIX",
@@ -242,20 +210,8 @@
       "status": "review",
       "reviewDate": "2026-08-04",
       "rationale": "Legacy Universe audit produced adverse pre-2023 evidence. Review only; no automatic removal.",
-      "legacyAudit": {
-        "classification": "D",
-        "effectiveWindow": {
-          "start": "2020-11-30",
-          "end": "2022-12-31"
-        },
-        "selectedMonths": 4,
-        "winRate": 0,
-        "averageSelectedHoldingReturn": -0.05902020291412238
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "legacyAudit": {"classification":"D","effectiveWindow":{"start":"2020-11-30","end":"2022-12-31"},"selectedMonths":4,"winRate":0,"averageSelectedHoldingReturn":-0.05902020291412238},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
     },
     {
       "symbol": "MP",
@@ -265,20 +221,44 @@
       "status": "review",
       "reviewDate": "2026-08-04",
       "rationale": "Legacy Universe audit produced adverse pre-2023 evidence. Review only; no automatic removal.",
-      "legacyAudit": {
-        "classification": "D",
-        "effectiveWindow": {
-          "start": "2020-11-30",
-          "end": "2022-12-31"
-        },
-        "selectedMonths": 8,
-        "winRate": 0.375,
-        "averageSelectedHoldingReturn": -0.005723532885381091
-      },
-      "forwardEvidence": {
-        "startDate": "2026-08-04",
-        "completedObservations": 0
-      }
+      "legacyAudit": {"classification":"D","effectiveWindow":{"start":"2020-11-30","end":"2022-12-31"},"selectedMonths":8,"winRate":0.375,"averageSelectedHoldingReturn":-0.005723532885381091},
+      "forwardEvidence": {"startDate":"2026-08-04","completedObservations":0}
+    },
+    {
+      "symbol": "AVAV",
+      "genre": "Defense",
+      "track": "legacy-review",
+      "priority": null,
+      "status": "review",
+      "reviewDate": "2026-08-08",
+      "rationale": "Carried forward from prior removal-watch research. Historical leave-one-out evidence is diagnostic only; independent removal evidence is required.",
+      "legacyAudit": null,
+      "evidenceNote": "Frozen pre-2023 legacy audit pending; do not infer removal from retrospective CAGR improvement.",
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "FN",
+      "genre": "Optical Networking",
+      "track": "legacy-review",
+      "priority": null,
+      "status": "review",
+      "reviewDate": "2026-08-08",
+      "rationale": "Carried forward from prior removal-watch research. Strong current business context means retrospective deletion benefit alone is insufficient.",
+      "legacyAudit": null,
+      "evidenceNote": "Frozen pre-2023 legacy audit pending; do not infer removal from retrospective CAGR improvement.",
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
+    },
+    {
+      "symbol": "NXE",
+      "genre": "Nuclear",
+      "track": "legacy-review",
+      "priority": null,
+      "status": "review",
+      "reviewDate": "2026-08-08",
+      "rationale": "Carried forward from prior removal-watch research. Risk-adjusted evidence did not justify automatic deletion, so retain under review.",
+      "legacyAudit": null,
+      "evidenceNote": "Frozen pre-2023 legacy audit pending; do not infer removal from retrospective CAGR improvement.",
+      "forwardEvidence": {"startDate":"2026-08-08","completedObservations":0}
     }
   ]
 }
