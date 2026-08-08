@@ -134,4 +134,6 @@ Use the following status semantics:
 - legacy `cleared`: review completed with no removal action
 - legacy `removed`: removed from production Universe through a separate governed decision
 
-Run `npm run check:watchlist` after any edit to the file. The validator enforces unique symbols, schema correctness, candidate/Universe separation, and consistency between legacy-review genres and the production Universe.
+Historical watch/review decisions may be migrated into the repository before their current Frozen Strategy sanity check or pre-2023 legacy audit has been rerun. In that case, store the corresponding evidence object as `null` and add an `evidenceNote` explaining what is pending. Never copy metrics from an older strategy configuration into the current frozen evidence fields.
+
+Run `npm run check:watchlist` after any edit to the file. The validator enforces unique symbols, schema correctness, candidate/Universe separation, legacy-review genre consistency, and explicit notes for pending evidence.
