@@ -9,10 +9,12 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
     "check:watchlist": "node --import tsx scripts/validate-universe-watchlist.ts",
-    "check": "npm run check:watchlist && npm run typecheck && npm run lint && npm run build",
+    "check:monitoring": "node --import tsx scripts/validate-universe-monitoring.ts",
+    "check": "npm run check:watchlist && npm run check:monitoring && npm run typecheck && npm run lint && npm run build",
     "sync:data": "node --import tsx scripts/sync-data.ts",
     "sync:oos": "node --import tsx scripts/sync-oos.ts",
-    "sync:all": "npm run sync:data && npm run sync:oos"
+    "sync:monitoring": "node --import tsx scripts/sync-universe-monitoring.ts",
+    "sync:all": "npm run sync:data && npm run sync:oos && npm run sync:monitoring"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
