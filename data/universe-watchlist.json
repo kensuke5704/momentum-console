@@ -236,7 +236,7 @@
       "symbol": "TER",
       "genre": "Robotics",
       "track": "candidate",
-      "priority": "B",
+      "priority": "A",
       "status": "watch",
       "discoveryDate": "2026-08-08",
       "rationale": "Carried forward from prior Momentum research as a physical AI / robotics candidate. Original discovery date was not persisted in the repository.",
