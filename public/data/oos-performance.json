@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T02:59:18.397Z",
+  "generatedAt": "2026-08-08T04:03:53.390Z",
   "frozen": {
     "id": "momentum-2026-08-v1",
     "frozenAt": "2026-08-04",
@@ -29,12 +29,8 @@
     }
   },
   "integrity": {
-    "defaultStrategyMatchesFrozen": false,
-    "mismatches": [
-      "topN current=10 frozen=9",
-      "weights.oneMonth current=0.2 frozen=0.1",
-      "weights.sixMonth current=0.4 frozen=0.5"
-    ]
+    "defaultStrategyMatchesFrozen": true,
+    "mismatches": []
   },
   "summary": {
     "completedMonths": 0,
