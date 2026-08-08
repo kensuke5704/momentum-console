@@ -28,8 +28,20 @@ const candidateSchema = z.object({
   status: z.enum(["watch", "adopted", "rejected"]),
   discoveryDate: isoDate,
   rationale: z.string().min(1),
-  sanityCheck: sanityCheckSchema,
+  sanityCheck: sanityCheckSchema.nullable(),
+  evidenceNote: z.string().min(1).optional(),
   forwardEvidence: forwardEvidenceSchema,
+});
+
+const legacyAuditSchema = z.object({
+  classification: z.enum(["A", "B", "C", "D"]),
+  effectiveWindow: z.object({
+    start: isoDate,
+    end: isoDate,
+  }),
+  selectedMonths: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  averageSelectedHoldingReturn: z.number(),
 });
 
 const legacyReviewSchema = z.object({
@@ -40,16 +52,8 @@ const legacyReviewSchema = z.object({
   status: z.enum(["review", "removed", "cleared"]),
   reviewDate: isoDate,
   rationale: z.string().min(1),
-  legacyAudit: z.object({
-    classification: z.enum(["A", "B", "C", "D"]),
-    effectiveWindow: z.object({
-      start: isoDate,
-      end: isoDate,
-    }),
-    selectedMonths: z.number().int().nonnegative(),
-    winRate: z.number().min(0).max(1),
-    averageSelectedHoldingReturn: z.number(),
-  }),
+  legacyAudit: legacyAuditSchema.nullable(),
+  evidenceNote: z.string().min(1).optional(),
   forwardEvidence: forwardEvidenceSchema,
 });
 
@@ -96,9 +100,17 @@ async function main() {
           `${entry.symbol}: candidate with status=${entry.status} is already in the production Universe`,
         );
       }
-      if (entry.sanityCheck.changedMonths > entry.sanityCheck.selectedMonths) {
+      if (
+        entry.sanityCheck &&
+        entry.sanityCheck.changedMonths > entry.sanityCheck.selectedMonths
+      ) {
         throw new Error(
           `${entry.symbol}: changedMonths cannot exceed selectedMonths`,
+        );
+      }
+      if (!entry.sanityCheck && !entry.evidenceNote) {
+        throw new Error(
+          `${entry.symbol}: pending candidate sanity check requires evidenceNote`,
         );
       }
       continue;
@@ -112,6 +124,11 @@ async function main() {
     if (universeTicker && universeTicker.genre !== entry.genre) {
       throw new Error(
         `${entry.symbol}: watchlist genre=${entry.genre} does not match Universe genre=${universeTicker.genre}`,
+      );
+    }
+    if (!entry.legacyAudit && !entry.evidenceNote) {
+      throw new Error(
+        `${entry.symbol}: pending legacy audit requires evidenceNote`,
       );
     }
   }
