@@ -3,77 +3,52 @@ name: Deploy Momentum Console
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
   workflow_dispatch:
   schedule:
     - cron: "20 22 * * 1-5"
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  register-cool:
-    if: github.event_name == 'pull_request' && github.head_ref == 'chatgpt/add-cool-watchlist-20260822'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout head branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Register COOL constituents
-        run: node --import tsx scripts/chatgpt-register-cool-watchlist.ts
-      - name: Validate watchlist
-        run: npm run check:watchlist
-      - name: Commit watchlist update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/universe-watchlist.json
-          git commit -m "Add COOL constituents to watchlist"
-          git push origin HEAD:${{ github.head_ref }}
-
   build:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - name: Install dependencies
         run: npm ci
+
       - name: Fetch market data
         run: npm run sync:data
+
       - name: Build static app
         env:
           PAGES_BASE_PATH: /${{ github.event.repository.name }}
         run: npm run build
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./out
 
   deploy:
-    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
