@@ -71,6 +71,7 @@
         document.getElementById("filterBox").classList.add("hidden");
         const touchPoints = new Map();
         let pinchDistance = null;
+        let touchPinchActive = false;
         const distance = () => {
           const [first, second] = [...touchPoints.values()];
           return first && second ? Math.hypot(first.x - second.x, first.y - second.y) : null;
@@ -82,6 +83,7 @@
         }, true);
         atlasCanvas.addEventListener("pointermove", (event) => {
           if (event.pointerType !== "touch" || !touchPoints.has(event.pointerId)) return;
+          if (touchPinchActive) { event.stopImmediatePropagation(); return; }
           touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
           const nextDistance = distance();
           if (!nextDistance || !pinchDistance) return;
@@ -92,6 +94,19 @@
         const releaseTouch = (event) => { touchPoints.delete(event.pointerId); pinchDistance = distance(); };
         atlasCanvas.addEventListener("pointerup", releaseTouch, true);
         atlasCanvas.addEventListener("pointercancel", releaseTouch, true);
+        const touchDistance = (touches) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+        atlasCanvas.addEventListener("touchstart", (event) => {
+          if (event.touches.length === 2) { touchPinchActive = true; pinchDistance = touchDistance(event.touches); }
+        }, { passive: false });
+        atlasCanvas.addEventListener("touchmove", (event) => {
+          if (!touchPinchActive || event.touches.length !== 2) return;
+          event.preventDefault();
+          const nextDistance = touchDistance(event.touches);
+          atlasCanvas.dispatchEvent(new WheelEvent("wheel", { deltaY: (pinchDistance - nextDistance) * 5, cancelable: true }));
+          pinchDistance = nextDistance;
+        }, { passive: false });
+        atlasCanvas.addEventListener("touchend", (event) => { if (event.touches.length < 2) touchPinchActive = false; }, { passive: false });
+        atlasCanvas.addEventListener("touchcancel", () => { touchPinchActive = false; }, { passive: false });
       }
     </script>
   </body>
