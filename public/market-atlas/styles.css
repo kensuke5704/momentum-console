@@ -9,3 +9,20 @@
 .panel-title{display:inline;padding-left:0}.panel-title i,.panel-title::before,.panel-title::after{display:none!important;content:none!important}
 .price-row strong:empty{display:none}
 .price-row{min-height:29px}
+@media (max-width:767px){
+  body{min-width:0;overflow:hidden}
+  .shell{min-height:100dvh}
+  .topbar{height:56px;padding:0 14px}
+  .brand{font-size:10px;gap:8px}.brand-mark{width:21px;height:21px}
+  .workspace{height:calc(100dvh - 56px);min-height:0;display:block;position:relative}
+  .atlas-stage{position:absolute;inset:0;touch-action:none}
+  .left-panel{position:absolute;z-index:5;top:10px;left:10px;right:10px;padding:12px 14px;background:rgba(19,49,79,.92);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(4,14,29,.24)}
+  .panel-heading{margin-bottom:8px}.universe{padding:7px 6px}
+  .filter-box{margin-top:12px;padding-top:12px}.lens{padding:8px 0;font-size:12px}
+  .right-panel{position:absolute;z-index:6;left:10px;right:10px;bottom:10px;max-height:56dvh;overflow:auto;padding:16px;background:rgba(19,49,79,.95);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 38px rgba(4,14,29,.32)}
+  .right-panel:has(.empty-detail:not(.hidden)){display:none}
+  .ticker{margin-top:16px}.stock-detail h2{font-size:23px}
+  .mini-chart svg{height:94px}.detail-divider{margin:18px 0 12px}.similar{padding:7px 0}
+  .inspect{margin-top:14px;padding:13px 0}.statusbar{display:none}
+  .crosshair{width:125px;height:125px}.crosshair:before{height:205px;left:61px;top:-40px}.crosshair:after{width:205px;top:61px;left:-40px}.crosshair span:first-child{width:38px;height:38px;left:43px;top:43px}
+}

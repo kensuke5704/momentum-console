@@ -67,6 +67,32 @@
       atlasCanvas.addEventListener("wheel", (event) => {
         if (event.isTrusted) atlasCanvas.dispatchEvent(new WheelEvent("wheel", { deltaY: event.deltaY * 2, cancelable: true }));
       });
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        document.getElementById("filterBox").classList.add("hidden");
+        const touchPoints = new Map();
+        let pinchDistance = null;
+        const distance = () => {
+          const [first, second] = [...touchPoints.values()];
+          return first && second ? Math.hypot(first.x - second.x, first.y - second.y) : null;
+        };
+        atlasCanvas.addEventListener("pointerdown", (event) => {
+          if (event.pointerType !== "touch") return;
+          touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          pinchDistance = distance();
+        }, true);
+        atlasCanvas.addEventListener("pointermove", (event) => {
+          if (event.pointerType !== "touch" || !touchPoints.has(event.pointerId)) return;
+          touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          const nextDistance = distance();
+          if (!nextDistance || !pinchDistance) return;
+          event.stopImmediatePropagation();
+          atlasCanvas.dispatchEvent(new WheelEvent("wheel", { deltaY: (pinchDistance - nextDistance) * 5, cancelable: true }));
+          pinchDistance = nextDistance;
+        }, true);
+        const releaseTouch = (event) => { touchPoints.delete(event.pointerId); pinchDistance = distance(); };
+        atlasCanvas.addEventListener("pointerup", releaseTouch, true);
+        atlasCanvas.addEventListener("pointercancel", releaseTouch, true);
+      }
     </script>
   </body>
 </html>
