@@ -12,3 +12,6 @@ canvas.addEventListener("pointerup",()=>{if(selected)loadMarketChart(selected.ti
 let displayedPrice=null,displayedChange=null,displayedChangeColor=null;
 canvas.addEventListener("pointerdown",()=>{if(!stockDetail.classList.contains("hidden")){displayedPrice=detailPrice.textContent;displayedChange=detailChange.textContent;displayedChangeColor=detailChange.style.color}else{displayedPrice=null;displayedChange=null;displayedChangeColor=null}});
 canvas.addEventListener("pointerup",()=>{if(!selected)return;if(displayedPrice!==null){detailPrice.textContent=displayedPrice;detailChange.textContent=displayedChange;detailChange.style.color=displayedChangeColor}else{detailPrice.textContent="";detailChange.textContent=""}});
+groups.benchmark={color:"#ff7aba",center:[.88,-.52,.62],label:"QQQ · NASDAQ 100"};
+const qqq=stocks.find(stock=>stock.ticker==="QQQ");
+if(qqq){Object.assign(qqq,{theme:"NASDAQ 100",name:"NASDAQ 100",sector:"benchmark",color:groups.benchmark.color,x:.88,y:-.52,z:.62,size:18});draw()}
