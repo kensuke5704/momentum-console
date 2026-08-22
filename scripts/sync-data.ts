@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { DEFAULT_STRATEGY, TICKERS } from "../src/lib/config";
 import { buildDashboard } from "../src/lib/momentum";
 import type { PricePoint } from "../src/lib/types";
-import { fetchHistories } from "../src/lib/yahoo";
+import { fetchHistories, fetchIntradayHistories } from "../src/lib/yahoo";
 
 type MarketDataFile = {
   histories?: Record<string, PricePoint[]>;
@@ -44,6 +44,7 @@ async function main() {
   console.log(`Fetching ${symbols.length} symbols...`);
 
   const fetchedHistories = await fetchHistories(symbols);
+  const intraday = await fetchIntradayHistories(symbols);
   const outputPath = resolve("public/data/market-data.json");
   const existingHistories = await readExistingHistories(outputPath);
   const histories = mergeHistories(existingHistories, fetchedHistories, symbols);
@@ -61,7 +62,7 @@ async function main() {
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(
     outputPath,
-    JSON.stringify({ generatedAt, histories, dashboard }),
+    JSON.stringify({ generatedAt, histories, intraday, dashboard }),
     "utf8",
   );
 

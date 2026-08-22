@@ -90,3 +90,58 @@ export async function fetchHistories(
 
   return output;
 }
+
+export type IntradayPricePoint = {
+  timestamp: string;
+  close: number;
+};
+
+export async function fetchYahooIntraday(
+  symbol: string,
+): Promise<IntradayPricePoint[]> {
+  const yahooSymbol = encodeURIComponent(symbol.replace(".", "-"));
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}` +
+    "?range=5d&interval=30m&includePrePost=false";
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 MomentumConsole/1.0",
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    throw new Error(`${symbol}: intraday data request failed (${response.status})`);
+  }
+
+  const body = (await response.json()) as YahooChartResponse;
+  const result = body.chart?.result?.[0];
+  const closes = result?.indicators?.quote?.[0]?.close ?? [];
+
+  return (result?.timestamp ?? [])
+    .map((timestamp, index) => {
+      const close = closes[index];
+      if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) {
+        return null;
+      }
+      return { timestamp: new Date(timestamp * 1000).toISOString(), close };
+    })
+    .filter((point): point is IntradayPricePoint => point !== null);
+}
+
+export async function fetchIntradayHistories(
+  symbols: string[],
+  concurrency = 6,
+): Promise<Record<string, IntradayPricePoint[]>> {
+  const output: Record<string, IntradayPricePoint[]> = {};
+  let cursor = 0;
+  async function worker() {
+    while (cursor < symbols.length) {
+      const symbol = symbols[cursor++];
+      output[symbol] = await fetchYahooIntraday(symbol);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, symbols.length) }, () => worker()));
+  return output;
+}
