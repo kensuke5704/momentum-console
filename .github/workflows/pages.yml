@@ -40,6 +40,10 @@ jobs:
           PAGES_BASE_PATH: /${{ github.event.repository.name }}
         run: npm run build
 
+      - name: Version Market Atlas assets
+        run: |
+          node -e 'const fs=require("fs");const p="out/market-atlas/index.html";let html=fs.readFileSync(p,"utf8");html=html.replaceAll("20260822-2",process.env.GITHUB_SHA);fs.writeFileSync(p,html)'
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
