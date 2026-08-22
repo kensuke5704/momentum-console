@@ -13,14 +13,13 @@
     <main class="shell">
       <header class="topbar">
         <a class="brand" href="#"><span class="brand-mark">M</span><span>MARKET ATLAS</span></a>
-        <div class="market-state"><i></i> MARKET OPEN <span>JP · 15:30</span></div>
-        <div class="top-actions"><button class="icon-btn" id="resetView" aria-label="表示をリセット">↺</button><button class="export-btn">EXPORT VIEW</button></div>
+        <div class="top-actions"><button class="icon-btn" id="resetView" aria-label="表示をリセット">↺</button></div>
       </header>
 
       <section class="workspace">
         <aside class="left-panel">
           <div class="panel-heading"><span>UNIVERSE</span><button id="filterToggle">FILTERS <b>⌄</b></button></div>
-          <button class="universe active" data-universe="us"><span class="dot us"></span><span>US Large Cap</span><em>100</em></button>
+          <button class="universe active" data-universe="us"><span class="dot us"></span><span>Momentum Universe</span><em>42</em></button>
           <button class="universe" data-universe="sp"><span class="dot jp"></span><span>S&amp;P 500</span><em>500</em></button>
           <button class="universe" data-universe="themes"><span class="dot themes"></span><span>Global Themes</span><em>96</em></button>
 
@@ -28,26 +27,18 @@
             <p>CLUSTER LENS</p>
             <div class="lens-list">
               <button class="lens active" data-lens="all"><span></span>全セクター</button>
-              <button class="lens" data-lens="tech"><span></span>テクノロジー</button>
-              <button class="lens" data-lens="finance"><span></span>金融</button>
-              <button class="lens" data-lens="health"><span></span>ヘルスケア</button>
-              <button class="lens" data-lens="consumer"><span></span>消費財</button>
-              <button class="lens" data-lens="industry"><span></span>産業・素材</button>
-              <button class="lens" data-lens="energy"><span></span>エネルギー・素材</button>
+              <button class="lens" data-lens="ai"><span></span>AI・半導体</button>
+              <button class="lens" data-lens="frontier"><span></span>フロンティア</button>
+              <button class="lens" data-lens="security"><span></span>防衛・サイバー</button>
+              <button class="lens" data-lens="power"><span></span>電力・原子力</button>
+              <button class="lens" data-lens="crypto"><span></span>暗号資産</button>
             </div>
           </div>
 
-          <div class="relation-note"><span class="relation-line"></span><p>距離は業種、事業テーマ、収益特性、価格相関から算出されます。</p></div>
         </aside>
 
         <section class="atlas-stage">
-          <div class="stage-top">
-            <div><p class="eyebrow">RELATIONSHIP MAP / 08.22.2026</p><h1>市場を、<strong>空間</strong>で読む。</h1></div>
-            <div class="legend"><span><i class="legend-node large"></i> 時価総額</span><span><i class="legend-node"></i> 関連度</span></div>
-          </div>
           <canvas id="marketCanvas" aria-label="株式市場の3D関係性マップ"></canvas>
-          <div class="axis x">GROWTH <b>→</b></div><div class="axis y">DEFENSIVE <b>↑</b></div><div class="axis z">MOMENTUM <b>↗</b></div>
-          <div class="canvas-tip" id="canvasTip">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM</div>
           <div class="crosshair"><span></span><span></span></div>
         </section>
 
@@ -65,7 +56,7 @@
         </aside>
       </section>
 
-      <footer class="statusbar"><div><span class="pulse"></span> US LARGE CAP · DEMO MAP <i></i> <b id="nodeCount">100</b> NODES</div><div>SPACE MODEL v1.4 <i></i> CORRELATION WINDOW: 180D</div><div>RELATEDNESS <span class="gradient-scale"></span></div></footer>
+      <footer class="statusbar"><div><span class="pulse"></span> MOMENTUM UNIVERSE <i></i> <b id="nodeCount">42</b> NODES</div><div>SPACE MODEL v1.4 <i></i> CORRELATION WINDOW: 180D</div><div>RELATEDNESS <span class="gradient-scale"></span></div></footer>
     </main>
     <script src="app.js"></script>
   </body>
