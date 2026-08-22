@@ -1,6 +1,10 @@
 "use client";
 
-import { MagnifyingGlassIcon } from "@phosphor-icons/react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  MagnifyingGlassIcon,
+} from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import bundledWatchlist from "../../data/universe-watchlist.json";
 
@@ -22,6 +26,18 @@ type WatchlistEntry = {
 type WatchlistData = {
   updatedAt: string;
   entries: WatchlistEntry[];
+};
+
+type SortKey =
+  | "symbol"
+  | "track"
+  | "priority"
+  | "status"
+  | "date"
+  | "observations";
+type SortState = {
+  key: SortKey;
+  direction: "desc" | "asc";
 };
 
 const WATCHLIST_URL =
@@ -57,9 +73,62 @@ function compactDate(value?: string) {
   return value ? value.replaceAll("-", ".") : "—";
 }
 
+function sortValue(entry: WatchlistEntry, key: SortKey) {
+  if (key === "symbol") return entry.symbol;
+  if (key === "track") return trackLabel(entry.track);
+  if (key === "priority") {
+    const priorityRank: Record<string, number> = { A: 3, B: 2, C: 1 };
+    return entry.priority ? (priorityRank[entry.priority] ?? 0) : null;
+  }
+  if (key === "status") return statusLabel(entry.status);
+  if (key === "date") return entry.discoveryDate ?? entry.reviewDate ?? "";
+  return entry.forwardEvidence?.completedObservations ?? 0;
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState | null;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sort?.key === sortKey;
+  return (
+    <th
+      aria-sort={
+        active
+          ? sort.direction === "desc"
+            ? "descending"
+            : "ascending"
+          : "none"
+      }
+    >
+      <button
+        type="button"
+        className={`watchlist-sort-button${active ? " active" : ""}`}
+        onClick={() => onSort(sortKey)}
+      >
+        <span>{label}</span>
+        {active ? (
+          sort.direction === "desc" ? (
+            <ArrowDownIcon aria-hidden="true" />
+          ) : (
+            <ArrowUpIcon aria-hidden="true" />
+          )
+        ) : null}
+      </button>
+    </th>
+  );
+}
+
 export function WatchlistView({ refreshVersion }: { refreshVersion: number }) {
   const [search, setSearch] = useState("");
   const [track, setTrack] = useState<"all" | WatchlistTrack>("all");
+  const [sort, setSort] = useState<SortState | null>(null);
   const [watchlistData, setWatchlistData] =
     useState<WatchlistData>(initialWatchlist);
 
@@ -92,7 +161,7 @@ export function WatchlistView({ refreshVersion }: { refreshVersion: number }) {
   const reviewCount = entries.length - candidateCount;
   const visibleEntries = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return entries.filter((entry) => {
+    const filtered = entries.filter((entry) => {
       if (track !== "all" && entry.track !== track) return false;
       return (
         !query ||
@@ -100,7 +169,33 @@ export function WatchlistView({ refreshVersion }: { refreshVersion: number }) {
         entry.genre.toLowerCase().includes(query)
       );
     });
-  }, [entries, search, track]);
+    if (!sort) return filtered;
+
+    const direction = sort.direction === "desc" ? -1 : 1;
+    return [...filtered].sort((left, right) => {
+      const leftValue = sortValue(left, sort.key);
+      const rightValue = sortValue(right, sort.key);
+      if (leftValue === null && rightValue === null) return 0;
+      if (leftValue === null) return 1;
+      if (rightValue === null) return -1;
+      const comparison =
+        typeof leftValue === "number" && typeof rightValue === "number"
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue), "ja");
+      return comparison * direction;
+    });
+  }, [entries, search, sort, track]);
+
+  function handleSort(key: SortKey) {
+    setSort((current) =>
+      current?.key === key
+        ? {
+            key,
+            direction: current.direction === "desc" ? "asc" : "desc",
+          }
+        : { key, direction: "desc" },
+    );
+  }
 
   return (
     <div className="view-stack watchlist-view">
@@ -154,12 +249,42 @@ export function WatchlistView({ refreshVersion }: { refreshVersion: number }) {
         <table>
           <thead>
             <tr>
-              <th>Ticker / Genre</th>
-              <th>区分</th>
-              <th>優先度</th>
-              <th>状態</th>
-              <th>登録 / 監査日</th>
-              <th>Forward観測</th>
+              <SortableHeader
+                label="Ticker / Genre"
+                sortKey="symbol"
+                sort={sort}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="区分"
+                sortKey="track"
+                sort={sort}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="優先度"
+                sortKey="priority"
+                sort={sort}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="状態"
+                sortKey="status"
+                sort={sort}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="登録 / 監査日"
+                sortKey="date"
+                sort={sort}
+                onSort={handleSort}
+              />
+              <SortableHeader
+                label="Forward観測"
+                sortKey="observations"
+                sort={sort}
+                onSort={handleSort}
+              />
             </tr>
           </thead>
           <tbody>
