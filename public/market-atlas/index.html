@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Market Atlas — 3D Equity Space</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -12,13 +13,13 @@
   <body>
     <main class="shell">
       <header class="topbar">
-        <a class="brand" href="#"><span class="brand-mark">M</span><span>MARKET ATLAS</span></a>
+        <a class="brand" href="#" aria-label="Market Atlas ホーム"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>MARKET ATLAS</span></a>
         <div class="top-actions"><button class="icon-btn" id="resetView" aria-label="表示をリセット">↺</button></div>
       </header>
 
       <section class="workspace">
         <aside class="left-panel">
-          <div class="panel-heading"><span>MODEL UNIVERSE</span><button id="filterToggle">THEMES <b>⌄</b></button></div>
+          <div class="panel-heading"><span class="panel-title"><i aria-hidden="true"></i>MODEL UNIVERSE</span><button id="filterToggle">THEMES <b>⌄</b></button></div>
           <button class="universe active" data-universe="momentum"><span class="dot us"></span><span>Momentum Watchlist</span><em>42</em></button>
 
           <div class="filter-box" id="filterBox">
