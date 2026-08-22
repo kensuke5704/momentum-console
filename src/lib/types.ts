@@ -4,6 +4,9 @@ export type AllocationStatus = "Invest" | "CashMarket" | "CashInsufficient";
 export type PricePoint = {
   date: string;
   close: number;
+  open?: number;
+  high?: number;
+  low?: number;
 };
 
 export type TickerConfig = {

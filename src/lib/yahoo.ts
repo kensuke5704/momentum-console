@@ -6,7 +6,12 @@ type YahooChartResponse = {
       timestamp?: number[];
       indicators?: {
         adjclose?: Array<{ adjclose?: Array<number | null> }>;
-        quote?: Array<{ close?: Array<number | null> }>;
+        quote?: Array<{
+          close?: Array<number | null>;
+          open?: Array<number | null>;
+          high?: Array<number | null>;
+          low?: Array<number | null>;
+        }>;
       };
     }>;
     error?: unknown;
@@ -45,9 +50,10 @@ export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
     throw new Error(`${symbol}: no price history returned`);
   }
 
+  const quote = result.indicators?.quote?.[0];
   const closes =
     result.indicators?.adjclose?.[0]?.adjclose ??
-    result.indicators?.quote?.[0]?.close ??
+    quote?.close ??
     [];
 
   return result.timestamp
@@ -57,9 +63,15 @@ export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
         return null;
       }
 
+      const open = quote?.open?.[index];
+      const high = quote?.high?.[index];
+      const low = quote?.low?.[index];
       return {
         date: new Date(timestamp * 1000).toISOString().slice(0, 10),
         close,
+        ...(typeof open === "number" && Number.isFinite(open) ? { open } : {}),
+        ...(typeof high === "number" && Number.isFinite(high) ? { high } : {}),
+        ...(typeof low === "number" && Number.isFinite(low) ? { low } : {}),
       };
     })
     .filter((point): point is PricePoint => point !== null);
@@ -94,6 +106,9 @@ export async function fetchHistories(
 export type IntradayPricePoint = {
   timestamp: string;
   close: number;
+  open: number;
+  high: number;
+  low: number;
 };
 
 export async function fetchYahooIntraday(
@@ -117,15 +132,17 @@ export async function fetchYahooIntraday(
 
   const body = (await response.json()) as YahooChartResponse;
   const result = body.chart?.result?.[0];
-  const closes = result?.indicators?.quote?.[0]?.close ?? [];
+  const quote = result?.indicators?.quote?.[0];
+  const closes = quote?.close ?? [];
 
   return (result?.timestamp ?? [])
     .map((timestamp, index) => {
       const close = closes[index];
-      if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) {
+      const open = quote?.open?.[index], high = quote?.high?.[index], low = quote?.low?.[index];
+      if (typeof close !== "number" || !Number.isFinite(close) || close <= 0 || typeof open !== "number" || typeof high !== "number" || typeof low !== "number") {
         return null;
       }
-      return { timestamp: new Date(timestamp * 1000).toISOString(), close };
+      return { timestamp: new Date(timestamp * 1000).toISOString(), close, open, high, low };
     })
     .filter((point): point is IntradayPricePoint => point !== null);
 }
