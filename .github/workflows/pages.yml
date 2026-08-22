@@ -2,7 +2,9 @@ name: Deploy Momentum Console
 
 on:
   push:
-    branches: ["main", "chatgpt/candidate-sanity-runtime3"]
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
   schedule:
     - cron: "20 22 * * 1-5"
@@ -18,7 +20,7 @@ concurrency:
 
 jobs:
   research:
-    if: github.ref == 'refs/heads/chatgpt/candidate-sanity-runtime3'
+    if: github.event_name == 'pull_request' && github.head_ref == 'chatgpt/candidate-sanity-runtime3'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
