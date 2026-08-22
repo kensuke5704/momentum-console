@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Atlas — 3D Equity Space</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="#"><span class="brand-mark">M</span><span>MARKET ATLAS</span></a>
+        <div class="market-state"><i></i> MARKET OPEN <span>JP · 15:30</span></div>
+        <div class="top-actions"><button class="icon-btn" id="resetView" aria-label="表示をリセット">↺</button><button class="export-btn">EXPORT VIEW</button></div>
+      </header>
+
+      <section class="workspace">
+        <aside class="left-panel">
+          <div class="panel-heading"><span>UNIVERSE</span><button id="filterToggle">FILTERS <b>⌄</b></button></div>
+          <button class="universe active" data-universe="us"><span class="dot us"></span><span>US Large Cap</span><em>100</em></button>
+          <button class="universe" data-universe="sp"><span class="dot jp"></span><span>S&amp;P 500</span><em>500</em></button>
+          <button class="universe" data-universe="themes"><span class="dot themes"></span><span>Global Themes</span><em>96</em></button>
+
+          <div class="filter-box" id="filterBox">
+            <p>CLUSTER LENS</p>
+            <div class="lens-list">
+              <button class="lens active" data-lens="all"><span></span>全セクター</button>
+              <button class="lens" data-lens="tech"><span></span>テクノロジー</button>
+              <button class="lens" data-lens="finance"><span></span>金融</button>
+              <button class="lens" data-lens="health"><span></span>ヘルスケア</button>
+              <button class="lens" data-lens="consumer"><span></span>消費財</button>
+              <button class="lens" data-lens="industry"><span></span>産業・素材</button>
+              <button class="lens" data-lens="energy"><span></span>エネルギー・素材</button>
+            </div>
+          </div>
+
+          <div class="relation-note"><span class="relation-line"></span><p>距離は業種、事業テーマ、収益特性、価格相関から算出されます。</p></div>
+        </aside>
+
+        <section class="atlas-stage">
+          <div class="stage-top">
+            <div><p class="eyebrow">RELATIONSHIP MAP / 08.22.2026</p><h1>市場を、<strong>空間</strong>で読む。</h1></div>
+            <div class="legend"><span><i class="legend-node large"></i> 時価総額</span><span><i class="legend-node"></i> 関連度</span></div>
+          </div>
+          <canvas id="marketCanvas" aria-label="株式市場の3D関係性マップ"></canvas>
+          <div class="axis x">GROWTH <b>→</b></div><div class="axis y">DEFENSIVE <b>↑</b></div><div class="axis z">MOMENTUM <b>↗</b></div>
+          <div class="canvas-tip" id="canvasTip">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM</div>
+          <div class="crosshair"><span></span><span></span></div>
+        </section>
+
+        <aside class="right-panel" id="detailPanel">
+          <div class="empty-detail" id="emptyDetail"><div class="empty-ring"></div><p>銘柄を選択すると<br />関係性を詳しく表示します</p></div>
+          <div class="stock-detail hidden" id="stockDetail">
+            <div class="detail-top"><span id="detailSector">TECHNOLOGY</span><button id="closeDetail" aria-label="閉じる">×</button></div>
+            <p class="ticker" id="detailTicker">7203</p><h2 id="detailName">トヨタ自動車</h2>
+            <div class="price-row"><strong id="detailPrice">¥2,784</strong><span id="detailChange">+1.82%</span></div>
+            <div class="mini-chart"><svg viewBox="0 0 300 76" preserveAspectRatio="none"><path id="chartPath" d="M0 62 C25 57,35 63,53 48 S78 46,91 39 S115 50,132 32 S156 39,175 23 S201 28,220 15 S250 22,300 4" fill="none" stroke="currentColor" stroke-width="2"/></svg><div><span>1D</span><span>1W</span><b>1M</b><span>1Y</span></div></div>
+            <div class="detail-divider"></div>
+            <div class="similar-head"><p>NEAREST NEIGHBORS</p><span>SIMILARITY</span></div><div class="similar-list" id="similarList"></div>
+            <button class="inspect">銘柄を詳しく見る <b>↗</b></button>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="statusbar"><div><span class="pulse"></span> US LARGE CAP · DEMO MAP <i></i> <b id="nodeCount">100</b> NODES</div><div>SPACE MODEL v1.4 <i></i> CORRELATION WINDOW: 180D</div><div>RELATEDNESS <span class="gradient-scale"></span></div></footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
