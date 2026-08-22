@@ -1,0 +1,33 @@
+name: Temporary XWNG Watchlist Registration
+on:
+  pull_request:
+    branches: ["main"]
+permissions:
+  contents: write
+jobs:
+  register:
+    if: github.head_ref == 'chatgpt/add-xwng-watchlist-20260822'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Update watchlist and remove temporary research files
+        run: |
+          node --import tsx scripts/chatgpt-register-xwng-watchlist.ts
+          rm scripts/chatgpt-register-xwng-watchlist.ts
+          rm .github/workflows/chatgpt-register-xwng-watchlist.yml
+      - name: Validate watchlist
+        run: npm run check:watchlist
+      - name: Commit watchlist-only change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add XWNG constituents to watchlist"
+          git push origin HEAD:${{ github.head_ref }}
