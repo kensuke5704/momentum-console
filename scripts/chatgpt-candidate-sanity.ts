@@ -25,10 +25,6 @@ function samePicks(a: string[], b: string[]) {
 
 async function main() {
   const rawCandidates = process.argv.slice(2);
-  if (!rawCandidates.length) {
-    throw new Error("Provide at least one candidate as SYMBOL:Genre");
-  }
-
   const candidates = rawCandidates.map(parseCandidate);
   const productionSymbols = new Set(TICKERS.map((ticker) => ticker.symbol));
   for (const candidate of candidates) {
