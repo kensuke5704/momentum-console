@@ -58,5 +58,11 @@
       <footer class="statusbar"><div><span class="pulse"></span> MOMENTUM UNIVERSE <i></i> <b id="nodeCount">42</b> NODES</div><div>SPACE MODEL v1.4 <i></i> CORRELATION WINDOW: 180D</div><div>RELATEDNESS <span class="gradient-scale"></span></div></footer>
     </main>
     <script src="app.js?v=20260822-2"></script>
+    <script>
+      const atlasCanvas = document.getElementById("marketCanvas");
+      const applyDefaultZoom = () => atlasCanvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -70, cancelable: true }));
+      applyDefaultZoom();
+      document.getElementById("resetView").addEventListener("click", applyDefaultZoom);
+    </script>
   </body>
 </html>
