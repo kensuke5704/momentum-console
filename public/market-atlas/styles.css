@@ -8,3 +8,4 @@
 .panel-title{position:relative;display:inline-block;padding-left:24px;line-height:12px}.panel-title i{position:absolute;left:0;top:6px;transform:translateY(-50%)}
 .panel-title{display:inline;padding-left:0}.panel-title i,.panel-title::before,.panel-title::after{display:none!important;content:none!important}
 .price-row strong:empty{display:none}
+.price-row{min-height:29px}
