@@ -333,6 +333,7 @@ main {
 .view-stack {
   display: grid;
   gap: 34px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .warning-banner {
@@ -3652,5 +3653,221 @@ tbody tr:hover {
 
   .backtest-table .ticker-list {
     min-width: 0;
+  }
+}
+
+/* Watchlist */
+.watchlist-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.watchlist-summary .metric {
+  border-bottom: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line);
+  min-height: 92px;
+  padding: 18px;
+}
+
+.watchlist-summary .metric:last-child {
+  border-right: 0;
+}
+
+.watchlist-summary .metric span {
+  color: var(--text-muted);
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.watchlist-summary .metric strong {
+  font-family: "Roboto Mono", monospace;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.watchlist-summary .metric .watchlist-updated-at {
+  font-size: 16px;
+}
+
+.watchlist-toolbar {
+  align-items: end;
+  border-bottom: 1px solid var(--line-strong);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  padding: 16px 18px;
+}
+
+.watchlist-search {
+  margin: 0;
+}
+
+.watchlist-track-filter select {
+  min-height: 44px;
+  width: 100%;
+}
+
+.watchlist-table {
+  border: 0;
+  border-radius: 0;
+}
+
+.watchlist-table table {
+  min-width: 760px;
+}
+
+.watchlist-ticker strong,
+.watchlist-ticker span {
+  display: block;
+}
+
+.watchlist-ticker strong {
+  font-family: "Roboto Mono", monospace;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+
+.watchlist-ticker span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.watchlist-tag {
+  border: 1px solid var(--line);
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 7px;
+}
+
+.watchlist-tag.candidate {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.watchlist-empty {
+  color: var(--text-muted);
+  margin: 0;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.theme-limit-grid {
+  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1.55fr);
+}
+
+.theme-limit-grid .excluded-field {
+  margin-top: 0;
+}
+
+.portfolio-table .inline-number input {
+  border-radius: 0;
+}
+
+.portfolio-table .currency-pair {
+  justify-items: start;
+  text-align: left;
+}
+
+.portfolio-summary .metric span {
+  text-align: left;
+}
+
+@media (min-width: 761px) {
+  .backtest-stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    min-width: 0;
+    width: 100%;
+  }
+
+  .backtest-stats .metric,
+  .backtest-stats .metric:nth-child(-n + 4),
+  .backtest-stats .metric:nth-child(2n),
+  .backtest-stats .metric:last-child {
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+    grid-column: auto;
+    min-width: 0;
+    padding-inline: 14px;
+  }
+
+  .backtest-stats .metric:last-child {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .theme-limit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .watchlist-summary .metric {
+    min-height: 82px;
+    padding: 15px 14px;
+  }
+
+  .watchlist-summary .metric:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .watchlist-toolbar {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .watchlist-table {
+    overflow: visible;
+  }
+
+  .watchlist-table table,
+  .watchlist-table tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .watchlist-table thead {
+    display: none;
+  }
+
+  .watchlist-table tr {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: 14px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 15px 14px;
+    width: 100%;
+  }
+
+  .watchlist-table td {
+    border: 0;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .watchlist-table td::before {
+    color: var(--text-muted);
+    content: attr(data-label);
+    display: block;
+    font-family: "Roboto Mono", monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+
+  .watchlist-table .watchlist-ticker {
+    grid-column: 1 / -1;
   }
 }
