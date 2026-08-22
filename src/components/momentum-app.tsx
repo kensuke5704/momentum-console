@@ -45,6 +45,7 @@ import {
 import { buildDashboard } from "@/lib/momentum";
 import { CandidateManagerView } from "@/components/candidate-manager-view";
 import { OperationScheduleSection } from "@/components/operation-schedule-section";
+import { WatchlistView } from "@/components/watchlist-view";
 import {
   fetchYahooHistoriesInBrowser,
   fetchYahooHistoryInBrowser,
@@ -62,6 +63,7 @@ type View =
   | "portfolio"
   | "backtest"
   | "comparison"
+  | "watchlist"
   | "settings";
 type HoldingMap = Record<string, number>;
 type MarketDataFile = {
@@ -110,10 +112,11 @@ const views: Array<{
   icon: typeof ChartLineUpIcon;
 }> = [
   { id: "overview", label: "概要", icon: ChartLineUpIcon },
-  { id: "screener", label: "銘柄分析", icon: ListChecksIcon },
+  { id: "screener", label: "銘柄一覧", icon: ListChecksIcon },
   { id: "portfolio", label: "ポートフォリオ", icon: WalletIcon },
   { id: "backtest", label: "バックテスト", icon: TargetIcon },
   { id: "comparison", label: "候補組み替え", icon: ScalesIcon },
+  { id: "watchlist", label: "ウォッチリスト", icon: MagnifyingGlassIcon },
   { id: "settings", label: "戦略設定", icon: GearSixIcon },
 ];
 
@@ -1151,7 +1154,7 @@ function SettingsView({
               <p>同一テーマへの集中と個別銘柄を制御</p>
             </div>
           </div>
-          <div className="form-grid three">
+          <div className="form-grid theme-limit-grid">
             <NumberField
               label="Genre共通上限"
               value={draft.genreMax}
@@ -1163,26 +1166,26 @@ function SettingsView({
                 setDraft((current) => ({ ...current, genreMax: value }))
               }
             />
+            <label className="field excluded-field">
+              <span>除外Ticker</span>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  value={draft.excludedTickers.join(", ")}
+                  placeholder="例: TQQQ, SOXL"
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      excludedTickers: event.target.value
+                        .split(",")
+                        .map((value) => value.trim().toUpperCase())
+                        .filter(Boolean),
+                    }))
+                  }
+                />
+              </div>
+            </label>
           </div>
-          <label className="field excluded-field">
-            <span>除外Ticker</span>
-            <div className="input-wrap">
-              <input
-                type="text"
-                value={draft.excludedTickers.join(", ")}
-                placeholder="例: TQQQ, SOXL"
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    excludedTickers: event.target.value
-                      .split(",")
-                      .map((value) => value.trim().toUpperCase())
-                      .filter(Boolean),
-                  }))
-                }
-              />
-            </div>
-          </label>
         </section>
 
         <section className="setting-section span-full">
@@ -1397,6 +1400,7 @@ export function MomentumApp({
   );
   const [loading, setLoading] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [watchlistRefreshVersion, setWatchlistRefreshVersion] = useState(0);
   const didInitialLoad = useRef(false);
 
   useEffect(() => {
@@ -1464,6 +1468,9 @@ export function MomentumApp({
             : "データ更新に失敗しました。",
       }));
     } finally {
+      if (forceDownload) {
+        setWatchlistRefreshVersion((current) => current + 1);
+      }
       setLoading(false);
     }
   }, [histories]);
@@ -1661,6 +1668,9 @@ export function MomentumApp({
           {view === "backtest" ? <BacktestView data={data} /> : null}
           {view === "comparison" ? (
             <CandidateManagerView data={data} />
+          ) : null}
+          {view === "watchlist" ? (
+            <WatchlistView refreshVersion={watchlistRefreshVersion} />
           ) : null}
           {view === "settings" ? (
             <SettingsView
