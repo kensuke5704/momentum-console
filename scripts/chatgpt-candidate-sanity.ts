@@ -23,6 +23,10 @@ function samePicks(a: string[], b: string[]) {
   return [...a].sort().join("|") === [...b].sort().join("|");
 }
 
+function mean(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
 async function main() {
   const rawCandidates = process.argv.slice(2);
   const candidates = rawCandidates.map(parseCandidate);
@@ -61,20 +65,30 @@ async function main() {
       return base ? !samePicks(base.picks, row.picks) : false;
     });
 
+    const candidateHistory = histories[candidate.symbol] ?? [];
+    const byDate = new Map(candidateHistory.map((point) => [point.date, point.close]));
     const displaced = new Map<string, number>();
     const selectedDetail = selectedRows.map((row) => {
       const base = baselineRows.get(row.signalMonth);
       const removed = base ? base.picks.filter((symbol) => !row.picks.includes(symbol)) : [];
       for (const symbol of removed) displaced.set(symbol, (displaced.get(symbol) ?? 0) + 1);
+      const entry = row.entryDate ? byDate.get(row.entryDate) : undefined;
+      const exit = row.exitDate ? byDate.get(row.exitDate) : undefined;
+      const candidateReturn = entry && exit ? exit / entry - 1 : null;
       return {
         signalMonth: row.signalMonth,
         market: row.market,
         entryDate: row.entryDate,
         exitDate: row.exitDate,
+        candidateReturn,
         portfolioReturn: row.monthlyReturn,
         displaced: removed,
       };
     });
+
+    const candidateReturns = selectedDetail
+      .map((row) => row.candidateReturn)
+      .filter((value): value is number => typeof value === "number");
 
     output.candidates.push({
       symbol: candidate.symbol,
@@ -89,6 +103,10 @@ async function main() {
       deltaAnnualizedVolatility: stats.annualizedVolatility - baselineStats.annualizedVolatility,
       calmar: calmar(stats.cagr, stats.maxDrawdown),
       deltaCalmar: calmar(stats.cagr, stats.maxDrawdown) - calmar(baselineStats.cagr, baselineStats.maxDrawdown),
+      averageSelectedHoldingReturn: mean(candidateReturns),
+      selectedWinRate: candidateReturns.length ? candidateReturns.filter((value) => value > 0).length / candidateReturns.length : null,
+      worstSelectedHoldingReturn: candidateReturns.length ? Math.min(...candidateReturns) : null,
+      bestSelectedHoldingReturn: candidateReturns.length ? Math.max(...candidateReturns) : null,
       displacedTickers: [...displaced.entries()].sort((a, b) => b[1] - a[1]).map(([symbol, months]) => ({ symbol, months })),
       selectedDetail,
     });
