@@ -3,8 +3,6 @@ name: Deploy Momentum Console
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
   workflow_dispatch:
   schedule:
     - cron: "20 22 * * 1-5"
@@ -15,36 +13,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  research:
-    if: github.event_name == 'pull_request' && github.head_ref == 'chatgpt/candidate-sanity-runtime3'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: COOL constituent sanity checks
-        run: >-
-          node --import tsx scripts/chatgpt-candidate-sanity.ts
-          "AEIS:AI Infrastructure"
-          "NVTS:AI Semi"
-          "VICR:AI Infrastructure"
-          "NVT:AI Infrastructure"
-
   build:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -76,7 +49,6 @@ jobs:
           path: ./out
 
   deploy:
-    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
