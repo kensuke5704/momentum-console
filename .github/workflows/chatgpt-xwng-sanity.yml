@@ -1,0 +1,19 @@
+name: Temporary XWNG Sanity
+on:
+  pull_request:
+    branches: ["main"]
+permissions:
+  contents: read
+jobs:
+  research:
+    if: github.head_ref == 'chatgpt/xwng-sanity-20260822-run2'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run XWNG constituent sanity checks
+        run: node --import tsx scripts/chatgpt-xwng-sanity.ts "ATRO:Aerospace" "SPIR:Space" "SPCX:Space" "MDA:Space" "RDW:Space" "VSAT:Space"
