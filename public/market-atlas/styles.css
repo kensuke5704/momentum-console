@@ -5,3 +5,4 @@
 .panel-heading{align-items:center}.panel-title{display:flex;align-items:center;gap:8px;line-height:1}.panel-title i{display:block;width:16px;height:2px;background:#dceaf5;flex:0 0 auto}.similar small{margin-left:6px}
 .shell{background:radial-gradient(ellipse at 52% 46%,#477da3 0%,#2b587e 44%,#1a3859 82%)}body{background:#1a3859}.left-panel,.right-panel{background:rgba(19,49,79,.76)}.atlas-stage{background-color:rgba(48,101,142,.28)}
 .panel-title i{transform:translateY(4px)}
+.panel-title{position:relative;display:inline-block;padding-left:24px;line-height:12px}.panel-title i{position:absolute;left:0;top:6px;transform:translateY(-50%)}
