@@ -35,8 +35,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Candidate sanity smoke run
-        run: node --import tsx scripts/chatgpt-candidate-sanity.ts
+      - name: COOL constituent sanity checks
+        run: >-
+          node --import tsx scripts/chatgpt-candidate-sanity.ts
+          "AEIS:AI Infrastructure"
+          "NVTS:AI Semi"
+          "VICR:AI Infrastructure"
+          "NVT:AI Infrastructure"
 
   build:
     if: github.ref == 'refs/heads/main'
