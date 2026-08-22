@@ -17,3 +17,4 @@ const qqq=stocks.find(stock=>stock.ticker==="QQQ"),tqqq=stocks.find(stock=>stock
 if(qqq)Object.assign(qqq,{theme:"NASDAQ 100",name:"NASDAQ 100",sector:"benchmark",color:groups.benchmark.color,x:.88,y:-.52,z:.62,size:18});
 if(tqqq)Object.assign(tqqq,{theme:"NASDAQ 100 3X",name:"NASDAQ 100 3X",sector:"benchmark",color:groups.benchmark.color,x:.76,y:-.44,z:.55,size:17});
 draw()
+fetch("../data/market-data.json",{cache:"no-store"}).then(response=>response.ok?response.json():null).then(payload=>{const positions=payload?.atlas?.positions;if(!positions)return;stocks.forEach(stock=>{const position=positions[stock.ticker];if(position)Object.assign(stock,position)});draw()}).catch(()=>{});
