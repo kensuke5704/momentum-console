@@ -117,6 +117,14 @@ async function main() {
     JSON.stringify({ generatedAt, histories, intraday, atlas: { method: "industry-taxonomy", positions: atlasPositions }, dashboard }),
     "utf8",
   );
+  const atlasHistories = Object.fromEntries(
+    TICKERS.map((ticker) => [ticker.symbol, (histories[ticker.symbol] ?? []).slice(-270)]),
+  );
+  await writeFile(
+    resolve("public/data/market-atlas.json"),
+    JSON.stringify({ generatedAt, histories: atlasHistories, intraday, atlas: { method: "business-context-tags", positions: atlasPositions } }),
+    "utf8",
+  );
 
   console.log(`Saved ${outputPath}`);
   console.log(`As of ${dashboard.asOf}`);
