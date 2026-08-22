@@ -60,7 +60,7 @@
     <script src="app.js?v=20260822-2"></script>
     <script>
       const atlasCanvas = document.getElementById("marketCanvas");
-      const applyDefaultZoom = () => atlasCanvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -70, cancelable: true }));
+      const applyDefaultZoom = () => atlasCanvas.dispatchEvent(new WheelEvent("wheel", { deltaY: -130, cancelable: true }));
       applyDefaultZoom();
       document.getElementById("resetView").addEventListener("click", applyDefaultZoom);
     </script>
