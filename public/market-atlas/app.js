@@ -18,3 +18,7 @@ draw()
 let marketAtlasPayload=null;
 const atlasDataPromise=fetch("../data/market-atlas.json",{cache:"force-cache"}).then(response=>response.ok?response.json():null).then(payload=>(marketAtlasPayload=payload)).catch(()=>null);
 atlasDataPromise.then(payload=>{const positions=payload?.atlas?.positions;if(!positions)return;stocks.forEach(stock=>{const position=positions[stock.ticker];if(position)Object.assign(stock,position)});draw()});
+let angleZ=0;
+project=function(s){const x=s.x,rotatedY=s.y*Math.cos(angleX)-s.z*Math.sin(angleX),rotatedZ=s.y*Math.sin(angleX)+s.z*Math.cos(angleX),rotatedX=x*Math.cos(angleZ)-rotatedY*Math.sin(angleZ),depth=x*Math.sin(angleZ)+rotatedY*Math.cos(angleZ),scale=190*zoom/(2.75-depth*.45);return{...s,px:width*.5+rotatedX*scale,py:height*.54-rotatedZ*scale,depth}};
+canvas.addEventListener("pointermove",event=>{if(!dragging)return;angleZ+=(event.clientX-last.x)*.008;angleX+=(event.clientY-last.y)*.008;last={x:event.clientX,y:event.clientY};draw();event.stopImmediatePropagation()},true);
+resetView.addEventListener("click",()=>{angleZ=0;draw()});
