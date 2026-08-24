@@ -77,13 +77,11 @@ Production signalとhistorical backtestは[`src/lib/strategy/state-machine.ts`](
 
 ## Forward OOS and benchmark
 
-Forward OOSは新Strategy IDから独立して開始し、旧戦略のequityへ接続しません。signal、Universe、ranking、target weights、market/risk state、execution、trigger historyを保存します。
+Backtest表示は`2026-08-25`に凍結した[`public/data/backtest-frozen.json`](public/data/backtest-frozen.json)だけを参照し、日次価格同期では変更しません。
+
+Forward OOSは`2026-08-25`から新Strategy IDで独立して開始し、旧戦略や凍結Backtestのequityへ接続しません。平日の米国市場Close後にGitHub ActionsがYahoo Financeの実OHLCを取得し、Productionと同じstate machine・next-open約定・取引コストで日次OOS equityを更新します。確定済みのOOS日次点は上書きせず、新しい取引日だけを追加します。signal、Universe、ranking、target weights、market/risk state、execution、trigger historyも保存します。
 
 Benchmarkは利用可能な期間のactual `TQQQ Buy & Hold`です。将来synthetic proxyを追加する場合は`Synthetic 3x QQQ proxy`と明示し、actual TQQQと混同しません。
-
-## Watchlist
-
-Watchlistは`Research / observation only`です。Watchlist membershipをProduction Universeへ強制追加する経路はありません。
 
 ## Validation
 

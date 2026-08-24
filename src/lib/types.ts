@@ -81,6 +81,33 @@ export type BacktestResult = {
   benchmark: { label: "TQQQ Buy & Hold" | "Synthetic 3x QQQ proxy"; equityCurve: EquityPoint[]; stats: PerformanceStats } | null;
   events: Array<{ date: string; type: string; symbols: string[]; reason: string }>;
 };
+export type OosRecord = {
+  strategyId: string;
+  signalMonth: string;
+  signalDate: string;
+  executionDate: string | null;
+  universeSymbols: string[];
+  rankedCandidates: unknown[];
+  selectedSymbols: string[];
+  targetWeights: number[];
+  marketState: string;
+  riskState: string;
+  entryPrices: Record<string, number>;
+  exitPrices: Record<string, number>;
+  return: number | null;
+  equity: number | null;
+  triggerHistory: unknown[];
+};
+export type ForwardOosResult = {
+  strategyId: string;
+  startedAt: string;
+  asOf: string | null;
+  source: "Yahoo Finance adjusted OHLC";
+  baselineBacktestEquity: number | null;
+  equityCurve: EquityPoint[];
+  stats: PerformanceStats;
+  records: OosRecord[];
+};
 export type DashboardPayload = {
   generatedAt: string;
   source: "live" | "snapshot";
@@ -90,5 +117,6 @@ export type DashboardPayload = {
   currentSignal: MonthlySignal | null;
   liveState: LiveStrategyState;
   qqq: { close: number | null; monthlyMa: number | null; dailySma: number | null; momentum20d: number | null };
+  oos: ForwardOosResult;
   backtest: BacktestResult;
 };
