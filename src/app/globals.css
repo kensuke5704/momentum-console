@@ -108,6 +108,11 @@
   border: 1px solid var(--line-strong);
 }
 
+.dynamic-card {
+  display: flex;
+  flex-direction: column;
+}
+
 .interactive-card {
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease;
@@ -227,6 +232,7 @@
 
 .top2-grid {
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 0 !important;
 }

@@ -12,6 +12,7 @@
   - `/var/folders/fs/c6jtr54d5578b7x83sgcy_300000gn/T/TemporaryItems/NSIRD_screencaptureui_AOyCMo/スクリーンショット 2026-08-25 0.59.06.png`
   - `/var/folders/fs/c6jtr54d5578b7x83sgcy_300000gn/T/TemporaryItems/NSIRD_screencaptureui_9HtPTQ/スクリーンショット 2026-08-25 0.59.52.png`
   - `/var/folders/fs/c6jtr54d5578b7x83sgcy_300000gn/T/TemporaryItems/NSIRD_screencaptureui_sKqvSj/スクリーンショット 2026-08-25 1.13.00.png`
+  - `/var/folders/fs/c6jtr54d5578b7x83sgcy_300000gn/T/TemporaryItems/NSIRD_screencaptureui_EIPNGQ/スクリーンショット 2026-08-25 1.49.35.png`
 - Browser-rendered implementation screenshots:
   - `/tmp/momentum-qa-overview.png`
   - `/tmp/momentum-qa-risk.png`
@@ -25,6 +26,7 @@
   - `/tmp/momentum-portfolio-fixed-full.png`
   - `/tmp/momentum-risk-fixed-full.png`
   - `/tmp/momentum-backtest-footer-fixed.png`
+  - `/tmp/momentum-divider-fixed.png`
 - Viewports: desktop `1280 x 720`; mobile `390 x 844`
 - Density normalization: source and implementation reviewed at CSS pixel scale / device scale factor 1. Focused implementation crops were compared with the corresponding source regions.
 - States: Overview, Risk, Operation Schedule, refresh success message, desktop and mobile navigation.
@@ -77,6 +79,7 @@
 - Latest P2: Allocation remained as a third Top2 cell and the divider appeared truncated. Removed the cell, changed the shared component to two equal tracks, and stretched both cells to the grid height; Overview and Target Portfolio now share the corrected result.
 - Latest P2: Recovery and execution-cost copy was more verbose than requested. Removed the Recovery explanation and reduced the execution value from `10 bp / side` to `10 bp`.
 - Latest P2: the chart footer repeated the benchmark label and created an unnecessary padded row. Removed the footer element itself, eliminating both the copy and its associated whitespace.
+- Latest P2: in Overview, the Top2 card stretched to match the adjacent Universe card while its inner grid retained content height, leaving the center divider short of the lower border. The card is now a column flex container and the Top2 grid fills the remaining height. Post-fix measurement shows the divider ends `1px` above the card bottom, exactly at the inner edge of the `1px` outer border.
 - Earlier P2: Watchlist remained in navigation after the feature was retired. Tab, component, data source, and CSS were removed; post-fix DOM contains no Watchlist entry.
 - Added interaction: Next Action now opens a six-entry explanation dialog. Desktop and mobile post-fix captures show all content without page-level horizontal overflow.
 
