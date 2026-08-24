@@ -14,7 +14,6 @@
     "sync:universe": "node --import tsx scripts/build-universe.ts",
     "sync:data": "node --import tsx scripts/sync-data.ts",
     "sync:oos": "node --import tsx scripts/sync-oos.ts",
-    "sync:monitoring": "node --import tsx scripts/sync-universe-monitoring.ts",
     "sync:all": "npm run sync:sec && npm run sync:universe && npm run sync:data && npm run sync:oos"
   },
   "dependencies": {
