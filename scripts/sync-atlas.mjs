@@ -3,31 +3,20 @@ import { dirname, resolve } from "node:path";
 
 const OUTPUT = resolve("public/data/atlas-layout.json");
 const UNIVERSE = resolve("public/data/universe-current.json");
-const FORMAT_VERSION = 2;
+const FORMAT_VERSION = 5;
 const USER_AGENT = "MomentumConsole/2.0 (https://github.com/kensuke5704/momentum-console)";
 const STOP = new Set(`a an and are as at be been being but by can company corporation could did do does for from had has have if in into is it its may more most not of on or our over such than that the their them then there these they this those through to under up was we were what when where which while who will with within would you your`.split(" "));
 const GENRES = {
-  ai: {
-    label: "AI · SEMICONDUCTORS · INFRASTRUCTURE",
-    words: ["artificial intelligence", "machine learning", "semiconductor", "chip", "processor", "data center", "cloud computing", "software", "database", "networking", "electronic design automation", "cyber infrastructure"],
-  },
-  frontier: {
-    label: "SPACE · QUANTUM · ROBOTICS",
-    words: ["spacecraft", "spaceflight", "satellite", "rocket", "quantum computing", "robotics", "autonomous vehicle", "aerospace", "industrial automation", "mobility"],
-  },
-  security: {
-    label: "DEFENSE · CYBERSECURITY",
-    words: ["cybersecurity", "computer security", "network security", "firewall", "defense contractor", "military", "weapons", "missile", "defense technology"],
-  },
-  power: {
-    label: "NUCLEAR · POWER INFRASTRUCTURE",
-    words: ["nuclear power", "electric power", "electricity generation", "power generation", "utility company", "energy infrastructure", "power grid", "renewable energy", "uranium", "natural gas", "oil and gas"],
-  },
-  crypto: {
-    label: "CRYPTO ASSETS",
-    words: ["cryptocurrency", "crypto exchange", "bitcoin", "blockchain", "digital asset", "stablecoin"],
-  },
-  other: { label: "OTHER", words: [] },
+  chipsai: { label: "SEMICONDUCTORS · AI INFRASTRUCTURE" },
+  software: { label: "SOFTWARE · CLOUD · INTERNET" },
+  security: { label: "CYBERSECURITY" },
+  power: { label: "POWER · ENERGY INFRASTRUCTURE" },
+  health: { label: "HEALTHCARE · BIOTECH" },
+  finance: { label: "FINANCE · PAYMENTS" },
+  consumer: { label: "CONSUMER · MEDIA" },
+  industrial: { label: "INDUSTRIAL · MOBILITY" },
+  crypto: { label: "DIGITAL ASSETS" },
+  other: { label: "OTHER" },
 };
 
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
@@ -211,15 +200,23 @@ function classicalMds(similarities) {
   const fit = (value) => Math.max(-1.35, Math.min(1.35, value / scale));
   return raw.map(([x, y, z]) => ({ x: fit(x), y: fit(y), z: fit(z) }));
 }
-function classify(text) {
-  const normalized = text.toLowerCase();
-  let best = { id: "other", score: 0 };
-  for (const [id, genre] of Object.entries(GENRES)) {
-    if (id === "other") continue;
-    const score = genre.words.reduce((total, phrase) => total + (normalized.includes(phrase) ? (phrase.includes(" ") ? 2 : 1) : 0), 0);
-    if (score > best.score) best = { id, score };
-  }
-  return best.score >= 1 ? best.id : "other";
+function classify(profile) {
+  const sector = String(profile.sector ?? "").toLowerCase();
+  const industry = String(profile.industry ?? "").toLowerCase();
+  const text = `${profile.name ?? ""} ${profile.description ?? ""} ${sector} ${industry} ${profile.text ?? ""}`.toLowerCase();
+  const has = (...phrases) => phrases.some((phrase) => text.includes(phrase));
+
+  if (has("cryptocurrency", "crypto exchange", "bitcoin", "blockchain", "digital asset", "stablecoin", "coinbase")) return "crypto";
+  if (has("cybersecurity", "cyber-security", "network security", "computer security", "firewall", "endpoint security", "zero trust")) return "security";
+  if (sector.includes("utilities") || sector.includes("energy") || has("electric utilities", "power generation", "power grid", "energy infrastructure", "energy technology", "nuclear power", "oil and gas", "integrated oil")) return "power";
+  if (sector.includes("health") || has("pharmaceutical", "biotechnology", "medical device", "health care", "healthcare")) return "health";
+  if (sector.includes("finance") || has("payment card", "payment network", "financial services", "major banks", "investment bank", "brokerage", "stock exchange", "insurance company")) return "finance";
+  if (has("semiconductor", "chipmaker", "microprocessor", "electronic components", "computer manufacturing", "data center", "data centre", "networking equipment", "communications equipment", "electronic design automation", "power management") || (sector.includes("technology") && has("industrial machinery", "electrical products"))) return "chipsai";
+  if (sector.includes("consumer") || has("retailer", "retail stores", "entertainment", "mass media", "beverage", "food delivery", "travel services", "lodging")) return "consumer";
+  if (sector.includes("industrials") || has("aerospace", "defense contractor", "automotive", "auto manufacturing", "industrial machinery", "construction equipment", "transportation services", "robotics")) return "industrial";
+  if (sector.includes("technology") || sector.includes("telecommunications") || has("software company", "cloud computing", "internet company", "social media", "digital advertising")) return "software";
+  if (sector.includes("real estate")) return has("data center", "data centre") ? "chipsai" : "finance";
+  return "other";
 }
 
 async function main() {
@@ -229,8 +226,16 @@ async function main() {
   let previous = {};
   try { previous = JSON.parse(await readFile(OUTPUT, "utf8")); } catch {}
   const previousSymbols = Object.keys(previous.positions ?? {}).sort();
-  if (previous.formatVersion === FORMAT_VERSION && previous.universeGeneratedAt === universe.generatedAt && previousSymbols.length === symbols.length && previousSymbols.every((symbol, index) => symbol === [...symbols].sort()[index])) {
+  const symbolsMatch = previousSymbols.length === symbols.length && previousSymbols.every((symbol, index) => symbol === [...symbols].sort()[index]);
+  if (previous.formatVersion === FORMAT_VERSION && previous.universeGeneratedAt === universe.generatedAt && symbolsMatch) {
     console.log(`Semantic atlas is current for ${symbols.length} symbols`);
+    return;
+  }
+  if (previous.formatVersion < FORMAT_VERSION && previous.universeGeneratedAt === universe.generatedAt && symbolsMatch && previous.profiles) {
+    const positions = Object.fromEntries(symbols.map((symbol) => [symbol, { ...previous.positions[symbol], genre: classify(previous.profiles[symbol] ?? {}) }]));
+    const output = { ...previous, formatVersion: FORMAT_VERSION, generatedAt: new Date().toISOString(), genres: Object.fromEntries(Object.entries(GENRES).map(([id, genre]) => [id, genre.label])), positions };
+    await writeFile(OUTPUT, `${JSON.stringify(output)}\n`);
+    console.log(`Reclassified ${symbols.length} existing semantic positions`);
     return;
   }
   const cached = previous.profiles ?? {};
@@ -249,7 +254,7 @@ async function main() {
   const neighbors = {};
   const profileMap = {};
   profiles.forEach((profile, index) => {
-    const genre = classify(profile.text);
+    const genre = classify(profile);
     positions[profile.symbol] = { ...coordinates[index], genre };
     const publicProfile = { ...profile };
     delete publicProfile.text;

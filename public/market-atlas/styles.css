@@ -6,11 +6,15 @@
 .shell{background:radial-gradient(ellipse at 52% 46%,#477da3 0%,#2b587e 44%,#1a3859 82%)}body{background:#1a3859}.left-panel,.right-panel{background:rgba(19,49,79,.76)}.atlas-stage{background-color:rgba(48,101,142,.28)}
 .panel-title i{transform:translateY(4px)}
 .lens[data-lens="all"] span{background:conic-gradient(#46d3ff,#bc8cff,#ff9a62,#b9ee6b,#ffcf63,#ff7aba,#46d3ff);border-color:transparent;box-shadow:0 0 8px rgba(220,235,246,.45)}
-.lens[data-lens="ai"] span{background:#46d3ff;border-color:#46d3ff;box-shadow:0 0 8px #46d3ff}
-.lens[data-lens="frontier"] span{background:#bc8cff;border-color:#bc8cff;box-shadow:0 0 8px #bc8cff}
-.lens[data-lens="security"] span{background:#ff9a62;border-color:#ff9a62;box-shadow:0 0 8px #ff9a62}
+.lens[data-lens="chipsai"] span{background:#46d3ff;border-color:#46d3ff;box-shadow:0 0 8px #46d3ff}
+.lens[data-lens="software"] span{background:#7aa2ff;border-color:#7aa2ff;box-shadow:0 0 8px #7aa2ff}
+.lens[data-lens="security"] span{background:#ff8066;border-color:#ff8066;box-shadow:0 0 8px #ff8066}
 .lens[data-lens="power"] span{background:#b9ee6b;border-color:#b9ee6b;box-shadow:0 0 8px #b9ee6b}
-.lens[data-lens="crypto"] span{background:#ffcf63;border-color:#ffcf63;box-shadow:0 0 8px #ffcf63}
+.lens[data-lens="health"] span{background:#ff7eb6;border-color:#ff7eb6;box-shadow:0 0 8px #ff7eb6}
+.lens[data-lens="finance"] span{background:#ffd166;border-color:#ffd166;box-shadow:0 0 8px #ffd166}
+.lens[data-lens="consumer"] span{background:#bc8cff;border-color:#bc8cff;box-shadow:0 0 8px #bc8cff}
+.lens[data-lens="industrial"] span{background:#52d6b6;border-color:#52d6b6;box-shadow:0 0 8px #52d6b6}
+.lens[data-lens="crypto"] span{background:#f7931a;border-color:#f7931a;box-shadow:0 0 8px #f7931a}
 .lens[data-lens="other"] span{background:#a8b4c3;border-color:#a8b4c3;box-shadow:0 0 8px rgba(168,180,195,.75)}
 .lens[data-lens="benchmark"] span{background:#ff7aba;border-color:#ff7aba;box-shadow:0 0 8px #ff7aba}
 .panel-title{position:relative;display:inline-block;padding-left:24px;line-height:12px}.panel-title i{position:absolute;left:0;top:6px;transform:translateY(-50%)}
