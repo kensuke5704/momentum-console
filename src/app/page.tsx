@@ -6,7 +6,7 @@ import type { DashboardPayload } from "@/lib/types";
 
 function initialDashboard(): DashboardPayload {
   try {
-    const data = JSON.parse(readFileSync(join(process.cwd(), "public/data/market-data.json"), "utf8")) as { dashboard?: DashboardPayload };
+    const data = JSON.parse(readFileSync(join(process.cwd(), "public/data/dashboard.json"), "utf8")) as { dashboard?: DashboardPayload };
     return data.dashboard?.config?.strategyId ? data.dashboard : SNAPSHOT_DASHBOARD;
   } catch { return SNAPSHOT_DASHBOARD; }
 }

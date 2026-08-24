@@ -14,5 +14,5 @@ export function buildDashboardPayload(histories: Record<string, PricePoint[]>, u
   const close = qqq.at(-1)?.close ?? null;
   const sma = qqq.length >= PRODUCTION_STRATEGY.recovery.qqqDailySmaDays ? mean(qqq.slice(-PRODUCTION_STRATEGY.recovery.qqqDailySmaDays).map((point) => point.close)) : null;
   const prior = qqq.at(-(PRODUCTION_STRATEGY.recovery.qqqMomentumDays + 1))?.close;
-  return { generatedAt: new Date().toISOString(), source, config: PRODUCTION_STRATEGY, currentUniverse, universeHistory, currentSignal, liveState: state, qqq: { close, monthlyMa: currentSignal?.qqqMonthlyMa ?? null, dailySma: sma, momentum20d: close && prior ? close / prior - 1 : null }, backtest };
+  return { generatedAt: new Date().toISOString(), source, config: PRODUCTION_STRATEGY, currentUniverse, currentSignal, liveState: state, qqq: { close, monthlyMa: currentSignal?.qqqMonthlyMa ?? null, dailySma: sma, momentum20d: close && prior ? close / prior - 1 : null }, backtest };
 }

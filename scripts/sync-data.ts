@@ -29,6 +29,7 @@ async function main() {
   const dashboard = buildDashboardPayload(histories, universeHistory);
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, dashboard })}\n`);
+  await writeFile(resolve("public/data/dashboard.json"), `${JSON.stringify({ dashboard })}\n`);
   await writeFile(resolve("public/data/live-state.json"), `${JSON.stringify(dashboard.liveState)}\n`);
   console.log(`Saved ${outputPath}; signal ${dashboard.currentSignal?.signalDate ?? "none"}; state ${dashboard.liveState.state}`);
 }

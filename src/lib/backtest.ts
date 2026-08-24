@@ -60,7 +60,13 @@ export function runStrategySimulation(args: {
     const nextSessionDate = tradingDates[index + 1] ?? null;
     const universe = universeBySignalDate.get(date);
     const signal = universe ? buildMonthlySignal({ universe, histories: args.histories, qqq, nextSessionDate, config }) : null;
-    const symbols = new Set(["QQQ", ...state.currentPositions.map((position) => position.symbol), ...(signal?.selectedSymbols ?? [])]);
+    const symbols = new Set([
+      "QQQ",
+      ...state.currentPositions.map((position) => position.symbol),
+      ...(state.pendingSignal?.selectedSymbols ?? []),
+      ...state.nextAction.symbols,
+      ...(signal?.selectedSymbols ?? []),
+    ]);
     const prices = Object.fromEntries([...symbols].map((symbol) => [symbol, priceMaps[symbol]?.get(date)]));
     state = transitionDay(state, { date, prices, qqqHistoryThroughClose: qqq.slice(0, (dateIndex.get(date) ?? index) + 1), monthlySignal: signal, nextSessionDate }, config);
     curve.push({ date, equity: state.currentEquity, drawdown: state.drawdown });
