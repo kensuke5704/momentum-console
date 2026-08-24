@@ -36,12 +36,13 @@ async function main() {
   const universeHistory = universeFile.history;
   if (!universeHistory.length) throw new Error("Dynamic Universe history is empty; run npm run sync:universe first");
   const symbols = [...new Set(["QQQ", "TQQQ", ...universeHistory.flatMap((month) => month.symbols.map((member) => member.symbol))])];
+  const intradaySymbols = [...new Set(["QQQ", "TQQQ", ...(universeHistory.at(-1)?.symbols.map((member) => member.symbol) ?? [])])];
   console.log(`Fetching adjusted OHLC for ${symbols.length} dynamic-universe symbols`);
   const outputPath = resolve("public/data/market-data.json");
   const existing = await existingMarketData(outputPath);
-  const [fetchedHistories, fetchedIntraday] = await Promise.all([fetchHistories(symbols, 8), fetchIntradayHistories(symbols, 8)]);
+  const [fetchedHistories, fetchedIntraday] = await Promise.all([fetchHistories(symbols, 8), fetchIntradayHistories(intradaySymbols, 8)]);
   const histories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
-  const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, symbols);
+  const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, intradaySymbols);
   const dashboard = buildDashboardPayload(histories, universeHistory);
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, intraday, dashboard })}\n`);

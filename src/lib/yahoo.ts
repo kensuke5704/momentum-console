@@ -162,7 +162,12 @@ export async function fetchIntradayHistories(
   async function worker() {
     while (cursor < symbols.length) {
       const symbol = symbols[cursor++];
-      output[symbol] = await fetchYahooIntraday(symbol);
+      try {
+        output[symbol] = await fetchYahooIntraday(symbol);
+      } catch (error) {
+        console.warn(error instanceof Error ? error.message : `${symbol}: intraday fetch failed`);
+        output[symbol] = [];
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, symbols.length) }, () => worker()));
