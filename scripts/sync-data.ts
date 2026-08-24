@@ -1,25 +1,27 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildDashboardPayload } from "../src/lib/dashboard";
-import { updateForwardOos } from "../src/lib/oos";
-import type { BacktestResult, ForwardOosResult, PricePoint, UniverseMonth } from "../src/lib/types";
-import { fetchHistories } from "../src/lib/yahoo";
+import type { PricePoint, UniverseMonth } from "../src/lib/types";
+import { fetchHistories, fetchIntradayHistories, type IntradayPricePoint } from "../src/lib/yahoo";
 
 type UniverseFile = { history: UniverseMonth[] };
-type MarketDataFile = { histories?: Record<string, PricePoint[]> };
-type FrozenBacktestFile = { strategyId: string; frozenAt: string; dataThrough: string | null; backtest: BacktestResult };
+type MarketDataFile = { histories?: Record<string, PricePoint[]>; intraday?: Record<string, IntradayPricePoint[]> };
 
 async function existingHistories(path: string): Promise<Record<string, PricePoint[]>> {
   try { return (JSON.parse(await readFile(path, "utf8")) as MarketDataFile).histories ?? {}; } catch { return {}; }
 }
-async function frozenBacktest(expectedStrategyId: string): Promise<BacktestResult> {
-  const frozen = JSON.parse(await readFile(resolve("public/data/backtest-frozen.json"), "utf8")) as FrozenBacktestFile;
-  if (!frozen.backtest?.strategyId) throw new Error("Frozen backtest is missing; run npm run freeze:backtest once intentionally");
-  if (frozen.strategyId !== expectedStrategyId || frozen.backtest.strategyId !== expectedStrategyId) throw new Error("Frozen backtest belongs to a different strategy; create a new intentional freeze before syncing");
-  return frozen.backtest;
+async function existingMarketData(path: string): Promise<MarketDataFile> {
+  try { return JSON.parse(await readFile(path, "utf8")) as MarketDataFile; } catch { return {}; }
 }
-async function existingOos(): Promise<ForwardOosResult | null> {
-  try { return JSON.parse(await readFile(resolve("public/data/oos-performance.json"), "utf8")) as ForwardOosResult; } catch { return null; }
+function mergeIntraday(existing: Record<string, IntradayPricePoint[]>, fetched: Record<string, IntradayPricePoint[]>, symbols: string[]) {
+  return Object.fromEntries(symbols.map((symbol) => {
+    const fresh = fetched[symbol] ?? [];
+    if (!fresh.length) return [symbol, existing[symbol] ?? []];
+    const byTimestamp = new Map<string, IntradayPricePoint>();
+    for (const point of existing[symbol] ?? []) byTimestamp.set(point.timestamp, point);
+    for (const point of fresh) byTimestamp.set(point.timestamp, point);
+    return [symbol, [...byTimestamp.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).slice(-80)];
+  }));
 }
 function merge(existing: Record<string, PricePoint[]>, fetched: Record<string, PricePoint[]>, symbols: string[]) {
   return Object.fromEntries(symbols.map((symbol) => {
@@ -36,15 +38,15 @@ async function main() {
   const symbols = [...new Set(["QQQ", "TQQQ", ...universeHistory.flatMap((month) => month.symbols.map((member) => member.symbol))])];
   console.log(`Fetching adjusted OHLC for ${symbols.length} dynamic-universe symbols`);
   const outputPath = resolve("public/data/market-data.json");
-  const histories = merge(await existingHistories(outputPath), await fetchHistories(symbols, 8), symbols);
-  const liveDashboard = buildDashboardPayload(histories, universeHistory);
-  const oos = updateForwardOos(liveDashboard.backtest, await existingOos());
-  const dashboard = { ...liveDashboard, backtest: await frozenBacktest(liveDashboard.config.strategyId), oos };
+  const existing = await existingMarketData(outputPath);
+  const [fetchedHistories, fetchedIntraday] = await Promise.all([fetchHistories(symbols, 8), fetchIntradayHistories(symbols, 8)]);
+  const histories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
+  const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, symbols);
+  const dashboard = buildDashboardPayload(histories, universeHistory);
   await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, dashboard })}\n`);
+  await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, intraday, dashboard })}\n`);
   await writeFile(resolve("public/data/dashboard.json"), `${JSON.stringify({ dashboard })}\n`);
   await writeFile(resolve("public/data/live-state.json"), `${JSON.stringify(dashboard.liveState)}\n`);
-  await writeFile(resolve("public/data/oos-performance.json"), `${JSON.stringify(oos)}\n`);
   console.log(`Saved ${outputPath}; signal ${dashboard.currentSignal?.signalDate ?? "none"}; state ${dashboard.liveState.state}`);
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

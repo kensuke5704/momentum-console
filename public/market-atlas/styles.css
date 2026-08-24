@@ -11,6 +11,7 @@
 .lens[data-lens="security"] span{background:#ff9a62;border-color:#ff9a62;box-shadow:0 0 8px #ff9a62}
 .lens[data-lens="power"] span{background:#b9ee6b;border-color:#b9ee6b;box-shadow:0 0 8px #b9ee6b}
 .lens[data-lens="crypto"] span{background:#ffcf63;border-color:#ffcf63;box-shadow:0 0 8px #ffcf63}
+.lens[data-lens="other"] span{background:#a8b4c3;border-color:#a8b4c3;box-shadow:0 0 8px rgba(168,180,195,.75)}
 .lens[data-lens="benchmark"] span{background:#ff7aba;border-color:#ff7aba;box-shadow:0 0 8px #ff7aba}
 .panel-title{position:relative;display:inline-block;padding-left:24px;line-height:12px}.panel-title i{position:absolute;left:0;top:6px;transform:translateY(-50%)}
 .panel-title{display:inline;padding-left:0}.panel-title i,.panel-title::before,.panel-title::after{display:none!important;content:none!important}

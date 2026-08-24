@@ -26,11 +26,11 @@ jobs:
         env:
           NPORT_CACHE_DIR: /tmp/momentum-console-nport
           SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
-        run: npm run sync:sec && npm run sync:universe
+        run: npm run sync:sec && npm run sync:universe && npm run sync:atlas
       - name: Commit auditable universe history
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add data/universe-history.json public/data/universe-history.json public/data/universe-current.json
+          git add data/universe-history.json public/data/universe-history.json public/data/universe-current.json public/data/atlas-layout.json
           git diff --cached --quiet || git commit -m "Update point-in-time Dynamic Universe"
           git push
