@@ -137,7 +137,7 @@ function Overview({ data }: { data: DashboardPayload }) {
 }
 function Top2({ signal }: { signal: DashboardPayload["currentSignal"] }) {
   if (!signal?.selectedSymbols.length) return <div className="empty-state">新規Risk-On portfolioはありません。</div>;
-  return <div className="top2-grid">{signal.selectedSymbols.map((symbol, index) => <div key={symbol}><span>TOP {index + 1}</span><strong>{symbol}</strong><b>{pct(signal.targetWeights[index], 0)}</b></div>)}<div className="allocation-evidence"><span>Allocation</span><strong>{signal.allocationMode}</strong></div></div>;
+  return <div className="top2-grid">{signal.selectedSymbols.map((symbol, index) => <div key={symbol}><span>TOP {index + 1}</span><strong>{symbol}</strong><b>{pct(signal.targetWeights[index], 0)}</b></div>)}</div>;
 }
 function Universe({ data }: { data: DashboardPayload }) {
   const universe = data.currentUniverse;
@@ -151,7 +151,7 @@ function Portfolio({ data }: { data: DashboardPayload }) {
 }
 function Risk({ data }: { data: DashboardPayload }) {
   const state = data.liveState;
-  return <div className="dynamic-stack"><div className="dynamic-metric-grid"><Metric label="STATE" value={stateLabel(state.state)} /><Metric label="PORTFOLIO PEAK" value={state.portfolioPeak.toFixed(3)} /><Metric label="CURRENT EQUITY" value={state.currentEquity.toFixed(3)} /><Metric label="DRAWDOWN" value={pct(state.drawdown)} tone="bad" /></div><Section title="Persistent Risk Control"><div className="rules-grid"><div><span>Individual stop</span><strong>-17.5%</strong></div><div><span>Portfolio circuit</span><strong>-15.0%</strong></div><div><span>Recovery</span><strong>10 closes</strong><p>10M gate + 100DMA + 20D momentum</p></div><div><span>Execution cost</span><strong className="execution-cost">10 bp / side</strong></div></div></Section><Section title="Last Trigger"><p className="trigger-text">{state.lastTrigger ?? "トリガー履歴はありません。"}</p></Section></div>;
+  return <div className="dynamic-stack"><div className="dynamic-metric-grid"><Metric label="STATE" value={stateLabel(state.state)} /><Metric label="PORTFOLIO PEAK" value={state.portfolioPeak.toFixed(3)} /><Metric label="CURRENT EQUITY" value={state.currentEquity.toFixed(3)} /><Metric label="DRAWDOWN" value={pct(state.drawdown)} tone="bad" /></div><Section title="Persistent Risk Control"><div className="rules-grid"><div><span>Individual stop</span><strong>-17.5%</strong></div><div><span>Portfolio circuit</span><strong>-15.0%</strong></div><div><span>Recovery</span><strong>10 closes</strong></div><div><span>Execution cost</span><strong className="execution-cost">10 bp</strong></div></div></Section><Section title="Last Trigger"><p className="trigger-text">{state.lastTrigger ?? "トリガー履歴はありません。"}</p></Section></div>;
 }
 function Backtest({ data }: { data: DashboardPayload }) {
   const stats = data.backtest.stats;
