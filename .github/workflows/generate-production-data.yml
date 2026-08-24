@@ -1,0 +1,43 @@
+name: Generate Dynamic Strategy Data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      NPORT_CACHE_DIR: /tmp/momentum-console-nport
+      SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: data/sec-nport/filings.json
+          key: nport-filings-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: nport-filings-${{ runner.os }}-
+      - run: npm run sync:sec
+      - run: npm run sync:universe
+      - run: npm run sync:data
+      - run: npm run sync:oos
+      - run: npm run check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-production-data
+          path: |
+            data/sec-nport/filings.json
+            data/universe-history.json
+            public/data/universe-current.json
+            public/data/universe-history.json
+            public/data/market-data.json
+            public/data/live-state.json
+            public/data/oos-performance.json
+          retention-days: 30

@@ -7,3 +7,4 @@ out/
 .env.local
 outputs/
 work/
+data/sec-nport/filings.json
