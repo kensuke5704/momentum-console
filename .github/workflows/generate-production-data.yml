@@ -41,4 +41,5 @@ jobs:
             public/data/dashboard.json
             public/data/live-state.json
             public/data/oos-performance.json
+            public/data/backtest-frozen.json
           retention-days: 30

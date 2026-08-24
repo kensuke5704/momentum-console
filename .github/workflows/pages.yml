@@ -9,7 +9,7 @@ on:
     - cron: "20 22 * * 1-5"
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -34,7 +34,16 @@ jobs:
         run: npm ci
 
       - name: Fetch market data
-        run: npm run sync:data
+        run: npm run sync:data && npm run sync:oos
+
+      - name: Persist append-only Forward OOS data
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add public/data/oos-performance.json
+          git diff --cached --quiet || git commit -m "Update daily Forward OOS [skip ci]"
+          git push
 
       - name: Build static app
         env:
