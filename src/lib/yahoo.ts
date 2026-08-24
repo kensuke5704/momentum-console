@@ -19,7 +19,7 @@ type YahooChartResponse = {
 };
 
 const START_UNIX = Math.floor(
-  new Date("2020-01-01T00:00:00Z").getTime() / 1000,
+  new Date("2018-01-01T00:00:00Z").getTime() / 1000,
 );
 
 export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
@@ -63,13 +63,22 @@ export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
         return null;
       }
 
-      const open = quote?.open?.[index];
-      const high = quote?.high?.[index];
-      const low = quote?.low?.[index];
+      const rawClose = quote?.close?.[index];
+      const rawOpen = quote?.open?.[index];
+      if (typeof rawClose !== "number" || rawClose <= 0 || typeof rawOpen !== "number" || rawOpen <= 0) return null;
+      // Yahoo's adjusted close incorporates splits/dividends. Apply the same
+      // factor to OHLC so a split cannot create a false stop or impossible
+      // adjusted-close/unadjusted-open execution return.
+      const factor = close / rawClose;
+      const open = rawOpen * factor;
+      const rawHigh = quote?.high?.[index];
+      const rawLow = quote?.low?.[index];
+      const high = typeof rawHigh === "number" ? rawHigh * factor : undefined;
+      const low = typeof rawLow === "number" ? rawLow * factor : undefined;
       return {
         date: new Date(timestamp * 1000).toISOString().slice(0, 10),
         close,
-        ...(typeof open === "number" && Number.isFinite(open) ? { open } : {}),
+        open,
         ...(typeof high === "number" && Number.isFinite(high) ? { high } : {}),
         ...(typeof low === "number" && Number.isFinite(low) ? { low } : {}),
       };
@@ -89,7 +98,12 @@ export async function fetchHistories(
       const index = cursor;
       cursor += 1;
       const symbol = symbols[index];
-      output[symbol] = await fetchYahooHistory(symbol);
+      try {
+        output[symbol] = await fetchYahooHistory(symbol);
+      } catch (error) {
+        console.warn(error instanceof Error ? error.message : `${symbol}: price fetch failed`);
+        output[symbol] = [];
+      }
     }
   }
 

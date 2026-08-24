@@ -8,13 +8,14 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
-    "check:watchlist": "node --import tsx scripts/validate-universe-watchlist.ts",
-    "check:monitoring": "node --import tsx scripts/validate-universe-monitoring.ts",
-    "check": "npm run check:watchlist && npm run check:monitoring && npm run typecheck && npm run lint && npm run build",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "check": "npm run test && npm run typecheck && npm run lint && npm run build",
+    "sync:sec": "node --import tsx scripts/sync-sec-nport.ts",
+    "sync:universe": "node --import tsx scripts/build-universe.ts",
     "sync:data": "node --import tsx scripts/sync-data.ts",
     "sync:oos": "node --import tsx scripts/sync-oos.ts",
     "sync:monitoring": "node --import tsx scripts/sync-universe-monitoring.ts",
-    "sync:all": "npm run sync:data && npm run sync:oos && npm run sync:monitoring"
+    "sync:all": "npm run sync:sec && npm run sync:universe && npm run sync:data && npm run sync:oos"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

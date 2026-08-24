@@ -1,0 +1,36 @@
+name: Refresh Point-in-Time Universe
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 22:35 UTC is after the US close in both EST and EDT.
+    - cron: "35 22 1-4 * *"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: data/sec-nport/filings.json
+          key: nport-filings-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: nport-filings-${{ runner.os }}-
+      - name: Rebuild N-PORT source and universes
+        env:
+          NPORT_CACHE_DIR: /tmp/momentum-console-nport
+          SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
+        run: npm run sync:sec && npm run sync:universe
+      - name: Commit auditable universe history
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add data/universe-history.json public/data/universe-history.json public/data/universe-current.json
+          git diff --cached --quiet || git commit -m "Update point-in-time Dynamic Universe"
+          git push
