@@ -87,7 +87,6 @@ export type DashboardPayload = {
   warning?: string;
   config: StrategyConfig;
   currentUniverse: UniverseMonth | null;
-  universeHistory: UniverseMonth[];
   currentSignal: MonthlySignal | null;
   liveState: LiveStrategyState;
   qqq: { close: number | null; monthlyMa: number | null; dailySma: number | null; momentum20d: number | null };

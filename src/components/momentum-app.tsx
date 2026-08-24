@@ -39,7 +39,7 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
     setRefreshMessage(null);
     try {
       const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-      const response = await fetch(`${base}/data/market-data.json?t=${Date.now()}`, { cache: "no-store" });
+      const response = await fetch(`${base}/data/dashboard.json?t=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error("配信済みデータを読み込めませんでした。");
       const body = await response.json() as { dashboard?: DashboardPayload };
       if (!body.dashboard) throw new Error("最新版のdashboardが見つかりませんでした。");

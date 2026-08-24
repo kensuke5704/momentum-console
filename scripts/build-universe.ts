@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildPointInTimeUniverse } from "../src/lib/universe/universe";
+import { buildPointInTimeUniverse, isCompletedSignalMonth } from "../src/lib/universe/universe";
 import { fetchYahooHistory } from "../src/lib/yahoo";
 import type { NportFiling, UniverseMonth } from "../src/lib/types";
 
@@ -11,7 +11,8 @@ async function main() {
   for (const point of qqq) monthEnds.set(point.date.slice(0, 7), point.date);
   const history: UniverseMonth[] = [];
   let previous: UniverseMonth | null = null;
-  for (const [signalMonth, asOf] of [...monthEnds].filter(([month]) => month >= "2020-01").sort(([a], [b]) => a.localeCompare(b))) {
+  const currentCalendarMonth = new Date().toISOString().slice(0, 7);
+  for (const [signalMonth, asOf] of [...monthEnds].filter(([month]) => month >= "2020-01" && isCompletedSignalMonth(month, currentCalendarMonth)).sort(([a], [b]) => a.localeCompare(b))) {
     const current = buildPointInTimeUniverse(raw.filings, signalMonth, asOf, previous);
     history.push(current);
     previous = current;

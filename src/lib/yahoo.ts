@@ -25,25 +25,17 @@ const START_UNIX = Math.floor(
 export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
   const endUnix = Math.floor(Date.now() / 1000) + 86400;
   const yahooSymbol = encodeURIComponent(symbol.replace(".", "-"));
-  const url =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}` +
-    `?period1=${START_UNIX}&period2=${endUnix}&interval=1d` +
-    "&events=history&includeAdjustedClose=true";
-
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 MomentumConsole/1.0",
-      Accept: "application/json",
-    },
-    next: { revalidate: 21600 },
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`${symbol}: market data request failed (${response.status})`);
+  let body: YahooChartResponse | null = null;
+  let lastStatus = 0;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const host = attempt % 2 === 0 ? "query1.finance.yahoo.com" : "query2.finance.yahoo.com";
+    const url = `https://${host}/v8/finance/chart/${yahooSymbol}?period1=${START_UNIX}&period2=${endUnix}&interval=1d&events=history&includeAdjustedClose=true`;
+    const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 MomentumConsole/2.0", Accept: "application/json" }, next: { revalidate: 21600 }, signal: AbortSignal.timeout(20000) });
+    lastStatus = response.status;
+    if (response.ok) { body = (await response.json()) as YahooChartResponse; break; }
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
   }
-
-  const body = (await response.json()) as YahooChartResponse;
+  if (!body) throw new Error(`${symbol}: market data request failed (${lastStatus})`);
   const result = body.chart?.result?.[0];
 
   if (!result?.timestamp?.length) {

@@ -38,6 +38,7 @@ jobs:
             public/data/universe-current.json
             public/data/universe-history.json
             public/data/market-data.json
+            public/data/dashboard.json
             public/data/live-state.json
             public/data/oos-performance.json
           retention-days: 30

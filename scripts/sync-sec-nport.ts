@@ -3,11 +3,13 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { gunzipSync } from "node:zlib";
 import type { NportFiling } from "../src/lib/types";
 
 const CACHE = process.env.NPORT_CACHE_DIR ?? join(tmpdir(), "momentum-console-nport");
 const START = process.env.NPORT_START_QUARTER ?? "2020q1";
 const OUTPUT = resolve("data/sec-nport/filings.json");
+const BOOTSTRAP = resolve("data/sec-nport/bootstrap.json.gz");
 const SEC_BASE = "https://www.sec.gov/files/dera/data/form-n-port-data-sets";
 const USER_AGENT = process.env.SEC_USER_AGENT ?? "MomentumConsole/2.0 kensuke5704@users.noreply.github.com";
 
@@ -61,7 +63,14 @@ async function main() {
   try {
     const existing = JSON.parse(await readFile(OUTPUT, "utf8")) as { filings?: NportFiling[]; quarters?: string[] };
     filings = existing.filings ?? []; processedQuarters = existing.quarters ?? [];
-  } catch { /* first reproducible extraction */ }
+  } catch {
+    try {
+      const bootstrap = JSON.parse(gunzipSync(await readFile(BOOTSTRAP)).toString("utf8")) as { snapshots?: NportFiling[]; startQuarter?: string; endQuarter?: string };
+      filings = bootstrap.snapshots ?? [];
+      if (bootstrap.startQuarter && bootstrap.endQuarter) processedQuarters = quarters(bootstrap.startQuarter, bootstrap.endQuarter);
+      console.log(`Loaded ${filings.length} audited filings from the reproducible bootstrap`);
+    } catch { /* first extraction without a bootstrap */ }
+  }
   const requested = quarters(START, process.env.NPORT_END_QUARTER ?? latestAvailableQuarter());
   for (const quarter of requested) {
     if (processedQuarters.includes(quarter)) continue;

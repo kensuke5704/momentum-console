@@ -5,6 +5,10 @@ import { latestPublicFilings } from "./sec-nport";
 const DAY_MS = 86_400_000;
 const ageDays = (asOf: string, filed: string) => Math.max(0, (Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${filed}T00:00:00Z`)) / DAY_MS);
 
+export function isCompletedSignalMonth(month: string, currentCalendarMonth = new Date().toISOString().slice(0, 7)): boolean {
+  return month < currentCalendarMonth;
+}
+
 export function buildPointInTimeUniverse(filings: NportFiling[], signalMonth: string, asOf: string, previous?: UniverseMonth | null, size = PRODUCTION_STRATEGY.universe.size): UniverseMonth {
   const sources = latestPublicFilings(filings, asOf);
   const rows = new Map<string, { seriesIds: Set<string>; aggregateWeight: number; maxWeight: number; recencyWeight: number }>();
