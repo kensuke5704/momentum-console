@@ -1,0 +1,71 @@
+name: CPCM Rank Persistence Scan
+
+on:
+  push:
+    branches:
+      - research/cpcm-rank-persistence-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        retain_rank: [2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Inject rank-persistence research rule
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/chronology-preserving-conditional-mc.ts')
+          s = p.read_text()
+          old_sig = 'function makeSignal(date:string,next:string|null,u:UniverseMonth,monthly:Map<string,number[]>):MonthlySignal{'
+          new_sig = 'function makeSignal(date:string,next:string|null,u:UniverseMonth,monthly:Map<string,number[]>,prev:string[],retainRank:number):MonthlySignal{'
+          if old_sig not in s:
+              raise SystemExit('makeSignal signature not found')
+          s = s.replace(old_sig, new_sig, 1)
+
+          old_choose = 'const chosen=e.slice(0,2),valid=chosen.length===2'
+          new_choose = 'const kept=prev.filter(s=>e.some(x=>x.symbol===s&&x.rank!=null&&x.rank<=retainRank)),chosen=[...kept,...e.filter(x=>!kept.includes(x.symbol)).map(x=>x.symbol)].slice(0,2).map(s=>e.find(x=>x.symbol===s)!),valid=chosen.length===2'
+          if old_choose not in s:
+              raise SystemExit('selection expression not found')
+          s = s.replace(old_choose, new_choose, 1)
+
+          old_path = 'for(let pathNo=0;pathNo<PATHS;pathNo++){const syn='
+          new_path = 'for(let pathNo=0;pathNo<PATHS;pathNo++){let retainedSelection:string[]=[];const syn='
+          if old_path not in s:
+              raise SystemExit('path initialization not found')
+          s = s.replace(old_path, new_path, 1)
+
+          old_call = 'signals[d]=makeSignal(d,next,latestU(us,d),monthly)'
+          new_call = 'signals[d]=makeSignal(d,next,latestU(us,d),monthly,retainedSelection,Number(process.env.CPCM_RETAIN_RANK??2));retainedSelection=signals[d].selectedSymbols'
+          if old_call not in s:
+              raise SystemExit('makeSignal call not found')
+          s = s.replace(old_call, new_call, 1)
+          p.write_text(s)
+          PY
+      - name: Run CPCM rank-persistence scan
+        env:
+          CPCM_PATHS: 300
+          CPCM_LABEL: rank_persistence_${{ matrix.retain_rank }}
+          CPCM_STOP: 0.175
+          CPCM_RECOVERY_DAYS: 5
+          CPCM_SEED: 20260825
+          CPCM_RETAIN_RANK: ${{ matrix.retain_rank }}
+        run: node --import tsx scripts/chronology-preserving-conditional-mc.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-rank-persistence-${{ matrix.retain_rank }}-300
+          path: data/research/structural-monte-carlo/cpcm-rank_persistence_${{ matrix.retain_rank }}.json
+          retention-days: 30
