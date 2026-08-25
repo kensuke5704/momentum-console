@@ -22,10 +22,10 @@ jobs:
       - run: npm ci
       - name: Run ablation
         env:
-          ABLATION_PATHS: 300
+          ABLATION_PATHS: 50
         run: node --import tsx scripts/structural-monte-carlo-ablation.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: structural-monte-carlo-ablation-300
+          name: structural-monte-carlo-ablation-50
           path: data/research/structural-monte-carlo/
           retention-days: 30
