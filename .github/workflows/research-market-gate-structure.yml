@@ -1,0 +1,28 @@
+name: Market Gate Structure Research
+
+on:
+  push:
+    branches:
+      - research/market-gate-structure-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run market gate structure research
+        run: node --import tsx scripts/market-gate-structure.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-gate-structure
+          path: data/research/market-gate/structure.json
+          retention-days: 30
