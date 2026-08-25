@@ -1,0 +1,28 @@
+name: Research Risk Parameter Neighborhood
+
+on:
+  push:
+    branches:
+      - research/risk-parameter-neighborhood-20260826
+    paths:
+      - 'scripts/risk-parameter-neighborhood-audit.ts'
+      - '.github/workflows/research-risk-parameter-neighborhood.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run coarse neighborhood audit
+        run: node --import tsx scripts/risk-parameter-neighborhood-audit.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: risk-parameter-neighborhood
+          path: data/research/risk-parameter-neighborhood/audit.json
+          retention-days: 30
