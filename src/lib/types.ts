@@ -74,6 +74,14 @@ export type LiveStrategyState = {
 
 export type EquityPoint = { date: string; equity: number; drawdown: number };
 export type PerformanceStats = { cagr: number; maxDrawdown: number; annualizedVolatility: number; calmar: number | null; finalEquity: number };
+export type ExpectedCagrModel = {
+  generatedAt: string;
+  sourceRun: string;
+  strategyId: string;
+  method: string;
+  sample: { start: string; end: string; tradingDays: number; months: number };
+  estimate: { point: number; central50: [number, number]; central90: [number, number] };
+};
 export type BacktestResult = {
   strategyId: string;
   equityCurve: EquityPoint[];
@@ -119,4 +127,5 @@ export type DashboardPayload = {
   qqq: { close: number | null; monthlyMa: number | null; dailySma: number | null; momentum20d: number | null };
   oos: ForwardOosResult;
   backtest: BacktestResult;
+  expectedCagr?: ExpectedCagrModel;
 };
