@@ -1,4 +1,4 @@
-name: CPCM Allocation Scan
+name: CPCM Equal Allocation Robustness
 
 on:
   push:
@@ -12,26 +12,17 @@ permissions:
 jobs:
   simulate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: adaptive_50_70
-            base_weight: 0.50
-            conc_weight: 0.70
-          - label: equal_50_50
-            base_weight: 0.50
-            conc_weight: 0.50
-          - label: adaptive_60_70
-            base_weight: 0.60
-            conc_weight: 0.70
-          - label: adaptive_50_80
-            base_weight: 0.50
-            conc_weight: 0.80
-          - label: adaptive_60_80
-            base_weight: 0.60
-            conc_weight: 0.80
+          - label: equal_50_50_s20260825
+            seed: 20260825
+          - label: equal_50_50_s314159
+            seed: 314159
+          - label: equal_50_50_s271828
+            seed: 271828
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,34 +30,28 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Inject research allocation weights
-        env:
-          CPCM_BASE_WEIGHT: ${{ matrix.base_weight }}
-          CPCM_CONC_WEIGHT: ${{ matrix.conc_weight }}
+      - name: Inject equal allocation
         run: |
           python3 - <<'PY'
-          import os, re
+          import re
           from pathlib import Path
           p = Path('scripts/chronology-preserving-conditional-mc.ts')
           s = p.read_text()
-          base = os.environ['CPCM_BASE_WEIGHT']
-          conc = os.environ['CPCM_CONC_WEIGHT']
-          replacement = f'w=conc?{conc}:{base}'
-          s2, n = re.subn(r'w=conc\?\s*\.7\s*:\s*\.5', replacement, s, count=1)
+          s2, n = re.subn(r'w=conc\?\s*\.7\s*:\s*\.5', 'w=.5', s, count=1)
           if n != 1:
               raise SystemExit(f'allocation expression matches={n}')
           p.write_text(s2)
           PY
-      - name: Run CPCM allocation scan
+      - name: Run CPCM equal-allocation robustness
         env:
-          CPCM_PATHS: 300
-          CPCM_LABEL: allocation_${{ matrix.label }}
+          CPCM_PATHS: 1000
+          CPCM_LABEL: ${{ matrix.label }}
           CPCM_STOP: 0.175
           CPCM_RECOVERY_DAYS: 5
-          CPCM_SEED: 20260825
+          CPCM_SEED: ${{ matrix.seed }}
         run: node --import tsx scripts/chronology-preserving-conditional-mc.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: cpcm-allocation-${{ matrix.label }}-300
-          path: data/research/structural-monte-carlo/cpcm-allocation_${{ matrix.label }}.json
+          name: cpcm-${{ matrix.label }}-1000
+          path: data/research/structural-monte-carlo/cpcm-${{ matrix.label }}.json
           retention-days: 30
