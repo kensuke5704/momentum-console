@@ -325,7 +325,6 @@
 .execution-cost { white-space: nowrap; }
 .section-actions { align-items: center; display: flex; gap: 14px; min-width: 0; }
 .section-asof,
-.section-size { color: var(--text-soft); font-family: "Roboto Mono", monospace; font-size: 10px; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
 .section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; white-space: nowrap; }
 .trigger-text { margin: 0; }
 .equity-chart { height: 430px; }
