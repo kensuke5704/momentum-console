@@ -632,6 +632,15 @@ select:focus-visible {
   width: 100%;
 }
 
+.tab-label-mobile {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .tab-label-default { display: none; }
+  .tab-label-mobile { display: inline; }
+}
+
 .sidebar nav button:hover {
   background: var(--surface-2);
   color: var(--text);
