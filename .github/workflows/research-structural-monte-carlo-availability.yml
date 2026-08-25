@@ -1,0 +1,32 @@
+name: Availability-aware Structural Monte Carlo
+
+on:
+  push:
+    branches:
+      - research/structural-monte-carlo-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run availability-aware structural Monte Carlo
+        env:
+          STRUCTURAL_MC_PATHS: 500
+          STRUCTURAL_MC_YEARS: 5
+        run: node --import tsx scripts/structural-monte-carlo-availability.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: structural-monte-carlo-availability-5y-500
+          path: data/research/structural-monte-carlo/
+          retention-days: 30
