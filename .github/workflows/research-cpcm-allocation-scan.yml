@@ -45,17 +45,17 @@ jobs:
           CPCM_CONC_WEIGHT: ${{ matrix.conc_weight }}
         run: |
           python3 - <<'PY'
-          import os
+          import os, re
           from pathlib import Path
           p = Path('scripts/chronology-preserving-conditional-mc.ts')
           s = p.read_text()
-          old = 'const conc=zg!=null&&zg>=.25,w=conc?.7:.5;'
           base = os.environ['CPCM_BASE_WEIGHT']
           conc = os.environ['CPCM_CONC_WEIGHT']
-          new = f'const conc=zg!=null&&zg>=.25,w=conc?{conc}:{base};'
-          if old not in s:
-              raise SystemExit('allocation expression not found')
-          p.write_text(s.replace(old, new, 1))
+          replacement = f'w=conc?{conc}:{base}'
+          s2, n = re.subn(r'w=conc\?\s*\.7\s*:\s*\.5', replacement, s, count=1)
+          if n != 1:
+              raise SystemExit(f'allocation expression matches={n}')
+          p.write_text(s2)
           PY
       - name: Run CPCM allocation scan
         env:
