@@ -22,10 +22,10 @@ jobs:
       - run: npm ci
       - name: Run chronology-preserving conditional Monte Carlo
         env:
-          CPCM_PATHS: 100
+          CPCM_PATHS: 500
         run: node --import tsx scripts/chronology-preserving-conditional-mc.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: chronology-preserving-conditional-mc-100
+          name: chronology-preserving-conditional-mc-500
           path: data/research/structural-monte-carlo/
           retention-days: 30
