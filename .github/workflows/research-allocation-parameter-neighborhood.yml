@@ -1,0 +1,28 @@
+name: Research Allocation Parameter Neighborhood
+
+on:
+  push:
+    branches:
+      - research/allocation-parameter-neighborhood-20260826
+    paths:
+      - 'scripts/allocation-parameter-neighborhood-audit.ts'
+      - '.github/workflows/research-allocation-parameter-neighborhood.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run allocation neighborhood audit
+        run: node --import tsx scripts/allocation-parameter-neighborhood-audit.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: allocation-parameter-neighborhood
+          path: data/research/allocation-parameter-neighborhood/audit.json
+          retention-days: 30
