@@ -100,6 +100,7 @@
 .dynamic-stack {
   display: grid;
   gap: 20px;
+  min-width: 0;
 }
 
 .dynamic-card,
@@ -111,6 +112,8 @@
 .dynamic-card {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
 }
 
 .interactive-card {
@@ -154,6 +157,10 @@
 
 .dynamic-metric-grid.five {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.dynamic-metric-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .dynamic-metric {
@@ -261,6 +268,9 @@
 .table-scroll {
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dynamic-table {
@@ -311,7 +321,8 @@
 .rules-grid p { color: var(--text-soft); margin: 8px 0 0; }
 .execution-cost { white-space: nowrap; }
 .section-actions { align-items: center; display: flex; gap: 14px; min-width: 0; }
-.section-asof { color: var(--text-soft); font-family: "Roboto Mono", monospace; font-size: 10px; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
+.section-asof,
+.section-size { color: var(--text-soft); font-family: "Roboto Mono", monospace; font-size: 10px; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
 .section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; white-space: nowrap; }
 .trigger-text { margin: 0; }
 .equity-chart { height: 430px; }
@@ -449,6 +460,7 @@
   .last-updated b { display: block; margin-right: 0; }
   .dynamic-card > header { min-height: 56px; padding: 0 14px; }
   .dynamic-card > header h2 { font-size: 15px; }
+  .section-actions { gap: 8px; }
   .section-actions .section-note { display: none; }
   .dynamic-metric strong { font-size: 18px; }
   .rules-grid,
