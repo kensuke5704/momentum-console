@@ -1,0 +1,33 @@
+name: Research CPCM Recovery Gap Attribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/cpcm-validity-audit-20260825"]
+    paths:
+      - "scripts/cpcm-recovery-gap-attribution-v2.ts"
+      - ".github/workflows/research-cpcm-recovery-gap-attribution.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  attribution:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CPCM_ATTR_PATHS: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run recovery gap attribution
+        run: node --import tsx scripts/cpcm-recovery-gap-attribution-v2.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-recovery-gap-attribution
+          path: data/research/cpcm-validity/recovery-gap-attribution.json
+          retention-days: 30
