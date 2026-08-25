@@ -1,0 +1,30 @@
+name: Production Monte Carlo Research
+
+on:
+  push:
+    branches:
+      - research/monte-carlo-20260825
+    paths:
+      - scripts/monte-carlo-production.mjs
+      - .github/workflows/research-monte-carlo.yml
+      - public/data/dashboard.json
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run 5y x 50,000-path block bootstrap
+        run: node scripts/monte-carlo-production.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-monte-carlo-5y-50000
+          path: data/research/monte-carlo/
+          retention-days: 30
