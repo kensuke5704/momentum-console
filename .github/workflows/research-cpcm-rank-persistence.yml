@@ -37,7 +37,7 @@ jobs:
           s = s.replace(old_sig, new_sig, 1)
 
           old_choose = 'const chosen=e.slice(0,2),valid=chosen.length===2'
-          new_choose = 'const kept=prev.filter(s=>e.some(x=>x.symbol===s&&x.rank!=null&&x.rank<=retainRank)),chosen=[...kept,...e.filter(x=>!kept.includes(x.symbol)).map(x=>x.symbol)].slice(0,2).map(s=>e.find(x=>x.symbol===s)!),valid=chosen.length===2'
+          new_choose = 'const kept=prev.filter(s=>e.some(x=>x.symbol===s&&x.rank!=null&&x.rank<=retainRank)),chosen=[...kept,...e.filter(x=>!kept.includes(x.symbol)).map(x=>x.symbol)].slice(0,2).map(s=>e.find(x=>x.symbol===s)!).sort((a,b)=>(a.rank??999)-(b.rank??999)),valid=chosen.length===2'
           if old_choose not in s:
               raise SystemExit('selection expression not found')
           s = s.replace(old_choose, new_choose, 1)
