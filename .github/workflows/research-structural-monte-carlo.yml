@@ -1,0 +1,33 @@
+name: Structural Monte Carlo Research
+
+on:
+  push:
+    branches:
+      - research/structural-monte-carlo-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run 5y stock-level structural Monte Carlo
+        env:
+          STRUCTURAL_MC_PATHS: 2000
+          STRUCTURAL_MC_YEARS: 5
+          STRUCTURAL_MC_BLOCK: 20
+        run: node --import tsx scripts/structural-monte-carlo.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: structural-monte-carlo-5y-2000
+          path: data/research/structural-monte-carlo/
+          retention-days: 30
