@@ -1,0 +1,28 @@
+name: Cash State Decomposition
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/cash-state-decomposition-20260825
+    paths:
+      - scripts/cash-state-decomposition.ts
+      - .github/workflows/research-cash-state-decomposition.yml
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run cash state decomposition
+        run: node --import tsx scripts/cash-state-decomposition.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cash-state-decomposition
+          path: data/research/cash-state/decomposition.json
+          retention-days: 30
