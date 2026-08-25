@@ -1,0 +1,23 @@
+name: Exposure Quality Attribution
+on:
+  push:
+    branches: [research/exposure-quality-attribution-20260825-v2]
+  workflow_dispatch:
+jobs:
+  research:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run exposure quality attribution
+        run: node --import tsx scripts/exposure-quality-attribution.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exposure-quality-attribution
+          path: data/research/exposure-quality/attribution.json
+          retention-days: 30
