@@ -1,6 +1,7 @@
 import { PRODUCTION_STRATEGY } from "./config";
 import { buildMonthlySignal } from "./strategy/momentum";
 import { initialEngineState, transitionDay, type EngineState } from "./strategy/state-machine";
+import { nextUsTradingSession } from "./trading-calendar";
 import type { BacktestResult, EquityPoint, PerformanceStats, PricePoint, StrategyConfig, UniverseMonth } from "./types";
 
 const mean = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -57,7 +58,7 @@ export function runStrategySimulation(args: {
   for (let index = 0; index < tradingDates.length; index++) {
     const date = tradingDates[index];
     if (date < config.backtestStart) continue;
-    const nextSessionDate = tradingDates[index + 1] ?? null;
+    const nextSessionDate = tradingDates[index + 1] ?? nextUsTradingSession(date);
     const universe = universeBySignalDate.get(date);
     const signal = universe ? buildMonthlySignal({ universe, histories: args.histories, qqq, nextSessionDate, config }) : null;
     const symbols = new Set([

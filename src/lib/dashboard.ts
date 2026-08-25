@@ -2,6 +2,7 @@ import { runStrategySimulation } from "./backtest";
 import { PRODUCTION_STRATEGY } from "./config";
 import { emptyForwardOos } from "./oos";
 import { buildMonthlySignal } from "./strategy/momentum";
+import { nextUsTradingSession } from "./trading-calendar";
 import type { DashboardPayload, PricePoint, UniverseMonth } from "./types";
 
 const mean = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
@@ -11,7 +12,7 @@ export function buildDashboardPayload(histories: Record<string, PricePoint[]>, u
   const currentUniverse = universeHistory.at(-1) ?? null;
   const qqq = histories.QQQ ?? [];
   const signalIndex = currentUniverse ? qqq.findIndex((point) => point.date === currentUniverse.asOf) : -1;
-  const currentSignal = currentUniverse ? buildMonthlySignal({ universe: currentUniverse, histories, qqq, nextSessionDate: signalIndex >= 0 ? qqq[signalIndex + 1]?.date ?? null : null }) : null;
+  const currentSignal = currentUniverse ? buildMonthlySignal({ universe: currentUniverse, histories, qqq, nextSessionDate: signalIndex >= 0 ? qqq[signalIndex + 1]?.date ?? nextUsTradingSession(currentUniverse.asOf) : null }) : null;
   const close = qqq.at(-1)?.close ?? null;
   const sma = qqq.length >= PRODUCTION_STRATEGY.recovery.qqqDailySmaDays ? mean(qqq.slice(-PRODUCTION_STRATEGY.recovery.qqqDailySmaDays).map((point) => point.close)) : null;
   const prior = qqq.at(-(PRODUCTION_STRATEGY.recovery.qqqMomentumDays + 1))?.close;
