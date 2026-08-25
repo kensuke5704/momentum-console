@@ -1,0 +1,32 @@
+name: Universe Ranking Ablation
+
+on:
+  push:
+    branches:
+      - research/universe-ranking-ablation-20260825-v2
+    paths:
+      - scripts/universe-ranking-ablation.ts
+      - .github/workflows/research-universe-ranking-ablation.yml
+  workflow_dispatch:
+
+jobs:
+  ablation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run 2x2 universe-ranking ablation
+        env:
+          CPCM_PATHS: 1000
+          CPCM_SEED: 20260825
+        run: node --import tsx scripts/universe-ranking-ablation.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: universe-ranking-ablation
+          path: data/research/universe-ranking/ablation.json
+          retention-days: 30
