@@ -1,0 +1,31 @@
+name: Research CPCM Validity Audit
+
+on:
+  push:
+    branches:
+      - research/cpcm-validity-audit-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run CPCM generator validity audit
+        env:
+          CPCM_AUDIT_PATHS: 500
+        run: node --import tsx scripts/cpcm-generator-validity-audit.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-validity-audit
+          path: data/research/cpcm-validity/
+          retention-days: 30
