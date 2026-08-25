@@ -1,0 +1,32 @@
+name: Research CPCM Generator Sensitivity Pilot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/cpcm-validity-audit-20260825"]
+    paths:
+      - ".github/workflows/research-cpcm-generator-sensitivity-pilot.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CPCM_SENS_PATHS: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run generator sensitivity pilot
+        run: node --import tsx scripts/cpcm-generator-sensitivity.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-generator-sensitivity-pilot
+          path: data/research/cpcm-validity/generator-sensitivity.json
+          retention-days: 30
