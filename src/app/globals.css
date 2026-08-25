@@ -220,16 +220,19 @@
 
 .next-action > div {
   align-content: center;
+  align-items: center;
   border-right: 1px solid var(--line);
   display: grid;
   gap: 7px;
+  grid-template-rows: 15px 28px 21px;
   min-height: 132px;
   padding: 22px;
 }
 
 .next-action > div:last-child { border-right: 0; }
-.next-action strong { font-family: "Roboto Mono", monospace; font-size: 23px; line-height: 1.15; }
-.next-action p { color: var(--text-soft); margin: 0; }
+.next-action span { line-height: 15px; }
+.next-action strong { font-family: "Roboto Mono", monospace; font-size: 23px; line-height: 28px; }
+.next-action p { color: var(--text-soft); font-size: 14px; line-height: 21px; margin: 0; }
 
 .overview-two {
   display: grid;
