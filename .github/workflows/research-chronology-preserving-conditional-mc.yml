@@ -13,6 +13,31 @@ jobs:
   simulate:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: baseline
+            stop: 0.175
+            recovery: 10
+          - label: stop20_r10
+            stop: 0.20
+            recovery: 10
+          - label: stop25_r10
+            stop: 0.25
+            recovery: 10
+          - label: nostop_r10
+            stop: 0.99
+            recovery: 10
+          - label: stop175_r5
+            stop: 0.175
+            recovery: 5
+          - label: stop20_r5
+            stop: 0.20
+            recovery: 5
+          - label: stop25_r5
+            stop: 0.25
+            recovery: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,10 +47,14 @@ jobs:
       - run: npm ci
       - name: Run chronology-preserving conditional Monte Carlo
         env:
-          CPCM_PATHS: 1000
+          CPCM_PATHS: 300
+          CPCM_LABEL: ${{ matrix.label }}
+          CPCM_STOP: ${{ matrix.stop }}
+          CPCM_RECOVERY_DAYS: ${{ matrix.recovery }}
+          CPCM_SEED: 20260825
         run: node --import tsx scripts/chronology-preserving-conditional-mc.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: chronology-preserving-conditional-mc-1000
-          path: data/research/structural-monte-carlo/
+          name: cpcm-${{ matrix.label }}-300
+          path: data/research/structural-monte-carlo/cpcm-${{ matrix.label }}.json
           retention-days: 30
