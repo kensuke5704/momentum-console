@@ -1,0 +1,31 @@
+name: Structural Monte Carlo Ablation V2
+
+on:
+  push:
+    branches:
+      - research/structural-monte-carlo-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run clean ablation
+        env:
+          ABLATION_PATHS: 100
+        run: node --import tsx scripts/structural-monte-carlo-ablation-v2.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: structural-monte-carlo-ablation-v2-100
+          path: data/research/structural-monte-carlo/
+          retention-days: 30
