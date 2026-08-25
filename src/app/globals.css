@@ -310,7 +310,9 @@
 .rules-grid strong { display: block; font-family: "Roboto Mono", monospace; font-size: 22px; margin-top: 8px; }
 .rules-grid p { color: var(--text-soft); margin: 8px 0 0; }
 .execution-cost { white-space: nowrap; }
-.section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; }
+.section-actions { align-items: center; display: flex; gap: 14px; min-width: 0; }
+.section-asof { color: var(--text-soft); font-family: "Roboto Mono", monospace; font-size: 10px; font-weight: 600; letter-spacing: .03em; white-space: nowrap; }
+.section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; white-space: nowrap; }
 .trigger-text { margin: 0; }
 .equity-chart { height: 430px; }
 .empty-state { color: var(--text-muted); padding: 28px !important; }
@@ -447,6 +449,7 @@
   .last-updated b { display: block; margin-right: 0; }
   .dynamic-card > header { min-height: 56px; padding: 0 14px; }
   .dynamic-card > header h2 { font-size: 15px; }
+  .section-actions .section-note { display: none; }
   .dynamic-metric strong { font-size: 18px; }
   .rules-grid,
   .top2-grid { grid-template-columns: 1fr; }
