@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      CPCM_SENS_PATHS: 300
+      CPCM_SENS_PATHS: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
