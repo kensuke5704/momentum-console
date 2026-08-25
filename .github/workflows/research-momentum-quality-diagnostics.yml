@@ -1,0 +1,29 @@
+name: Momentum Quality Diagnostics
+
+on:
+  push:
+    branches:
+      - research/momentum-quality-diagnostics-20260825
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run momentum quality diagnostics
+        run: node --import tsx scripts/momentum-quality-diagnostics.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: momentum-quality-diagnostics
+          path: data/research/momentum-quality/diagnostics.json
+          retention-days: 30
