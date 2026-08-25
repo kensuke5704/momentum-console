@@ -3946,6 +3946,7 @@ tbody tr:hover {
   }
 
   .topbar .refresh-button {
+    gap: 0;
     min-width: 42px;
     padding: 0;
     width: 42px;
