@@ -17,27 +17,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: baseline
+          - label: baseline_s20260825
             stop: 0.175
             recovery: 10
-          - label: stop20_r10
-            stop: 0.20
-            recovery: 10
-          - label: stop25_r10
-            stop: 0.25
-            recovery: 10
-          - label: nostop_r10
-            stop: 0.99
-            recovery: 10
-          - label: stop175_r5
+            seed: 20260825
+          - label: recovery5_s20260825
             stop: 0.175
             recovery: 5
-          - label: stop20_r5
-            stop: 0.20
+            seed: 20260825
+          - label: baseline_s314159
+            stop: 0.175
+            recovery: 10
+            seed: 314159
+          - label: recovery5_s314159
+            stop: 0.175
             recovery: 5
-          - label: stop25_r5
-            stop: 0.25
+            seed: 314159
+          - label: baseline_s271828
+            stop: 0.175
+            recovery: 10
+            seed: 271828
+          - label: recovery5_s271828
+            stop: 0.175
             recovery: 5
+            seed: 271828
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -47,14 +50,14 @@ jobs:
       - run: npm ci
       - name: Run chronology-preserving conditional Monte Carlo
         env:
-          CPCM_PATHS: 300
+          CPCM_PATHS: 1000
           CPCM_LABEL: ${{ matrix.label }}
           CPCM_STOP: ${{ matrix.stop }}
           CPCM_RECOVERY_DAYS: ${{ matrix.recovery }}
-          CPCM_SEED: 20260825
+          CPCM_SEED: ${{ matrix.seed }}
         run: node --import tsx scripts/chronology-preserving-conditional-mc.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: cpcm-${{ matrix.label }}-300
+          name: cpcm-${{ matrix.label }}-1000
           path: data/research/structural-monte-carlo/cpcm-${{ matrix.label }}.json
           retention-days: 30
