@@ -1,0 +1,33 @@
+name: Research CPCM Trigger Event Study
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/cpcm-validity-audit-20260825"]
+    paths:
+      - "scripts/cpcm-trigger-event-study.ts"
+      - ".github/workflows/research-cpcm-trigger-event-study.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  event-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CPCM_EVENT_PATHS: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run trigger-conditioned event study
+        run: node --import tsx scripts/cpcm-trigger-event-study.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-trigger-event-study
+          path: data/research/cpcm-validity/trigger-event-study.json
+          retention-days: 30
