@@ -29,10 +29,11 @@ const updatedAt = (value: string) => {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).formatToParts(new Date(value));
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("year")}.${part("month")}.${part("day")} ${part("hour")}:${part("minute")}`;
+  return `${part("year")}.${part("month")}.${part("day")} ${part("hour")}:${part("minute")}:${part("second")}`;
 };
 const stateLabel = (state: string) => ({
   WAITING_RECOVERY: "RECOVERY",
@@ -64,6 +65,7 @@ function StateBadge({ state }: { state: string }) {
 export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardPayload }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [data, setData] = useState(initialDashboard);
+  const [lastLoadedAt, setLastLoadedAt] = useState(initialDashboard.generatedAt);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   useEffect(() => {
@@ -83,6 +85,7 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
       const body = await response.json() as { dashboard?: DashboardPayload };
       if (!body.dashboard) throw new Error("最新版のdashboardが見つかりませんでした。");
       setData(body.dashboard);
+      setLastLoadedAt(new Date().toISOString());
       if (interactive) setRefreshMessage(`GitHub Actions生成版を取得しました（${date(body.dashboard.generatedAt.slice(0, 10))}）。`);
     } catch (error) {
       if (interactive) setRefreshMessage(error instanceof Error ? error.message : "最新データの取得に失敗しました。");
@@ -109,7 +112,7 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
       <div className="sidebar-foot"><span>Production strategy</span><strong>{data.config.strategyId}</strong></div>
     </aside>
     <main>
-      <div className="topbar"><div><span>Point-in-Time / next-open</span><strong>{title}</strong></div><div className="topbar-refresh"><span className="last-updated"><b>最終更新</b> {updatedAt(data.generatedAt)}</span><button className="refresh-button" onClick={refresh} disabled={refreshing}><ArrowsClockwiseIcon className={refreshing ? "spin" : ""} size={20} />最新データを読込</button></div></div>
+      <div className="topbar"><div><span>Point-in-Time / next-open</span><strong>{title}</strong></div><div className="topbar-refresh"><span className="last-updated" title={`データ生成 ${updatedAt(data.generatedAt)}`}><b>最終更新</b> {updatedAt(lastLoadedAt)}</span><button className="refresh-button" onClick={refresh} disabled={refreshing}><ArrowsClockwiseIcon className={refreshing ? "spin" : ""} size={20} />最新データを読込</button></div></div>
       <div className="dynamic-content">
         {data.warning && <div className="data-warning">{data.warning}</div>}
         {refreshMessage && <div className="refresh-message">{refreshMessage}</div>}
