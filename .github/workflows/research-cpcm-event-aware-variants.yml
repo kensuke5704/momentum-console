@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      CPCM_EVENT_AWARE_PATHS: 100
+      CPCM_EVENT_AWARE_PATHS: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
