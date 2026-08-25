@@ -12,6 +12,11 @@ const tabs = [
   ["backtest", "バックテスト", ClockCounterClockwiseIcon],
   ["schedule", "運用スケジュール", CalendarDotsIcon],
 ] as const;
+const mobileTabLabels: Partial<Record<Tab, string>> = {
+  portfolio: "保有",
+  backtest: "検証",
+  schedule: "予定",
+};
 const number = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 2 });
 const pct = (value: number | null | undefined, digits = 1) => value == null ? "—" : `${(value * 100).toFixed(digits)}%`;
 const money = (value: number | null | undefined) => value == null ? "—" : `$${number.format(value)}`;
@@ -100,7 +105,7 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
   return <div className="app-shell dynamic-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><TrendUpIcon weight="bold" /></div><div><strong>Momentum</strong><span>Dynamic Console</span></div></div>
-      <nav>{tabs.map(([key, label, Icon]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}><Icon size={18} /><span>{label}</span></button>)}</nav>
+      <nav>{tabs.map(([key, label, Icon]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}><Icon size={18} /><span className="tab-label-default">{label}</span><span className="tab-label-mobile">{mobileTabLabels[key] ?? label}</span></button>)}</nav>
       <div className="sidebar-foot"><span>Production strategy</span><strong>{data.config.strategyId}</strong></div>
     </aside>
     <main>
