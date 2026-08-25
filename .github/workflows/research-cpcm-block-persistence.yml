@@ -1,0 +1,44 @@
+name: CPCM Block Persistence
+
+on:
+  push:
+    branches:
+      - research/cpcm-block-persistence-20260825-exec2
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        block: [20, 63, 126]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run block persistence diagnostic
+        shell: bash
+        run: |
+          cp scripts/exposure-quality-attribution.ts /tmp/exposure-quality-attribution.ts
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/exposure-quality-attribution.ts')
+          s=p.read_text()
+          old='const PATHS=1000,H=5*252,WARM=252,BLOCK=20,RADIUS=126,SEED=20260825;'
+          new='const PATHS=500,H=5*252,WARM=252,BLOCK=${{ matrix.block }},RADIUS=126,SEED=20260825;'
+          if old not in s:
+              raise SystemExit('constant signature not found')
+          p.write_text(s.replace(old,new).replace('audited chronology-preserving 20d block / +/-126d donor', f'audited chronology-preserving ${{ matrix.block }}d block / +/-126d donor'))
+          PY
+          node --import tsx scripts/exposure-quality-attribution.ts
+          mkdir -p data/research/cpcm-block
+          cp data/research/exposure-quality/attribution.json data/research/cpcm-block/block-${{ matrix.block }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-block-${{ matrix.block }}
+          path: data/research/cpcm-block/block-${{ matrix.block }}.json
+          retention-days: 30
