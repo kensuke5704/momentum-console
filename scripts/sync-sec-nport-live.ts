@@ -27,14 +27,20 @@ async function main() {
   }
   const byAccession = new Map(prior.map((f) => [f.accession, f]));
   const todo = entries.filter((e) => !byAccession.has(e.accession));
-  let ok = 0, failed = 0;
-  for (const [i, entry] of todo.entries()) {
-    const filing = await fetchLiveNportFiling(entry);
-    if (filing?.holdings.length) { byAccession.set(filing.accession, filing); ok++; }
-    else failed++;
-    if ((i + 1) % 20 === 0 || i + 1 === todo.length) console.log(`parsed ${i + 1}/${todo.length}; ok=${ok}; failed=${failed}`);
-    await sleep(130);
+  let ok = 0, failed = 0, cursor = 0, done = 0;
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= todo.length) return;
+      const filing = await fetchLiveNportFiling(todo[i]);
+      if (filing?.holdings.length) { byAccession.set(filing.accession, filing); ok++; }
+      else failed++;
+      done++;
+      if (done % 25 === 0 || done === todo.length) console.log(`parsed ${done}/${todo.length}; ok=${ok}; failed=${failed}`);
+      await sleep(650);
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(4, Math.max(1, todo.length)) }, () => worker()));
   const filings = [...byAccession.values()].sort((a, b) => a.filingDate.localeCompare(b.filingDate) || a.accession.localeCompare(b.accession));
   await mkdir(resolve("data/sec-nport"), { recursive: true });
   await writeFile(OUTPUT, `${JSON.stringify({ generatedAt: new Date().toISOString(), source: "SEC EDGAR daily master index + individual NPORT-P primary XML", baselineMaxFilingDate: maxBaselineDate, scanStart: start, scanEnd: end, discovered: entries.length, parsedNew: ok, parseFailed: failed, filings })}\n`);
