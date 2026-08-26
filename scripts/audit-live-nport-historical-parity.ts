@@ -13,7 +13,7 @@ async function main() {
   const history = JSON.parse(await readFile(resolve("public/data/universe-history.json"), "utf8")) as { history: UniverseMonth[] };
   const truth = history.history.find((m) => m.signalMonth === SIGNAL_MONTH && m.asOf === SIGNAL_DATE);
   if (!truth) throw new Error(`truth Universe not found for ${SIGNAL_MONTH} ${SIGNAL_DATE}`);
-  const previous = history.history.filter((m) => m.asOf < SIGNAL_DATE).at(-2) ?? null;
+  const previous = history.history.filter((m) => m.asOf < SIGNAL_DATE).at(-1) ?? null;
   const seed = quarterly.filings.filter((f) => f.filingDate < START);
   const direct = live.filings.filter((f) => f.filingDate >= START && f.filingDate <= SIGNAL_DATE);
   const merged = new Map<string, NportFiling>();
