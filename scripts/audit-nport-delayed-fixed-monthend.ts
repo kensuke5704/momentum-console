@@ -8,7 +8,7 @@ import type { EquityPoint, MonthlySignal, NportFiling, PricePoint, UniverseMonth
 import { buildPointInTimeUniverse } from "../src/lib/universe/universe";
 import { fetchHistories, fetchYahooHistory } from "../src/lib/yahoo";
 
-const START = "2020-04-01";
+const START = "2020-01-01";
 const DELAYS = [1, 3, 5, 10] as const;
 
 function previousQuarterEnd(date: string): string {
@@ -67,13 +67,7 @@ function simulateWithFixedMonthEndExtra(args: {
     if (!receiptDate || !executionDate) continue;
     const available = args.filings.filter((f) => f.filingDate <= monthEnd);
     const newUniverse = buildPointInTimeUniverse(available, signalMonth, monthEnd, null);
-    const signal = buildMonthlySignal({
-      universe: newUniverse,
-      histories: args.histories,
-      qqq,
-      nextSessionDate: executionDate,
-      config: PRODUCTION_STRATEGY,
-    });
+    const signal = buildMonthlySignal({ universe: newUniverse, histories: args.histories, qqq, nextSessionDate: executionDate, config: PRODUCTION_STRATEGY });
     extras.set(receiptDate, signal);
   }
 
@@ -86,21 +80,9 @@ function simulateWithFixedMonthEndExtra(args: {
     const regularUniverse = regularByDate.get(date);
     const regularSignal = regularUniverse ? buildMonthlySignal({ universe: regularUniverse, histories: args.histories, qqq, nextSessionDate, config: PRODUCTION_STRATEGY }) : null;
     const signal = extras.get(date) ?? regularSignal;
-    const symbols = new Set([
-      "QQQ",
-      ...state.currentPositions.map((p) => p.symbol),
-      ...(state.pendingSignal?.selectedSymbols ?? []),
-      ...state.nextAction.symbols,
-      ...(signal?.selectedSymbols ?? []),
-    ]);
+    const symbols = new Set(["QQQ", ...state.currentPositions.map((p) => p.symbol), ...(state.pendingSignal?.selectedSymbols ?? []), ...state.nextAction.symbols, ...(signal?.selectedSymbols ?? [])]);
     const prices = Object.fromEntries([...symbols].map((symbol) => [symbol, priceMaps[symbol]?.get(date)]));
-    state = transitionDay(state, {
-      date,
-      prices,
-      qqqHistoryThroughClose: qqq.slice(0, (dateIndex.get(date) ?? index) + 1),
-      monthlySignal: signal,
-      nextSessionDate,
-    }, PRODUCTION_STRATEGY);
+    state = transitionDay(state, { date, prices, qqqHistoryThroughClose: qqq.slice(0, (dateIndex.get(date) ?? index) + 1), monthlySignal: signal, nextSessionDate }, PRODUCTION_STRATEGY);
     curve.push({ date, equity: state.currentEquity, drawdown: state.drawdown });
   }
   return { stats: performanceStats(curve), eventCounts: countEvents(state.events), signalEvents: args.fallbackHistory.length + extras.size };
@@ -113,18 +95,11 @@ async function main() {
   const monthEnds = new Map<string, string>();
   for (const point of qqq) monthEnds.set(point.date.slice(0, 7), point.date);
   const lastMonth = published.history.at(-1)?.signalMonth ?? "9999-12";
-  const months = [...monthEnds].filter(([m]) => m >= "2020-04" && m <= lastMonth).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, string]>;
+  const months = [...monthEnds].filter(([m]) => m >= "2020-01" && m <= lastMonth).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, string]>;
   const fallbackHistory = buildFallbackHistory(quarterly.filings, months);
-  const quarterUniverses = months
-    .filter(([signalMonth]) => isQuarterEndMonth(signalMonth))
-    .map(([signalMonth, monthEnd]) => buildPointInTimeUniverse(quarterly.filings.filter((f) => f.filingDate <= monthEnd), signalMonth, monthEnd, null));
+  const quarterUniverses = months.filter(([signalMonth]) => isQuarterEndMonth(signalMonth)).map(([signalMonth, monthEnd]) => buildPointInTimeUniverse(quarterly.filings.filter((f) => f.filingDate <= monthEnd), signalMonth, monthEnd, null));
 
-  const symbols = [...new Set([
-    "QQQ", "TQQQ",
-    ...published.history.flatMap((m) => m.symbols.map((x) => x.symbol)),
-    ...fallbackHistory.flatMap((m) => m.symbols.map((x) => x.symbol)),
-    ...quarterUniverses.flatMap((m) => m.symbols.map((x) => x.symbol)),
-  ])];
+  const symbols = [...new Set(["QQQ", "TQQQ", ...published.history.flatMap((m) => m.symbols.map((x) => x.symbol)), ...fallbackHistory.flatMap((m) => m.symbols.map((x) => x.symbol)), ...quarterUniverses.flatMap((m) => m.symbols.map((x) => x.symbol))])];
   console.log(`Fetching histories for ${symbols.length} symbols`);
   const histories = await fetchHistories(symbols, 8);
 
@@ -140,15 +115,15 @@ async function main() {
       receipt: "When the ZIP arrives after N trading-session closes, replace only the Universe. Recompute Top2 using the NEW Universe but keep all momentum returns and the QQQ monthly gate anchored to the original quarter-end close. Execute any changed allocation at the next session open.",
       delaysTestedTradingSessions: DELAYS,
       transactionCostPerSide: PRODUCTION_STRATEGY.execution.transactionCost,
-      caveat: "Historical exact user upload times do not exist. Delays are scenario tests. Filing inclusion uses filingDate <= calendar quarter-end from the audited quarterly dataset.",
+      caveat: "Historical exact user upload times do not exist. Delays are scenario tests. The audited bootstrap starts in 2020 Q1, so fallback scenarios in Jan-Mar 2020 do not have the 2019 Q4 N-PORT snapshot that would have been available in real time; this is retained intentionally here to match the site's 2020-01-01 start date rather than to remove the bootstrap bias.",
     },
     baselinePublished: { stats: baseline.stats, eventCounts: countEvents(baseline.events) },
     fallbackOnly: { stats: fallback.stats, eventCounts: countEvents(fallback.events) },
     fixedMonthEndExtraRebalance: scenarios,
   };
   await mkdir(resolve("data/research/live-nport-ingestion"), { recursive: true });
-  await writeFile(resolve("data/research/live-nport-ingestion/nport-delayed-fixed-monthend.json"), `${JSON.stringify(result, null, 2)}\n`);
-  console.log("NPORT_DELAYED_FIXED_MONTHEND=" + JSON.stringify(result));
+  await writeFile(resolve("data/research/live-nport-ingestion/nport-delayed-fixed-monthend-2020-01.json"), `${JSON.stringify(result, null, 2)}\n`);
+  console.log("NPORT_DELAYED_FIXED_MONTHEND_2020_01=" + JSON.stringify(result));
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });
