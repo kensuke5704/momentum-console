@@ -1,0 +1,33 @@
+name: Research Live N-PORT Ingestion
+on:
+  push:
+    branches: ["research/live-nport-ingestion-20260826"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npm run typecheck
+      - name: Build quarterly SEC baseline
+        run: npm run sync:sec
+      - name: Ingest live EDGAR N-PORT filings
+        run: node --import tsx scripts/sync-sec-nport-live.ts
+      - name: Compare live-augmented and published Universe
+        run: node --import tsx scripts/audit-live-nport-universe.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-nport-ingestion-audit
+          path: |
+            data/sec-nport/live-filings.json
+            data/research/live-nport-ingestion/result.json
+          retention-days: 30
