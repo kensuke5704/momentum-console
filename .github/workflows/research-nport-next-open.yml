@@ -1,0 +1,23 @@
+name: Research N-PORT Next Open
+on:
+  push:
+    branches: ["research/execution-feasibility-audit-20260826"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --import tsx scripts/nport-acceptance-audit.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nport-next-open-audit
+          path: data/research/execution-feasibility/nport-next-open-audit.json
+          retention-days: 30
