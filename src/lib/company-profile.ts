@@ -1,3 +1,4 @@
+// Company summaries shown in the UI are always emitted in Japanese.
 export type CompanyProfile = {
   symbol: string;
   companyName: string;
