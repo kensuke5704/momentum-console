@@ -12,6 +12,8 @@ module.exports = async function handler(_req, res) {
       const response = await fetch(url, {
         headers: {
           "User-Agent": USER_AGENT,
+          "Accept-Encoding": "gzip, deflate",
+          Host: "www.sec.gov",
           Accept: "text/plain,application/xml,*/*",
         },
         redirect: "follow",
