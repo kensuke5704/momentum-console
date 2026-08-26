@@ -17,7 +17,8 @@
     "sync:data": "node --import tsx scripts/sync-data.ts",
     "sync:oos": "node --import tsx scripts/sync-oos.ts",
     "sync:all": "npm run sync:sec && npm run sync:universe && npm run sync:atlas && npm run sync:data && npm run sync:oos",
-    "sync:all:live": "npm run sync:sec && npm run sync:sec:live && npm run sync:universe && npm run sync:atlas && npm run sync:data && npm run sync:oos"
+    "sync:all:live": "npm run sync:sec && npm run sync:sec:live && npm run sync:universe && npm run sync:atlas && npm run sync:data && npm run sync:oos",
+    "import:nport": "node --import tsx scripts/import-nport-zip.ts"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
