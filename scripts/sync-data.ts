@@ -1,17 +1,22 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildDashboardPayload } from "../src/lib/dashboard";
+import { fetchCompanyProfiles, type CompanyProfile } from "../src/lib/company-profile";
 import type { PricePoint, UniverseMonth } from "../src/lib/types";
 import { fetchHistories, fetchIntradayHistories, type IntradayPricePoint } from "../src/lib/yahoo";
 
 type UniverseFile = { history: UniverseMonth[] };
 type MarketDataFile = { histories?: Record<string, PricePoint[]>; intraday?: Record<string, IntradayPricePoint[]> };
+type CompanyProfileFile = { generatedAt?: string; profiles?: Record<string, CompanyProfile> };
 
 async function existingHistories(path: string): Promise<Record<string, PricePoint[]>> {
   try { return (JSON.parse(await readFile(path, "utf8")) as MarketDataFile).histories ?? {}; } catch { return {}; }
 }
 async function existingMarketData(path: string): Promise<MarketDataFile> {
   try { return JSON.parse(await readFile(path, "utf8")) as MarketDataFile; } catch { return {}; }
+}
+async function existingCompanyProfiles(path: string): Promise<Record<string, CompanyProfile>> {
+  try { return (JSON.parse(await readFile(path, "utf8")) as CompanyProfileFile).profiles ?? {}; } catch { return {}; }
 }
 function mergeIntraday(existing: Record<string, IntradayPricePoint[]>, fetched: Record<string, IntradayPricePoint[]>, symbols: string[]) {
   return Object.fromEntries(symbols.map((symbol) => {
@@ -36,11 +41,18 @@ async function main() {
   const universeHistory = universeFile.history;
   if (!universeHistory.length) throw new Error("Dynamic Universe history is empty; run npm run sync:universe first");
   const symbols = [...new Set(["QQQ", "TQQQ", ...universeHistory.flatMap((month) => month.symbols.map((member) => member.symbol))])];
-  const intradaySymbols = [...new Set(["QQQ", "TQQQ", ...(universeHistory.at(-1)?.symbols.map((member) => member.symbol) ?? [])])];
+  const currentSymbols = [...new Set(universeHistory.at(-1)?.symbols.map((member) => member.symbol) ?? [])];
+  const intradaySymbols = [...new Set(["QQQ", "TQQQ", ...currentSymbols])];
   console.log(`Fetching adjusted OHLC for ${symbols.length} dynamic-universe symbols`);
   const outputPath = resolve("public/data/market-data.json");
+  const profilePath = resolve("public/data/company-profiles.json");
   const existing = await existingMarketData(outputPath);
-  const [fetchedHistories, fetchedIntraday] = await Promise.all([fetchHistories(symbols, 8), fetchIntradayHistories(intradaySymbols, 8)]);
+  const existingProfiles = await existingCompanyProfiles(profilePath);
+  const [fetchedHistories, fetchedIntraday, companyProfiles] = await Promise.all([
+    fetchHistories(symbols, 8),
+    fetchIntradayHistories(intradaySymbols, 8),
+    fetchCompanyProfiles(currentSymbols, existingProfiles, 4),
+  ]);
   const histories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
   const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, intradaySymbols);
   const dashboard = buildDashboardPayload(histories, universeHistory);
@@ -48,6 +60,7 @@ async function main() {
   await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, intraday, dashboard })}\n`);
   await writeFile(resolve("public/data/dashboard.json"), `${JSON.stringify({ dashboard })}\n`);
   await writeFile(resolve("public/data/live-state.json"), `${JSON.stringify(dashboard.liveState)}\n`);
-  console.log(`Saved ${outputPath}; signal ${dashboard.currentSignal?.signalDate ?? "none"}; state ${dashboard.liveState.state}`);
+  await writeFile(profilePath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, profiles: companyProfiles })}\n`);
+  console.log(`Saved ${outputPath}; signal ${dashboard.currentSignal?.signalDate ?? "none"}; state ${dashboard.liveState.state}; company profiles ${currentSymbols.length}`);
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
