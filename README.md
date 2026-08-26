@@ -38,11 +38,11 @@ Universe score =
 
 ## Data workflow
 
-初回または新しいSEC quarter:
+新しいSEC quarterは、SEC公式サイトから人が取得したquarterly ZIPだけを手動で取り込みます。アプリやGitHub ActionsからSECへ直接ダウンロードしません。
 
 ```bash
-npm run sync:sec
-npm run sync:universe
+npm ci
+npm run import:nport -- /absolute/path/YYYYqN_nport.zip
 ```
 
 日次価格・state・backtest・Forward OOS:
@@ -52,11 +52,11 @@ npm run sync:data
 npm run sync:oos
 ```
 
-`sync:sec`はSEC公式quarterly bulk ZIPをstream処理し、正規化済みfiling cacheを増分更新します。`sync:universe`はQQQのofficial trading close dateをsignal dateとしてPIT Universe historyを再生成します。`sync:data`はYahoo Financeのadjusted closeと同一adjustment factorをOpen/High/Lowへ適用し、splitによる偽stopを防ぎます。
+`import:nport`はZIP構造と必須headerを検証して正規化済みfiling cacheを更新し、Universe、atlas、market data、OOS、tests/typecheck/lint/buildまで一括実行します。詳細は[`docs/runbooks/manual-nport-update.md`](docs/runbooks/manual-nport-update.md)を参照してください。`sync:universe`はQQQのofficial trading close dateをsignal dateとしてPIT Universe historyを再生成します。`sync:data`はYahoo Financeのadjusted closeと同一adjustment factorをOpen/High/Lowへ適用し、splitによる偽stopを防ぎます。
 
 GitHub Actionsは22:20 UTCに実行します。これはESTで17:20、EDTで18:20となり、DSTのどちらでも米国Close後です。画面の「最新データを読込」はActionsが公開した`market-data.json`をcache無効で再取得します。ブラウザ内に別のsignalロジックはありません。
 
-月初のUniverse workflowはN-PORT historyを更新し、日次workflowはstop/circuit/recoveryとNext Actionを更新します。
+月初のUniverse workflowは最後に手動取込・検証されたN-PORT sourceからUniverse historyを再構築し、日次workflowはstop/circuit/recoveryとNext Actionを更新します。
 
 ## State machine
 
