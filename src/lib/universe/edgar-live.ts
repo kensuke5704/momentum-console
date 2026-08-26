@@ -19,13 +19,21 @@ function quarterFor(date: string): number {
 function ymd(date: string): string { return date.replaceAll("-", ""); }
 
 async function secFetch(url: string, accept = "text/plain,*/*"): Promise<Response | null> {
+  let lastStatus = 0;
   for (let attempt = 0; attempt < 4; attempt++) {
     const res = await fetch(url, { headers: { "User-Agent": UA, Accept: accept }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
     if (res?.ok) return res;
     if (res?.status === 404) return null;
+    lastStatus = res?.status ?? 0;
+    if (res?.status === 403) {
+      const body = await res.text().catch(() => "");
+      if (/Undeclared Automated Tool|Request Rate Threshold/i.test(body)) {
+        throw new Error(`SEC live EDGAR access blocked (${res.status}) for ${url}; refusing to continue with a stale Universe`);
+      }
+    }
     await sleep(450 * (attempt + 1));
   }
-  return null;
+  throw new Error(`SEC live EDGAR request failed (${lastStatus || "network"}) for ${url}; refusing to continue with a stale Universe`);
 }
 
 export async function fetchDailyNportIndex(date: string): Promise<EdgarIndexEntry[]> {
