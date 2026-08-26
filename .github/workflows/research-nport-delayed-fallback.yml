@@ -1,0 +1,31 @@
+name: Research N-PORT Delayed Fallback Backtest
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/live-nport-ingestion-20260826
+    paths:
+      - scripts/audit-nport-delayed-fallback.ts
+      - .github/workflows/research-nport-delayed-fallback.yml
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Restore audited quarterly N-PORT bootstrap
+        run: npm run sync:sec
+      - name: Run delayed fallback scenarios
+        run: node --import tsx scripts/audit-nport-delayed-fallback.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nport-delayed-fallback-audit
+          path: data/research/live-nport-ingestion/nport-delayed-fallback.json
