@@ -1,7 +1,5 @@
 name: Research Quarterly Live-Compatible Backtest
-on:
-  push:
-    branches: ["research/live-nport-ingestion-20260826"]
+on: workflow_dispatch
 permissions:
   contents: read
 jobs:
