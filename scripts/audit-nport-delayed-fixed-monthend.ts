@@ -115,12 +115,15 @@ async function main() {
   const lastMonth = published.history.at(-1)?.signalMonth ?? "9999-12";
   const months = [...monthEnds].filter(([m]) => m >= "2020-04" && m <= lastMonth).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, string]>;
   const fallbackHistory = buildFallbackHistory(quarterly.filings, months);
+  const quarterUniverses = months
+    .filter(([signalMonth]) => isQuarterEndMonth(signalMonth))
+    .map(([signalMonth, monthEnd]) => buildPointInTimeUniverse(quarterly.filings.filter((f) => f.filingDate <= monthEnd), signalMonth, monthEnd, null));
 
   const symbols = [...new Set([
     "QQQ", "TQQQ",
     ...published.history.flatMap((m) => m.symbols.map((x) => x.symbol)),
     ...fallbackHistory.flatMap((m) => m.symbols.map((x) => x.symbol)),
-    ...quarterly.filings.flatMap((f) => f.holdings.map((h) => h.symbol)),
+    ...quarterUniverses.flatMap((m) => m.symbols.map((x) => x.symbol)),
   ])];
   console.log(`Fetching histories for ${symbols.length} symbols`);
   const histories = await fetchHistories(symbols, 8);
