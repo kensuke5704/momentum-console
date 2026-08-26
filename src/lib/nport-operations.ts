@@ -26,15 +26,22 @@ export function nextNportImportDeadline(activeQuarter: string | null, now = new 
   if (activeQuarter) {
     year = Number(activeQuarter.slice(0, 4));
     const quarter = Number(activeQuarter.at(-1));
-    month = quarter * 3 + 1;
+    // The next required dataset is the quarter after activeQuarter. Its update
+    // month starts after that next quarter closes (q1 -> July, q2 -> October).
+    month = quarter * 3 + 4;
     if (month > 12) { year += 1; month -= 12; }
   } else {
     year = now.getUTCFullYear();
-    month = Math.floor(now.getUTCMonth() / 3) * 3 + 1;
+    month = Math.floor(now.getUTCMonth() / 3) * 3 + 4;
+    if (month > 12) { year += 1; month -= 12; }
   }
-  // The monthly Universe selection runs at 07:00 UTC on calendar days 1-4.
-  // The first run is 16:00 JST, so this is the latest accepted import time.
-  return `${year}-${String(month).padStart(2, "0")}-01T16:00:00+09:00`;
+  const firstOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
+  const previousDay = new Date(`${firstOfMonth}T00:00:00Z`);
+  previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+  const firstTradingDay = nextUsTradingSession(previousDay.toISOString().slice(0, 10));
+  // 07:00 UTC / 16:00 JST is the existing Universe-selection cutoff and is
+  // safely before 09:30 ET during both EST and EDT.
+  return `${firstTradingDay}T16:00:00+09:00`;
 }
 
 const sameWeights = (left: number[], right: number[]) => left.length === right.length && left.every((value, index) => Math.abs(value - right[index]) < 1e-12);
