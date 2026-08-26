@@ -72,7 +72,7 @@ async function main() {
   console.log(`Fetching histories for ${symbols.length} symbols`);
   const histories = await fetchHistories(symbols, 8);
 
-  const run = (history: UniverseMonth[], start = PRODUCTION_STRATEGY.backtestStart) => runBacktest({ histories, universeHistory: history, config: configFrom(start) }).stats;
+  const run = (history: UniverseMonth[], start: string = PRODUCTION_STRATEGY.backtestStart) => runBacktest({ histories, universeHistory: history, config: configFrom(start) }).stats;
   const baseline = run(published.history);
   const prior = run(priorQuarter);
   const strict = run(strictPosting);
