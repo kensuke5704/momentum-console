@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildDashboardPayload } from "../src/lib/dashboard";
 import { fetchCompanyProfiles, type CompanyProfile } from "../src/lib/company-profile";
+import { enrichCompanyProfiles } from "../src/lib/company-profile-enrichment";
 import type { PricePoint, UniverseMonth } from "../src/lib/types";
 import { fetchHistories, fetchIntradayHistories, type IntradayPricePoint } from "../src/lib/yahoo";
 
@@ -9,33 +10,12 @@ type UniverseFile = { history: UniverseMonth[] };
 type MarketDataFile = { histories?: Record<string, PricePoint[]>; intraday?: Record<string, IntradayPricePoint[]> };
 type CompanyProfileFile = { generatedAt?: string; profiles?: Record<string, CompanyProfile> };
 
-async function existingHistories(path: string): Promise<Record<string, PricePoint[]>> {
-  try { return (JSON.parse(await readFile(path, "utf8")) as MarketDataFile).histories ?? {}; } catch { return {}; }
-}
-async function existingMarketData(path: string): Promise<MarketDataFile> {
-  try { return JSON.parse(await readFile(path, "utf8")) as MarketDataFile; } catch { return {}; }
-}
-async function existingCompanyProfiles(path: string): Promise<Record<string, CompanyProfile>> {
-  try { return (JSON.parse(await readFile(path, "utf8")) as CompanyProfileFile).profiles ?? {}; } catch { return {}; }
-}
-function mergeIntraday(existing: Record<string, IntradayPricePoint[]>, fetched: Record<string, IntradayPricePoint[]>, symbols: string[]) {
-  return Object.fromEntries(symbols.map((symbol) => {
-    const fresh = fetched[symbol] ?? [];
-    if (!fresh.length) return [symbol, existing[symbol] ?? []];
-    const byTimestamp = new Map<string, IntradayPricePoint>();
-    for (const point of existing[symbol] ?? []) byTimestamp.set(point.timestamp, point);
-    for (const point of fresh) byTimestamp.set(point.timestamp, point);
-    return [symbol, [...byTimestamp.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).slice(-80)];
-  }));
-}
-function merge(existing: Record<string, PricePoint[]>, fetched: Record<string, PricePoint[]>, symbols: string[]) {
-  return Object.fromEntries(symbols.map((symbol) => {
-    const byDate = new Map<string, PricePoint>();
-    for (const point of existing[symbol] ?? []) byDate.set(point.date, point);
-    for (const point of fetched[symbol] ?? []) byDate.set(point.date, point);
-    return [symbol, [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))];
-  }));
-}
+async function existingHistories(path: string): Promise<Record<string, PricePoint[]>> { try { return (JSON.parse(await readFile(path, "utf8")) as MarketDataFile).histories ?? {}; } catch { return {}; } }
+async function existingMarketData(path: string): Promise<MarketDataFile> { try { return JSON.parse(await readFile(path, "utf8")) as MarketDataFile; } catch { return {}; } }
+async function existingCompanyProfiles(path: string): Promise<Record<string, CompanyProfile>> { try { return (JSON.parse(await readFile(path, "utf8")) as CompanyProfileFile).profiles ?? {}; } catch { return {}; } }
+function mergeIntraday(existing: Record<string, IntradayPricePoint[]>, fetched: Record<string, IntradayPricePoint[]>, symbols: string[]) { return Object.fromEntries(symbols.map((symbol) => { const fresh = fetched[symbol] ?? []; if (!fresh.length) return [symbol, existing[symbol] ?? []]; const byTimestamp = new Map<string, IntradayPricePoint>(); for (const point of existing[symbol] ?? []) byTimestamp.set(point.timestamp, point); for (const point of fresh) byTimestamp.set(point.timestamp, point); return [symbol, [...byTimestamp.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).slice(-80)]; })); }
+function merge(existing: Record<string, PricePoint[]>, fetched: Record<string, PricePoint[]>, symbols: string[]) { return Object.fromEntries(symbols.map((symbol) => { const byDate = new Map<string, PricePoint>(); for (const point of existing[symbol] ?? []) byDate.set(point.date, point); for (const point of fetched[symbol] ?? []) byDate.set(point.date, point); return [symbol, [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))]; })); }
+
 async function main() {
   const universeFile = JSON.parse(await readFile(resolve("data/universe-history.json"), "utf8")) as UniverseFile;
   const universeHistory = universeFile.history;
@@ -48,11 +28,12 @@ async function main() {
   const profilePath = resolve("public/data/company-profiles.json");
   const existing = await existingMarketData(outputPath);
   const existingProfiles = await existingCompanyProfiles(profilePath);
-  const [fetchedHistories, fetchedIntraday, companyProfiles] = await Promise.all([
+  const [fetchedHistories, fetchedIntraday, baseCompanyProfiles] = await Promise.all([
     fetchHistories(symbols, 8),
     fetchIntradayHistories(intradaySymbols, 8),
     fetchCompanyProfiles(currentSymbols, existingProfiles, 4),
   ]);
+  const companyProfiles = await enrichCompanyProfiles(baseCompanyProfiles, currentSymbols, 3);
   const histories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
   const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, intradaySymbols);
   const dashboard = buildDashboardPayload(histories, universeHistory);
