@@ -24,7 +24,7 @@ async function getAcceptance(accession:string):Promise<{compact:string|null,url:
       const m=/<ACCEPTANCE-DATETIME>\s*(\d{14})/i.exec(text);
       return {compact:m?.[1]??null,url};
     }
-    await sleep(700*(attempt+1));
+    await sleep(900*(attempt+1));
   }
   return {compact:null,url};
 }
@@ -44,25 +44,27 @@ function classify(v:string|null):AuditRow["status"]{
 async function main(){
   const uf=JSON.parse(await readFile(resolve("public/data/universe-history.json"),"utf8")) as UniverseFile;
   const same:SameDay[]=[];
-  for(const u of uf.history){
-    for(const f of u.sourceFilings){
-      if(f.filingDate===u.asOf) same.push({signalMonth:u.signalMonth,signalDate:u.asOf,...f});
+  for(const u of uf.history) for(const f of u.sourceFilings) if(f.filingDate===u.asOf) same.push({signalMonth:u.signalMonth,signalDate:u.asOf,...f});
+  const unique=[...new Map(same.map(x=>[`${x.signalDate}|${x.accession}`,x])).values()];
+  const rows:Array<AuditRow|undefined>=new Array(unique.length);
+  let cursor=0, done=0;
+  async function worker(){
+    while(true){
+      const i=cursor++; if(i>=unique.length)return;
+      const f=unique[i];
+      const got=await getAcceptance(f.accession);
+      rows[i]={...f,acceptedCompact:got.compact,acceptedAtET:formatET(got.compact),status:classify(got.compact),secUrl:got.url};
+      done++; if(done%20===0||done===unique.length)console.log(`checked ${done}/${unique.length}`);
+      await sleep(700);
     }
   }
-  const unique=[...new Map(same.map(x=>[`${x.signalDate}|${x.accession}`,x])).values()];
-  const rows:AuditRow[]=[];
-  for(let i=0;i<unique.length;i++){
-    const f=unique[i];
-    const got=await getAcceptance(f.accession);
-    rows.push({...f,acceptedCompact:got.compact,acceptedAtET:formatET(got.compact),status:classify(got.compact),secUrl:got.url});
-    if((i+1)%20===0) console.log(`checked ${i+1}/${unique.length}`);
-    await sleep(140);
-  }
-  const counts=Object.fromEntries(["BEFORE_13_ET","BETWEEN_13_16_ET","AFTER_16_ET","FAILED"].map(s=>[s,rows.filter(r=>r.status===s).length]));
-  const impactedMonths=[...new Set(rows.filter(r=>r.status==="AFTER_16_ET"||r.status==="BETWEEN_13_16_ET").map(r=>r.signalMonth))];
-  const out={generatedAt:new Date().toISOString(),definition:{sameDay:"source filingDate equals Universe signal close date",classification:"<13:00 ET definitely pre-close; 13:00-15:59:59 ET requires early-close-calendar check; >=16:00 ET unavailable by regular close"},totalSameDaySourceFilings:same.length,uniqueSameDayAccessions:unique.length,counts,impactedMonths,rows};
+  await Promise.all(Array.from({length:5},()=>worker()));
+  const complete=rows.filter((x):x is AuditRow=>Boolean(x));
+  const counts=Object.fromEntries(["BEFORE_13_ET","BETWEEN_13_16_ET","AFTER_16_ET","FAILED"].map(s=>[s,complete.filter(r=>r.status===s).length]));
+  const impactedMonths=[...new Set(complete.filter(r=>r.status==="AFTER_16_ET"||r.status==="BETWEEN_13_16_ET").map(r=>r.signalMonth))];
+  const out={generatedAt:new Date().toISOString(),definition:{sameDay:"source filingDate equals Universe signal close date",classification:"<13:00 ET definitely pre-close; 13:00-15:59:59 ET requires early-close-calendar check; >=16:00 ET unavailable by regular close"},totalSameDaySourceFilings:same.length,uniqueSameDayAccessions:unique.length,counts,impactedMonths,rows:complete};
   await mkdir(resolve("data/research/execution-feasibility"),{recursive:true});
   await writeFile(resolve("data/research/execution-feasibility/nport-acceptance.json"),JSON.stringify(out,null,2));
-  console.log("NPORT_ACCEPTANCE_SUMMARY="+JSON.stringify({totalSameDaySourceFilings:same.length,uniqueSameDayAccessions:unique.length,counts,impactedMonths,after16:rows.filter(r=>r.status==="AFTER_16_ET").map(r=>({month:r.signalMonth,date:r.signalDate,accession:r.accession,series:r.seriesName,accepted:r.acceptedAtET})),between13and16:rows.filter(r=>r.status==="BETWEEN_13_16_ET").map(r=>({month:r.signalMonth,date:r.signalDate,accession:r.accession,series:r.seriesName,accepted:r.acceptedAtET})),failed:rows.filter(r=>r.status==="FAILED").map(r=>({date:r.signalDate,accession:r.accession,series:r.seriesName}))}));
+  console.log("NPORT_ACCEPTANCE_SUMMARY="+JSON.stringify({totalSameDaySourceFilings:same.length,uniqueSameDayAccessions:unique.length,counts,impactedMonths,after16:complete.filter(r=>r.status==="AFTER_16_ET").map(r=>({month:r.signalMonth,date:r.signalDate,accession:r.accession,series:r.seriesName,accepted:r.acceptedAtET})),between13and16:complete.filter(r=>r.status==="BETWEEN_13_16_ET").map(r=>({month:r.signalMonth,date:r.signalDate,accession:r.accession,series:r.seriesName,accepted:r.acceptedAtET})),failed:complete.filter(r=>r.status==="FAILED").map(r=>({date:r.signalDate,accession:r.accession,series:r.seriesName}))}));
 }
 main().catch(e=>{console.error(e);process.exit(1)});
