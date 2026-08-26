@@ -55,7 +55,8 @@ export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfil
       `https://${host}/v10/finance/quoteSummary/${yahooSymbol}?modules=price,assetProfile`,
     );
     const row = body?.quoteSummary?.result?.[0];
-    const name = row?.price?.longName ?? row?.price?.shortName;
+    if (!row) continue;
+    const name = row.price?.longName ?? row.price?.shortName;
     if (name) {
       return {
         symbol,
@@ -74,7 +75,8 @@ export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfil
   );
   const quote = search?.quotes?.find((row) => row.symbol?.toUpperCase() === symbol.replace(".", "-").toUpperCase())
     ?? search?.quotes?.find((row) => row.symbol?.toUpperCase() === symbol.toUpperCase());
-  const name = quote?.longname ?? quote?.shortname;
+  if (!quote) return null;
+  const name = quote.longname ?? quote.shortname;
   if (!name) return null;
   return {
     symbol,
