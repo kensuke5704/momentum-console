@@ -1,3 +1,5 @@
+export {};
+
 const USER_AGENT = process.env.SEC_USER_AGENT ?? "MomentumConsole/2.0 kensuke5704@users.noreply.github.com";
 const BASE = "https://www.sec.gov/files/dera/data/form-n-port-data-sets";
 
