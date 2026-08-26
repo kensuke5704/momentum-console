@@ -39,8 +39,8 @@ function buildFallbackHistory(filings: NportFiling[], months: Array<[string, str
 }
 
 function countEvents(events: Array<{ type?: string }>) {
-  const entries = events.filter((e) => e.type === "ENTRY").length;
-  const exits = events.filter((e) => e.type === "EXIT").length;
+  const entries = events.filter((e) => e.type === "ENTRY_OPEN").length;
+  const exits = events.filter((e) => e.type === "EXIT_OPEN").length;
   return { entries, exits, rebalanceEvents: entries };
 }
 
