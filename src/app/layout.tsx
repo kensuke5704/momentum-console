@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { TickerProfileEnhancer } from "@/components/ticker-profile";
 
 export const metadata: Metadata = {
   title: "Momentum Console",
@@ -18,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>{children}<TickerProfileEnhancer /></body>
     </html>
   );
 }
