@@ -34,8 +34,9 @@ type YahooSearchResponse = {
 };
 
 const headers = {
-  "User-Agent": "Mozilla/5.0 MomentumConsole/2.0",
-  Accept: "application/json",
+  "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36 MomentumConsole/2.0",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
 };
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -80,22 +81,45 @@ const sectorJa: Record<string, string> = {
   "Utilities": "公益",
 };
 
+const industryDetailJa: Record<string, string> = {
+  "Semiconductors": "半導体や関連する設計技術・コンピューティング基盤を扱う分野です。主な需要先にはデータセンター、AI、PC、通信、産業機器、自動車などが含まれ、製品性能、ソフトウェアとの統合、供給能力が競争力を左右します。",
+  "Software - Infrastructure": "企業や政府機関のIT基盤、データ処理、セキュリティ、クラウド運用などを支えるソフトウェア分野です。導入後の継続利用や大型契約が収益の安定性に影響し、顧客基盤の拡大と製品の定着率が重要になります。",
+  "Software - Application": "業務や特定用途で利用されるアプリケーションソフトウェアを提供する分野です。サブスクリプション型の収益モデルが多く、利用企業数、契約単価、継続率、新機能の投入が成長を左右します。",
+  "Computer Hardware": "コンピューター、計算機器、周辺装置、専用ハードウェアなどを扱う分野です。製品性能だけでなく、開発サイクル、製造・調達体制、ソフトウェアやサービスとの組み合わせが競争上の重要要素です。",
+  "Information Technology Services": "企業向けのIT導入、運用、コンサルティング、データ処理などを提供する分野です。長期契約や継続的なサービス収入が中心となりやすく、大口顧客との関係や人材・技術力が競争力につながります。",
+  "Internet Content & Information": "インターネット上のコンテンツ、情報流通、広告、データサービスなどを扱う分野です。利用者規模、エンゲージメント、広告・課金モデル、保有データの価値が収益力に直結しやすい特徴があります。",
+  "Communication Equipment": "通信ネットワークや接続機器、関連ハードウェアを提供する分野です。通信事業者や企業の設備投資サイクルの影響を受けやすく、性能、信頼性、規格対応が競争力を左右します。",
+  "Consumer Electronics": "一般消費者向けの電子機器や関連製品を扱う分野です。ブランド力、製品サイクル、価格競争、流通網、エコシステムとの連携が業績に影響します。",
+  "Aerospace & Defense": "ロケット、人工衛星、防衛装備、航空宇宙システムや関連サービスを扱う分野です。政府・防衛機関や商業顧客との大型契約が多く、技術実証、打ち上げ・製造能力、受注残、規制対応が成長を左右します。",
+  "Biotechnology": "生命科学を活用して医薬品や治療技術を研究・開発する分野です。研究開発成果、臨床試験、規制承認、提携契約などが企業価値に大きく影響し、製品化前は収益変動が大きくなりやすい特徴があります。",
+  "Medical Devices": "診断・治療に用いる医療機器や関連サービスを提供する分野です。医療機関への採用、規制承認、保険償還、製品の安全性と臨床上の有効性が成長の主要因です。",
+  "Auto Manufacturers": "自動車や関連モビリティ製品を開発・製造する分野です。販売台数、車種構成、価格、製造効率に加え、EV・自動運転・ソフトウェア化への対応が競争力を左右します。",
+  "Electrical Equipment & Parts": "電力制御、電子部品、電気設備などを供給する分野です。産業設備、データセンター、エネルギーインフラなどの設備投資需要の影響を受けやすく、製品性能と供給能力が重要です。",
+  "Specialty Industrial Machinery": "特定用途向けの産業機械や自動化設備を提供する分野です。製造業の設備投資や自動化需要との連動性が高く、技術力、受注残、アフターサービスが収益性に影響します。",
+  "Capital Markets": "証券取引、投資銀行、資産運用、マーケットメイクなど資本市場に関連する金融サービスを提供する分野です。市場環境、取引量、運用資産残高、金利や信用環境の変化が収益に影響します。",
+};
+
 function normalizeIndustry(value: string | null): string | null {
   return value?.replace(/[—–]/g, " - ").replace(/\s+/g, " ").trim() ?? null;
 }
 
 function japaneseMetadataSummary(companyName: string, industry: string | null, sector: string | null): string {
   const normalizedIndustry = normalizeIndustry(industry);
-  const industryLabel = normalizedIndustry ? industryJa[normalizedIndustry] ?? null : null;
-  const sectorLabel = sector ? sectorJa[sector] ?? null : null;
-  if (industryLabel && sectorLabel) return `${companyName}は、${sectorLabel}セクターに属し、主に${industryLabel}分野で事業を展開する企業です。`;
-  if (industryLabel) return `${companyName}は、主に${industryLabel}分野で事業を展開する企業です。`;
-  if (sectorLabel) return `${companyName}は、${sectorLabel}セクターに属する企業です。`;
-  return `${companyName}は米国株式市場で取引されている企業です。`;
+  const industryLabel = normalizedIndustry ? industryJa[normalizedIndustry] ?? normalizedIndustry : null;
+  const sectorLabel = sector ? sectorJa[sector] ?? sector : null;
+  const intro = industryLabel && sectorLabel
+    ? `${companyName}は、${sectorLabel}セクターに属し、主に${industryLabel}分野で事業を展開する企業です。`
+    : industryLabel
+      ? `${companyName}は、主に${industryLabel}分野で事業を展開する企業です。`
+      : sectorLabel
+        ? `${companyName}は、${sectorLabel}セクターに属する企業です。`
+        : `${companyName}は米国株式市場で取引されている企業です。`;
+  const detail = normalizedIndustry ? industryDetailJa[normalizedIndustry] : null;
+  return detail ? `${intro}${detail}` : intro;
 }
 
 async function translateBusinessSummaryToJapanese(summary: string): Promise<string | null> {
-  const source = summary.trim().slice(0, 3500);
+  const source = summary.trim().slice(0, 5000);
   if (!source) return null;
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ja&dt=t&q=${encodeURIComponent(source)}`;
@@ -106,21 +130,56 @@ async function translateBusinessSummaryToJapanese(summary: string): Promise<stri
     const translated = body[0]
       .map((item) => Array.isArray(item) && typeof item[0] === "string" ? item[0] : "")
       .join("")
+      .replace(/\s+/g, " ")
       .trim();
-    return translated.length >= 20 ? translated : null;
+    return translated.length >= 40 ? translated : null;
   } catch {
     return null;
   }
 }
 
+function findDescription(value: unknown, depth = 0): string | null {
+  if (depth > 6 || value == null) return null;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    for (const key of ["companyDescription", "businessDescription", "longBusinessSummary", "description"]) {
+      const candidate = record[key];
+      if (typeof candidate === "string" && candidate.trim().length >= 80) return candidate.trim();
+      if (candidate && typeof candidate === "object") {
+        const nested = candidate as Record<string, unknown>;
+        for (const subkey of ["value", "label", "text"]) {
+          if (typeof nested[subkey] === "string" && String(nested[subkey]).trim().length >= 80) return String(nested[subkey]).trim();
+        }
+      }
+    }
+    for (const child of Object.values(record)) {
+      const found = findDescription(child, depth + 1);
+      if (found) return found;
+    }
+  } else if (Array.isArray(value)) {
+    for (const child of value) {
+      const found = findDescription(child, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+async function fetchNasdaqBusinessSummary(symbol: string): Promise<string | null> {
+  const body = await fetchJson<unknown>(`https://api.nasdaq.com/api/company/${encodeURIComponent(symbol)}/company-profile`);
+  return findDescription(body);
+}
+
 async function buildJapaneseSummary(
+  symbol: string,
   companyName: string,
   industry: string | null,
   sector: string | null,
   englishBusinessSummary?: string | null,
 ): Promise<string> {
-  if (englishBusinessSummary) {
-    const translated = await translateBusinessSummaryToJapanese(englishBusinessSummary);
+  const source = englishBusinessSummary?.trim() || await fetchNasdaqBusinessSummary(symbol);
+  if (source) {
+    const translated = await translateBusinessSummaryToJapanese(source);
     if (translated) return translated;
   }
   return japaneseMetadataSummary(companyName, industry, sector);
@@ -144,7 +203,7 @@ export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfil
         companyName: name,
         industry,
         sector,
-        summary: await buildJapaneseSummary(name, industry, sector, row.assetProfile?.longBusinessSummary),
+        summary: await buildJapaneseSummary(symbol, name, industry, sector, row.assetProfile?.longBusinessSummary),
         website: row.assetProfile?.website ?? null,
         updatedAt: now,
       };
@@ -166,7 +225,7 @@ export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfil
     companyName: name,
     industry,
     sector,
-    summary: japaneseMetadataSummary(name, industry, sector),
+    summary: await buildJapaneseSummary(symbol, name, industry, sector),
     website: null,
     updatedAt: now,
   };
@@ -191,7 +250,7 @@ export async function fetchCompanyProfiles(
           companyName: prior?.companyName ?? symbol,
           industry: prior?.industry ?? null,
           sector: prior?.sector ?? null,
-          summary: prior?.summary && /[ぁ-んァ-ヶ一-龠]/.test(prior.summary)
+          summary: prior?.summary && /[ぁ-んァ-ヶ一-龠]/.test(prior.summary) && prior.summary.length >= 80
             ? prior.summary
             : japaneseMetadataSummary(prior?.companyName ?? symbol, prior?.industry ?? null, prior?.sector ?? null),
           website: prior?.website ?? null,
