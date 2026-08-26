@@ -11,11 +11,12 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run test && npm run typecheck && npm run lint && npm run build",
     "sync:sec": "node --import tsx scripts/sync-sec-nport.ts",
+    "sync:sec:live": "node --import tsx scripts/sync-sec-nport-live.ts",
     "sync:universe": "node --import tsx scripts/build-universe.ts",
     "sync:atlas": "node scripts/sync-atlas.mjs",
     "sync:data": "node --import tsx scripts/sync-data.ts",
     "sync:oos": "node --import tsx scripts/sync-oos.ts",
-    "sync:all": "npm run sync:sec && npm run sync:universe && npm run sync:atlas && npm run sync:data && npm run sync:oos"
+    "sync:all": "npm run sync:sec && npm run sync:sec:live && npm run sync:universe && npm run sync:atlas && npm run sync:data && npm run sync:oos"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
