@@ -1,4 +1,6 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+type JsonResponse = {
+  status: (code: number) => { json: (body: unknown) => unknown };
+};
 
 const USER_AGENT = "MomentumConsole/2.0 kensuke5704@users.noreply.github.com";
 
@@ -7,8 +9,8 @@ const TARGETS = [
   "https://www.sec.gov/Archives/edgar/data/850027/000085002726000015/primary_doc.xml",
 ] as const;
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  const results = [];
+export default async function handler(_req: unknown, res: JsonResponse) {
+  const results: Array<Record<string, unknown>> = [];
   for (const url of TARGETS) {
     try {
       const response = await fetch(url, {
@@ -33,6 +35,6 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
       results.push({ url, status: 0, ok: false, error: String(error) });
     }
   }
-  const ok = results.every((result) => result.ok);
+  const ok = results.every((result) => result.ok === true);
   res.status(ok ? 200 : 503).json({ generatedAt: new Date().toISOString(), runtime: "vercel", ok, results });
 }
