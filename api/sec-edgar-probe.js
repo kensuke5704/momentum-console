@@ -1,38 +1,42 @@
 const USER_AGENT = "MomentumConsole/2.0 kensuke5704@users.noreply.github.com";
 
-const TARGETS = [
-  "https://www.sec.gov/Archives/edgar/daily-index/2026/QTR3/master.20260731.idx",
-  "https://www.sec.gov/Archives/edgar/data/850027/000085002726000015/primary_doc.xml",
-];
+const quarters = [];
+for (let year = 2020; year <= 2026; year++) {
+  for (let q = 1; q <= 4; q++) {
+    if (year === 2026 && q > 2) break;
+    quarters.push(`${year}q${q}`);
+  }
+}
 
 module.exports = async function handler(_req, res) {
   const results = [];
-  for (const url of TARGETS) {
+  for (const quarter of quarters) {
+    const url = `https://www.sec.gov/files/dera/data/form-n-port-data-sets/${quarter}_nport.zip`;
     try {
       const response = await fetch(url, {
+        method: "HEAD",
         headers: {
           "User-Agent": USER_AGENT,
+          Accept: "application/zip,*/*",
           "Accept-Encoding": "gzip, deflate",
-          Host: "www.sec.gov",
-          Accept: "text/plain,application/xml,*/*",
         },
         redirect: "follow",
         signal: AbortSignal.timeout(20_000),
       });
-      const body = await response.text();
       results.push({
+        quarter,
         url,
         status: response.status,
         ok: response.ok,
-        contentType: response.headers.get("content-type"),
-        length: body.length,
-        blocked: /Undeclared Automated Tool|Request Rate Threshold/i.test(body),
-        containsNport: /NPORT-P/i.test(body),
+        lastModified: response.headers.get("last-modified"),
+        etag: response.headers.get("etag"),
+        contentLength: response.headers.get("content-length"),
+        date: response.headers.get("date"),
       });
     } catch (error) {
-      results.push({ url, status: 0, ok: false, error: String(error) });
+      results.push({ quarter, url, status: 0, ok: false, error: String(error) });
     }
   }
-  const ok = results.every((result) => result.ok === true);
+  const ok = results.every((result) => result.ok === true && result.lastModified);
   res.status(ok ? 200 : 503).json({ generatedAt: new Date().toISOString(), runtime: "vercel", ok, results });
 };
