@@ -232,7 +232,11 @@
 .next-action > div:nth-child(2n) { border-right: 0; }
 .next-action > div:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
 .next-action-copy { align-content: start; display: grid; gap: 3px; min-width: 0; }
-.next-action span { line-height: 15px; }
+.next-action > div > span {
+  color: var(--text-muted);
+  line-height: 15px;
+  opacity: 1;
+}
 .next-action strong { font-family: "Roboto Mono", monospace; font-size: 23px; line-height: 28px; }
 .next-action p { color: var(--text-soft); font-size: 14px; line-height: 21px; margin: 0; }
 
