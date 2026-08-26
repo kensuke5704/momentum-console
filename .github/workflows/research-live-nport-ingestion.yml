@@ -20,7 +20,9 @@ jobs:
       - run: npm run typecheck
       - name: Build quarterly SEC baseline
         run: npm run sync:sec
-      - name: Ingest live EDGAR N-PORT filings
+      - name: Ingest live EDGAR N-PORT filings through latest completed signal date
+        env:
+          NPORT_LIVE_END: "2026-07-31"
         run: node --import tsx scripts/sync-sec-nport-live.ts
       - name: Compare live-augmented and published Universe
         run: node --import tsx scripts/audit-live-nport-universe.ts
