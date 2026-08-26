@@ -1,0 +1,20 @@
+name: Research List Same-day N-PORT
+on:
+  push:
+    branches: [research/execution-feasibility-audit-20260826]
+    paths:
+      - 'scripts/list-sameday-nport.ts'
+      - '.github/workflows/research-list-sameday-nport.yml'
+permissions:
+  contents: read
+jobs:
+  list:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --import tsx scripts/list-sameday-nport.ts
