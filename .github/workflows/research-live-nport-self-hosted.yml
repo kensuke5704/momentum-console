@@ -1,0 +1,50 @@
+name: Research Live N-PORT Self-hosted
+on:
+  workflow_dispatch:
+    inputs:
+      scan_start:
+        description: First SEC filing date to scan (YYYY-MM-DD)
+        required: true
+        type: string
+      scan_end:
+        description: Last SEC filing date to scan (YYYY-MM-DD)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  validate:
+    # Intentionally manual until a runner with confirmed SEC access is registered.
+    runs-on: [self-hosted, sec-edgar]
+    timeout-minutes: 60
+    env:
+      SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
+      NPORT_LIVE_START: ${{ inputs.scan_start }}
+      NPORT_LIVE_END: ${{ inputs.scan_end }}
+      NPORT_LIVE_EXPECTED_END: ${{ inputs.scan_end }}
+      REQUIRE_LIVE_NPORT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prove SEC Archives access
+        run: node --import tsx scripts/probe-edgar-index.ts
+      - name: Build quarterly SEC baseline
+        run: npm run sync:sec
+      - name: Ingest and validate live EDGAR filings
+        run: npm run sync:sec:live
+      - name: Build Universe with required live overlay
+        run: npm run sync:universe
+      - name: Audit live-augmented Universe
+        run: node --import tsx scripts/audit-live-nport-universe.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-nport-self-hosted-${{ inputs.scan_end }}
+          path: |
+            data/sec-nport/live-filings.json
+            data/research/live-nport-ingestion/result.json
+            data/universe-history.json
+          retention-days: 30

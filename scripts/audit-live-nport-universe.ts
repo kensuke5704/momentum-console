@@ -2,13 +2,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { NportFiling, UniverseMonth } from "../src/lib/types";
 import { buildPointInTimeUniverse } from "../src/lib/universe/universe";
+import { validateLiveNportSnapshot, type LiveNportSnapshot } from "../src/lib/universe/live-ingestion";
 
 type FilingFile = { filings: NportFiling[] };
 type UniverseFile = { history: UniverseMonth[] };
 
 async function main() {
   const quarterly = JSON.parse(await readFile(resolve("data/sec-nport/filings.json"), "utf8")) as FilingFile;
-  const live = JSON.parse(await readFile(resolve("data/sec-nport/live-filings.json"), "utf8")) as FilingFile;
+  const live = JSON.parse(await readFile(resolve("data/sec-nport/live-filings.json"), "utf8")) as LiveNportSnapshot;
+  validateLiveNportSnapshot(live, { requireDiscovery: true });
   const published = JSON.parse(await readFile(resolve("public/data/universe-history.json"), "utf8")) as UniverseFile;
   const baseHistory = published.history;
   const latest = baseHistory.at(-1);

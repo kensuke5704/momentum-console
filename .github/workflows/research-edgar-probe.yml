@@ -1,8 +1,5 @@
 name: Research EDGAR Probe
-on:
-  push:
-    branches: ["research/live-nport-ingestion-20260826"]
-  workflow_dispatch:
+on: workflow_dispatch
 permissions:
   contents: read
 jobs:

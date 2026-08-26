@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { NportFiling, UniverseMonth } from "../src/lib/types";
 import { buildPointInTimeUniverse } from "../src/lib/universe/universe";
+import { validateLiveNportSnapshot, type LiveNportSnapshot } from "../src/lib/universe/live-ingestion";
 
 const START = process.env.PARITY_START ?? "2026-04-01";
 const SIGNAL_MONTH = process.env.PARITY_SIGNAL_MONTH ?? "2026-05";
@@ -9,7 +10,8 @@ const SIGNAL_DATE = process.env.PARITY_SIGNAL_DATE ?? "2026-05-29";
 
 async function main() {
   const quarterly = JSON.parse(await readFile(resolve("data/sec-nport/filings.json"), "utf8")) as { filings: NportFiling[] };
-  const live = JSON.parse(await readFile(resolve("data/sec-nport/live-filings.json"), "utf8")) as { filings: NportFiling[] };
+  const live = JSON.parse(await readFile(resolve("data/sec-nport/live-filings.json"), "utf8")) as LiveNportSnapshot;
+  validateLiveNportSnapshot(live, { requireDiscovery: true, expectedScanEnd: SIGNAL_DATE });
   const history = JSON.parse(await readFile(resolve("public/data/universe-history.json"), "utf8")) as { history: UniverseMonth[] };
   const truth = history.history.find((m) => m.signalMonth === SIGNAL_MONTH && m.asOf === SIGNAL_DATE);
   if (!truth) throw new Error(`truth Universe not found for ${SIGNAL_MONTH} ${SIGNAL_DATE}`);

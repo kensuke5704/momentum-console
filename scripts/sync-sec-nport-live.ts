@@ -1,7 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { NportFiling } from "../src/lib/types";
-import { dateRange, fetchDailyNportIndex, fetchLiveNportFiling } from "../src/lib/universe/edgar-live";
+import { dateRange, fetchDailyNportIndexResult, fetchLiveNportFiling } from "../src/lib/universe/edgar-live";
+import { validateLiveNportSnapshot, type LiveNportSnapshot } from "../src/lib/universe/live-ingestion";
 
 const OUTPUT = resolve("data/sec-nport/live-filings.json");
 const BASELINE = resolve("data/sec-nport/filings.json");
@@ -19,8 +20,11 @@ async function main() {
   const start = process.env.NPORT_LIVE_START ?? addDays(maxBaselineDate, -3);
   const end = process.env.NPORT_LIVE_END ?? new Date().toISOString().slice(0, 10);
   const entries = [];
+  let indexedDays = 0;
   for (const date of dateRange(start, end)) {
-    const rows = await fetchDailyNportIndex(date);
+    const result = await fetchDailyNportIndexResult(date);
+    if (result.available) indexedDays++;
+    const rows = result.entries;
     if (rows.length) console.log(`${date}: ${rows.length} NPORT-P filings`);
     entries.push(...rows);
     await sleep(120);
@@ -33,7 +37,7 @@ async function main() {
       const i = cursor++;
       if (i >= todo.length) return;
       const filing = await fetchLiveNportFiling(todo[i]);
-      if (filing?.holdings.length) { byAccession.set(filing.accession, filing); ok++; }
+      if (filing) { byAccession.set(filing.accession, filing); ok++; }
       else failed++;
       done++;
       if (done % 25 === 0 || done === todo.length) console.log(`parsed ${done}/${todo.length}; ok=${ok}; failed=${failed}`);
@@ -42,8 +46,25 @@ async function main() {
   }
   await Promise.all(Array.from({ length: Math.min(4, Math.max(1, todo.length)) }, () => worker()));
   const filings = [...byAccession.values()].sort((a, b) => a.filingDate.localeCompare(b.filingDate) || a.accession.localeCompare(b.accession));
+  const unresolvedAccessions = entries.map((entry) => entry.accession).filter((accession) => !byAccession.has(accession));
+  const snapshot: LiveNportSnapshot = {
+    generatedAt: new Date().toISOString(),
+    source: "SEC EDGAR daily master index + individual NPORT-P primary XML",
+    baselineMaxFilingDate: maxBaselineDate,
+    scanStart: start,
+    scanEnd: end,
+    indexedDays,
+    discovered: entries.length,
+    parsedNew: ok,
+    parseFailed: failed,
+    unresolvedAccessions,
+    filings,
+  };
+  validateLiveNportSnapshot(snapshot, { requireDiscovery: true, expectedScanEnd: end });
   await mkdir(resolve("data/sec-nport"), { recursive: true });
-  await writeFile(OUTPUT, `${JSON.stringify({ generatedAt: new Date().toISOString(), source: "SEC EDGAR daily master index + individual NPORT-P primary XML", baselineMaxFilingDate: maxBaselineDate, scanStart: start, scanEnd: end, discovered: entries.length, parsedNew: ok, parseFailed: failed, filings })}\n`);
-  console.log(`LIVE_NPORT_SUMMARY=${JSON.stringify({ baselineMaxFilingDate: maxBaselineDate, start, end, discovered: entries.length, prior: prior.length, parsedNew: ok, parseFailed: failed, totalLive: filings.length })}`);
+  const temporary = `${OUTPUT}.${process.pid}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(snapshot)}\n`);
+  await rename(temporary, OUTPUT);
+  console.log(`LIVE_NPORT_SUMMARY=${JSON.stringify({ baselineMaxFilingDate: maxBaselineDate, start, end, indexedDays, discovered: entries.length, prior: prior.length, parsedNew: ok, parseFailed: failed, unresolved: unresolvedAccessions.length, totalLive: filings.length })}`);
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -12,6 +12,12 @@ export type EdgarIndexEntry = {
   accession: string;
 };
 
+export type EdgarDailyIndexResult = {
+  date: string;
+  available: boolean;
+  entries: EdgarIndexEntry[];
+};
+
 function quarterFor(date: string): number {
   return Math.floor(Number(date.slice(5, 7)) / 3) + (Number(date.slice(5, 7)) % 3 === 0 ? 0 : 1);
 }
@@ -36,11 +42,11 @@ async function secFetch(url: string, accept = "text/plain,*/*"): Promise<Respons
   throw new Error(`SEC live EDGAR request failed (${lastStatus || "network"}) for ${url}; refusing to continue with a stale Universe`);
 }
 
-export async function fetchDailyNportIndex(date: string): Promise<EdgarIndexEntry[]> {
+export async function fetchDailyNportIndexResult(date: string): Promise<EdgarDailyIndexResult> {
   const year = date.slice(0, 4), q = quarterFor(date);
   const url = `${SEC}/Archives/edgar/daily-index/${year}/QTR${q}/master.${ymd(date)}.idx`;
   const res = await secFetch(url);
-  if (!res) return [];
+  if (!res) return { date, available: false, entries: [] };
   const text = await res.text();
   const rows: EdgarIndexEntry[] = [];
   for (const line of text.split(/\r?\n/)) {
@@ -52,7 +58,11 @@ export async function fetchDailyNportIndex(date: string): Promise<EdgarIndexEntr
     if (!m) continue;
     rows.push({ cik, companyName, formType, filingDate, accession: m[1] });
   }
-  return rows;
+  return { date, available: true, entries: rows };
+}
+
+export async function fetchDailyNportIndex(date: string): Promise<EdgarIndexEntry[]> {
+  return (await fetchDailyNportIndexResult(date)).entries;
 }
 
 function decodeXml(value: string): string {
@@ -63,7 +73,7 @@ const tag = (xml: string, name: string) => {
   return m ? decodeXml(m[1].replace(/<[^>]+>/g, "")) : "";
 };
 const attr = (xml: string, name: string, attribute: string) => {
-  const m = new RegExp(`<${name}\\b[^>]*\\b${attribute}=["']([^"']+)["'][^>]*\\/?\s*>`, "i").exec(xml);
+  const m = new RegExp(`<${name}\\b[^>]*\\b${attribute}=["']([^"']+)["'][^>]*\\/?\\s*>`, "i").exec(xml);
   return m ? decodeXml(m[1]) : "";
 };
 

@@ -3,10 +3,22 @@ import { resolve } from "node:path";
 import { buildPointInTimeUniverse, isCompletedSignalMonth } from "../src/lib/universe/universe";
 import { fetchYahooHistory } from "../src/lib/yahoo";
 import type { NportFiling, UniverseMonth } from "../src/lib/types";
+import { validateLiveNportSnapshot, type LiveNportSnapshot } from "../src/lib/universe/live-ingestion";
 
 async function optionalLiveFilings(): Promise<NportFiling[]> {
-  try { return (JSON.parse(await readFile(resolve("data/sec-nport/live-filings.json"), "utf8")) as { filings?: NportFiling[] }).filings ?? []; }
-  catch { return []; }
+  const required = process.env.REQUIRE_LIVE_NPORT === "1";
+  try {
+    const snapshot = JSON.parse(await readFile(resolve("data/sec-nport/live-filings.json"), "utf8")) as LiveNportSnapshot;
+    validateLiveNportSnapshot(snapshot, {
+      requireDiscovery: true,
+      expectedScanEnd: required ? process.env.NPORT_LIVE_EXPECTED_END : undefined,
+    });
+    return snapshot.filings;
+  } catch (error) {
+    if (required) throw error;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
 }
 
 async function main() {
