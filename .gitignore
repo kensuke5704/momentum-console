@@ -8,3 +8,4 @@ out/
 outputs/
 work/
 data/sec-nport/filings.json
+*_nport.zip

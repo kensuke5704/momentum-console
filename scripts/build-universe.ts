@@ -1,11 +1,18 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { buildPointInTimeUniverse, isCompletedSignalMonth } from "../src/lib/universe/universe";
 import { fetchYahooHistory } from "../src/lib/yahoo";
 import type { NportFiling, UniverseMonth } from "../src/lib/types";
 
 async function main() {
-  const raw = JSON.parse(await readFile(resolve("data/sec-nport/filings.json"), "utf8")) as { filings: NportFiling[] };
+  let filings: NportFiling[];
+  try {
+    filings = (JSON.parse(await readFile(resolve("data/sec-nport/filings.json"), "utf8")) as { filings: NportFiling[] }).filings;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    filings = (JSON.parse(gunzipSync(await readFile(resolve("data/sec-nport/bootstrap.json.gz"))).toString("utf8")) as { snapshots: NportFiling[] }).snapshots;
+  }
   const qqq = await fetchYahooHistory("QQQ");
   const monthEnds = new Map<string, string>();
   for (const point of qqq) monthEnds.set(point.date.slice(0, 7), point.date);
@@ -13,7 +20,7 @@ async function main() {
   let previous: UniverseMonth | null = null;
   const currentCalendarMonth = new Date().toISOString().slice(0, 7);
   for (const [signalMonth, asOf] of [...monthEnds].filter(([month]) => month >= "2020-01" && isCompletedSignalMonth(month, currentCalendarMonth)).sort(([a], [b]) => a.localeCompare(b))) {
-    const current = buildPointInTimeUniverse(raw.filings, signalMonth, asOf, previous);
+    const current = buildPointInTimeUniverse(filings, signalMonth, asOf, previous);
     history.push(current);
     previous = current;
   }

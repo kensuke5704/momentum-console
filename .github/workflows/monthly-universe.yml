@@ -17,16 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - uses: actions/cache@v4
-        with:
-          path: data/sec-nport/filings.json
-          key: nport-filings-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: nport-filings-${{ runner.os }}-
-      - name: Rebuild N-PORT source and universes
-        env:
-          NPORT_CACHE_DIR: /tmp/momentum-console-nport
-          SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
-        run: npm run sync:sec && npm run sync:universe && npm run sync:atlas
+      - name: Rebuild universes from the committed audited source snapshot
+        run: npm run sync:universe && npm run sync:atlas
       - name: Commit auditable universe history
         run: |
           git config user.name github-actions[bot]
