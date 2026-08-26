@@ -65,10 +65,12 @@ observation date is always the latest official US month-end close.
 - If the audited quarterly ZIP is imported before the first session open, the
   new Top 80 is used for the normal month-end signal and the order remains a
   next-session-open order.
-- The displayed import deadline is the first day of the next quarterly refresh
-  month at 16:00 JST (07:00 UTC), exactly when the first monthly Universe
-  selection job starts. Import and validation must finish before that timestamp
-  to affect the first selection; otherwise the fallback flow applies.
+- The displayed import deadline is the first US trading day of the next
+  required quarter's update month at 16:00 JST (07:00 UTC). The existing US
+  trading calendar skips weekends and NYSE holidays. This cutoff is safely
+  before 09:30 ET in both EST and EDT and matches the Universe-selection job.
+  Import, validation, Universe generation, and signal generation must finish by
+  that timestamp; otherwise the fallback flow applies.
 - If it is not available, the monthly job must continue with the previous valid
   Top 80. It must never stop or skip the monthly rebalance merely because a ZIP
   is late.
