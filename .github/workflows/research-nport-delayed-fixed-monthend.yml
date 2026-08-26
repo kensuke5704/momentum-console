@@ -1,0 +1,33 @@
+name: Research N-PORT Delayed Fixed-Month-End Backtest
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/live-nport-ingestion-20260826
+    paths:
+      - scripts/audit-nport-delayed-fixed-monthend.ts
+      - .github/workflows/research-nport-delayed-fixed-monthend.yml
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Restore audited quarterly N-PORT bootstrap
+        run: npm run sync:sec
+      - name: Run fixed-month-end delayed scenarios
+        run: node --import tsx scripts/audit-nport-delayed-fixed-monthend.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nport-delayed-fixed-monthend-audit
+          path: data/research/live-nport-ingestion/nport-delayed-fixed-monthend.json
