@@ -116,6 +116,24 @@ export type ForwardOosResult = {
   stats: PerformanceStats;
   records: OosRecord[];
 };
+export type NportOperations = {
+  activeQuarter: string | null;
+  lastImportedAt: string | null;
+  nextImportDeadlineAt: string;
+  universeMode: "CURRENT" | "FALLBACK";
+  fallbackReason: string | null;
+  extraordinaryRebalance: {
+    evaluatedAt: string;
+    priceAsOf: string;
+    changed: boolean;
+    executionDate: string | null;
+    previousSymbols: string[];
+    previousWeights: number[];
+    nextSymbols: string[];
+    nextWeights: number[];
+    signal: MonthlySignal;
+  } | null;
+};
 export type DashboardPayload = {
   generatedAt: string;
   source: "live" | "snapshot";
@@ -128,4 +146,5 @@ export type DashboardPayload = {
   oos: ForwardOosResult;
   backtest: BacktestResult;
   expectedCagr?: ExpectedCagrModel;
+  nportOperations?: NportOperations;
 };

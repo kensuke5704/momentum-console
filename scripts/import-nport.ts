@@ -3,10 +3,18 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
 import type { DashboardPayload, ForwardOosResult, NportFiling, UniverseMonth } from "../src/lib/types";
+import type { NportOperations, PricePoint } from "../src/lib/types";
+import { buildDelayedNportRebalance, nextNportImportDeadline } from "../src/lib/nport-operations";
+import { restoreFileSet, snapshotFileSet } from "../src/lib/file-transaction";
 import { parseQuarterlyNportZip, quarterForDate } from "../src/lib/universe/nport-quarterly";
 
 const OUTPUT = resolve("data/sec-nport/filings.json");
 const BOOTSTRAP = resolve("data/sec-nport/bootstrap.json.gz");
+const TRANSACTION_FILES = [
+  "data/sec-nport/filings.json", "data/sec-nport/bootstrap.json.gz", "data/nport-operations.json", "data/universe-history.json",
+  "public/data/universe-history.json", "public/data/universe-current.json", "public/data/atlas-layout.json", "public/data/market-data.json",
+  "public/data/dashboard.json", "public/data/live-state.json", "public/data/company-profiles.json", "public/data/oos-performance.json",
+].map((path) => resolve(path));
 
 function run(command: string, args: string[]): Promise<void> {
   return new Promise((resolveRun, reject) => {
@@ -66,6 +74,8 @@ async function main() {
   const zipPath = process.argv[2];
   if (!zipPath) throw new Error("Usage: npm run import:nport -- /absolute/path/YYYYqN_nport.zip");
   const beforeSymbols = await currentUniverseSymbols();
+  const previousDashboard = (JSON.parse(await readFile(resolve("public/data/dashboard.json"), "utf8")) as { dashboard: DashboardPayload }).dashboard;
+  const transaction = await snapshotFileSet(TRANSACTION_FILES);
   const parsed = await parseQuarterlyNportZip(resolve(zipPath));
   const existing = await loadExisting();
   const retained = existing.filings.filter((filing) => quarterForDate(filing.filingDate) !== parsed.quarter);
@@ -79,10 +89,6 @@ async function main() {
     quarters,
     filings,
   };
-  await mkdir(resolve("data/sec-nport"), { recursive: true });
-  const temporary = `${OUTPUT}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(payload)}\n`);
-  await rename(temporary, OUTPUT);
   const bootstrap = {
     generatedAt: payload.generatedAt,
     source: payload.source,
@@ -90,13 +96,46 @@ async function main() {
     endQuarter: quarters.at(-1),
     snapshots: filings,
   };
-  const bootstrapTemporary = `${BOOTSTRAP}.${process.pid}.tmp`;
-  await writeFile(bootstrapTemporary, gzipSync(JSON.stringify(bootstrap), { level: 9 }));
-  await rename(bootstrapTemporary, BOOTSTRAP);
-  console.log(`Validated ${parsed.quarter}: ${parsed.zipBytes} bytes, sha256=${parsed.sha256}, ${parsed.submissions} submissions, ${parsed.filings.length} eligible ETF filings`);
+  try {
+    await mkdir(resolve("data/sec-nport"), { recursive: true });
+    const temporary = `${OUTPUT}.${process.pid}.tmp`;
+    await writeFile(temporary, `${JSON.stringify(payload)}\n`);
+    await rename(temporary, OUTPUT);
+    const bootstrapTemporary = `${BOOTSTRAP}.${process.pid}.tmp`;
+    await writeFile(bootstrapTemporary, gzipSync(JSON.stringify(bootstrap), { level: 9 }));
+    await rename(bootstrapTemporary, BOOTSTRAP);
+    console.log(`Validated ${parsed.quarter}: ${parsed.zipBytes} bytes, sha256=${parsed.sha256}, ${parsed.submissions} submissions, ${parsed.filings.length} eligible ETF filings`);
 
-  for (const script of ["sync:universe", "sync:atlas", "sync:data", "sync:oos", "check"]) await run("npm", ["run", script]);
-  await run("git", ["diff", "--quiet", "--", "src/lib/config.ts", "src/lib/strategy"]);
+    for (const script of ["sync:universe", "sync:atlas", "sync:data"]) await run("npm", ["run", script]);
+    const firstPass = await validateGeneratedOutputs();
+    const market = JSON.parse(await readFile(resolve("public/data/market-data.json"), "utf8")) as { histories: Record<string, PricePoint[]> };
+    let extraordinaryRebalance: NportOperations["extraordinaryRebalance"] = null;
+    if (previousDashboard.currentSignal && firstPass.dashboard.currentSignal?.signalMonth === previousDashboard.currentSignal.signalMonth) {
+      extraordinaryRebalance = buildDelayedNportRebalance({
+        previousSignal: previousDashboard.currentSignal,
+        newUniverse: firstPass.current,
+        histories: market.histories,
+        qqq: market.histories.QQQ ?? [],
+        receivedAt: payload.generatedAt,
+      });
+    }
+    const operations: NportOperations = {
+      activeQuarter: parsed.quarter,
+      lastImportedAt: payload.generatedAt,
+      nextImportDeadlineAt: nextNportImportDeadline(parsed.quarter),
+      universeMode: "CURRENT",
+      fallbackReason: null,
+      extraordinaryRebalance,
+    };
+    const operationsTemporary = `${resolve("data/nport-operations.json")}.${process.pid}.tmp`;
+    await writeFile(operationsTemporary, `${JSON.stringify(operations, null, 2)}\n`);
+    await rename(operationsTemporary, resolve("data/nport-operations.json"));
+    for (const script of ["sync:data", "sync:oos", "check"]) await run("npm", ["run", script]);
+    await run("git", ["diff", "--quiet", "--", "src/lib/config.ts", "src/lib/strategy"]);
+  } catch (error) {
+    await restoreFileSet(transaction);
+    throw new Error(`N-PORT import failed; previous Universe restored with no partial activation: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   const { dashboard, current } = await validateGeneratedOutputs();
   const afterSymbols = current.symbols.map((member) => member.symbol);

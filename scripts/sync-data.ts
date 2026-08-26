@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildDashboardPayload } from "../src/lib/dashboard";
 import { fetchCompanyProfiles, type CompanyProfile } from "../src/lib/company-profile";
-import type { PricePoint, UniverseMonth } from "../src/lib/types";
+import type { BacktestResult, ForwardOosResult, NportOperations, PricePoint, UniverseMonth } from "../src/lib/types";
 import { fetchHistories, fetchIntradayHistories, type IntradayPricePoint } from "../src/lib/yahoo";
 
 type UniverseFile = { history: UniverseMonth[] };
@@ -17,6 +17,9 @@ async function existingMarketData(path: string): Promise<MarketDataFile> {
 }
 async function existingCompanyProfiles(path: string): Promise<Record<string, CompanyProfile>> {
   try { return (JSON.parse(await readFile(path, "utf8")) as CompanyProfileFile).profiles ?? {}; } catch { return {}; }
+}
+async function optionalJson<T>(path: string): Promise<T | undefined> {
+  try { return JSON.parse(await readFile(path, "utf8")) as T; } catch { return undefined; }
 }
 function mergeIntraday(existing: Record<string, IntradayPricePoint[]>, fetched: Record<string, IntradayPricePoint[]>, symbols: string[]) {
   return Object.fromEntries(symbols.map((symbol) => {
@@ -55,7 +58,10 @@ async function main() {
   ]);
   const histories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
   const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, intradaySymbols);
-  const dashboard = buildDashboardPayload(histories, universeHistory);
+  const oos = await optionalJson<ForwardOosResult>(resolve("public/data/oos-performance.json"));
+  const frozen = await optionalJson<{ backtest?: BacktestResult }>(resolve("public/data/backtest-frozen.json"));
+  const nportOperations = await optionalJson<NportOperations>(resolve("data/nport-operations.json"));
+  const dashboard = buildDashboardPayload(histories, universeHistory, "live", { oos, frozenBacktest: frozen?.backtest, nportOperations });
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, intraday, dashboard })}\n`);
   await writeFile(resolve("public/data/dashboard.json"), `${JSON.stringify({ dashboard })}\n`);

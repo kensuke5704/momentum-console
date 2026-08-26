@@ -214,7 +214,7 @@
 
 .next-action {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(160px, 1fr));
+  grid-template-columns: minmax(0, 1.8fr) repeat(3, minmax(150px, 1fr));
   padding: 0 !important;
 }
 

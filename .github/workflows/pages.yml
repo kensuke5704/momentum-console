@@ -7,6 +7,8 @@ on:
   schedule:
     # 22:20 UTC is after the US close in both EST (17:20) and EDT (18:20).
     - cron: "20 22 * * 1-5"
+    # Pre-open refresh publishes a month-start fallback or delayed N-PORT plan.
+    - cron: "30 8 * * 1-5"
 
 permissions:
   contents: read
@@ -35,6 +37,9 @@ jobs:
 
       - name: Fetch market data
         run: npm run sync:data
+
+      - name: Update Forward OOS with actual daily prices
+        run: npm run sync:oos
 
       - name: Refresh semantic atlas when Universe changes
         run: npm run sync:atlas

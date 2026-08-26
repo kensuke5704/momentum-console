@@ -57,6 +57,40 @@ MANUAL_NPORT_IMPORT_OK quarter=YYYYqN filings=N
 
 Absence of this marker is failure.
 
+## Production timing, fallback, and delayed receipt
+
+The Frozen Strategy parameters are not changed by an N-PORT import. The price
+observation date is always the latest official US month-end close.
+
+- If the audited quarterly ZIP is imported before the first session open, the
+  new Top 80 is used for the normal month-end signal and the order remains a
+  next-session-open order.
+- The displayed import deadline is the first day of the next quarterly refresh
+  month at 16:00 JST (07:00 UTC), exactly when the first monthly Universe
+  selection job starts. Import and validation must finish before that timestamp
+  to affect the first selection; otherwise the fallback flow applies.
+- If it is not available, the monthly job must continue with the previous valid
+  Top 80. It must never stop or skip the monthly rebalance merely because a ZIP
+  is late.
+- A parse, validation, generation, or check failure keeps the previous Top 80
+  active. The importer snapshots every affected artifact and rolls the complete
+  set back; a partial Universe activation is a failed import.
+- When a delayed ZIP is imported, only the Universe is replaced. Momentum and
+  the QQQ monthly gate are recomputed with the same latest official month-end
+  close used by the fallback signal. Receipt-day, interim-month, pre-market,
+  and intraday prices are prohibited inputs.
+- If either Top2 or target weights changes, an extraordinary rebalance is
+  scheduled for the next US session open. If both are unchanged, no order is
+  created.
+
+The two supported flows are therefore:
+
+```text
+MONTHLY: month-end close -> active/fallback Universe -> signal -> next open
+DELAYED: prior signal -> validated new Universe -> same month-end prices
+         -> changed Top2/weights only -> next open extraordinary rebalance
+```
+
 ## Review before commit
 
 Run `git status --short` and inspect the complete diff. The expected changes are
