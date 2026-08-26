@@ -1,0 +1,24 @@
+name: Research N-PORT Dataset Availability
+on:
+  push:
+    branches: [research/live-nport-ingestion-20260826]
+    paths:
+      - scripts/audit-nport-dataset-availability.ts
+      - .github/workflows/research-nport-dataset-availability.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Read quarterly N-PORT availability headers
+        env:
+          SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
+        run: node --import tsx scripts/audit-nport-dataset-availability.ts
