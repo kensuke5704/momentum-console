@@ -1,0 +1,28 @@
+name: Research Quarterly Live-Compatible Backtest
+on:
+  push:
+    branches: ["research/live-nport-ingestion-20260826"]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npm run typecheck
+      - name: Build quarterly SEC baseline
+        run: npm run sync:sec
+      - name: Run quarterly live-compatible audit
+        run: node --import tsx scripts/audit-quarterly-live-compatible.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quarterly-live-compatible-audit
+          path: data/research/live-nport-ingestion/quarterly-live-compatible.json
+          retention-days: 30
