@@ -32,6 +32,12 @@ type YahooSearchResponse = {
   }>;
 };
 
+type WikipediaQueryResponse = {
+  query?: {
+    pages?: Record<string, { extract?: string }>;
+  };
+};
+
 const headers = {
   "User-Agent": "Mozilla/5.0 MomentumConsole/2.0",
   Accept: "application/json",
@@ -47,6 +53,16 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
+async function fetchWikipediaSummary(companyName: string): Promise<string | null> {
+  const query = `${companyName} company`;
+  const body = await fetchJson<WikipediaQueryResponse>(
+    `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=1&prop=extracts&exintro=1&explaintext=1&redirects=1&format=json&origin=*`,
+  );
+  const page = Object.values(body?.query?.pages ?? {})[0];
+  const extract = page?.extract?.trim();
+  return extract && extract.length >= 40 ? extract : null;
+}
+
 export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfile | null> {
   const yahooSymbol = encodeURIComponent(symbol.replace(".", "-"));
   const now = new Date().toISOString();
@@ -58,12 +74,13 @@ export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfil
     if (!row) continue;
     const name = row.price?.longName ?? row.price?.shortName;
     if (name) {
+      const summary = row.assetProfile?.longBusinessSummary ?? await fetchWikipediaSummary(name);
       return {
         symbol,
         companyName: name,
         industry: row.assetProfile?.industry ?? null,
         sector: row.assetProfile?.sector ?? null,
-        summary: row.assetProfile?.longBusinessSummary ?? null,
+        summary,
         website: row.assetProfile?.website ?? null,
         updatedAt: now,
       };
@@ -83,7 +100,7 @@ export async function fetchCompanyProfile(symbol: string): Promise<CompanyProfil
     companyName: name,
     industry: quote.industry ?? null,
     sector: quote.sector ?? null,
-    summary: null,
+    summary: await fetchWikipediaSummary(name),
     website: null,
     updatedAt: now,
   };
