@@ -1,0 +1,23 @@
+name: Validate Detailed Company Summaries
+on:
+  push:
+    branches: ["enhance/company-summary-detail-20260826"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - name: Probe detailed Japanese summaries
+        run: |
+          node --import tsx -e "import('./src/lib/company-profile.ts').then(async ({fetchCompanyProfile}) => { for (const s of ['NVDA','PLTR','RKLB','IONQ']) { const p=await fetchCompanyProfile(s); console.log(s, JSON.stringify(p)); if (!p?.summary || !/[ぁ-んァ-ヶ一-龠]/.test(p.summary) || p.summary.length < 80) process.exit(1); } })"
