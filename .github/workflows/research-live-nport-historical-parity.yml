@@ -1,0 +1,32 @@
+name: Research Live N-PORT Historical Parity
+on:
+  push:
+    branches: ["research/live-nport-ingestion-20260826"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build quarterly truth dataset
+        run: npm run sync:sec
+      - name: Reconstruct April-May 2026 from individual EDGAR filings
+        env:
+          NPORT_LIVE_START: "2026-04-01"
+          NPORT_LIVE_END: "2026-05-29"
+        run: npm run sync:sec:live
+      - name: Compare reconstructed May Universe with quarterly truth
+        run: node --import tsx scripts/audit-live-nport-historical-parity.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-nport-historical-parity
+          path: data/research/live-nport-ingestion/historical-parity.json
+          retention-days: 30
