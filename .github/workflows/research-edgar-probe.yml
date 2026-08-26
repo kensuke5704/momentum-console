@@ -11,7 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
       - name: Probe SEC endpoints
         env:
           SEC_USER_AGENT: MomentumConsole/2.0 kensuke5704@users.noreply.github.com
