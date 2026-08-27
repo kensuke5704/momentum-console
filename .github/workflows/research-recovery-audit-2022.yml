@@ -1,0 +1,25 @@
+name: Research Recovery Audit 2022
+
+on:
+  push:
+    branches:
+      - research/recovery-audit-2022-20260828
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Audit 2022 recovery sequence
+        run: node --import tsx scripts/audit-recovery-2022.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovery-audit-2022
+          path: data/research/recovery-audit-2022.json
