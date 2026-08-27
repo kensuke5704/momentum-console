@@ -29,7 +29,9 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           source = Path('scripts/audit-nport-delay-monte-carlo.ts').read_text()
+          source = source.replace('const START = "2020-01-01";', 'const START = "2020-01-01";\nconst END = "2026-08-25";')
           source = source.replace('const PATHS = 10_000;', 'const PATHS = 1_000;')
+          source = source.replace('const histories = await fetchHistories(symbols, 8);', 'const rawHistories = await fetchHistories(symbols, 8);\n  const histories = Object.fromEntries(Object.entries(rawHistories).map(([symbol, points]) => [symbol, points.filter((point) => point.date <= END)]));')
           source = source.replace('const minEdge = Math.floor(Math.min(...values) / width) * width;', 'const minValue = values.reduce((minimum, value) => Math.min(minimum, value), Infinity);\n  const minEdge = Math.floor(minValue / width) * width;')
           source = source.replace('const maxEdge = Math.ceil(Math.max(...values) / width) * width;', 'const maxValue = values.reduce((maximum, value) => Math.max(maximum, value), -Infinity);\n  const maxEdge = Math.ceil(maxValue / width) * width;')
           Path('scripts/audit-nport-delay-monte-carlo-1000.ts').write_text(source)
