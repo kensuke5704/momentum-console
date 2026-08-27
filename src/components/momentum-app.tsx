@@ -1,22 +1,22 @@
 "use client";
 
-import { ArrowsClockwiseIcon, CalendarDotsIcon, ChartLineUpIcon, ClockCounterClockwiseIcon, DatabaseIcon, GaugeIcon, ShieldCheckIcon, TrendUpIcon, WalletIcon, XIcon } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, ChartLineUpIcon, ClockCounterClockwiseIcon, DatabaseIcon, GaugeIcon, GearIcon, TrendUpIcon, WalletIcon, XIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { buildExpectedCagrOverlay } from "@/lib/expected-cagr";
 import type { DashboardPayload, EquityPoint, ExpectedCagrModel, NextActionType, PerformanceStats } from "@/lib/types";
 
-type Tab = "overview" | "universe" | "ranking" | "portfolio" | "risk" | "oos" | "backtest" | "schedule";
+type Tab = "overview" | "universe" | "ranking" | "portfolio" | "oos" | "backtest" | "schedule";
 const tabs = [
   ["overview", "概要", GaugeIcon], ["universe", "Dynamic Universe", DatabaseIcon], ["ranking", "Momentum順位", TrendUpIcon],
-  ["portfolio", "ポートフォリオ", WalletIcon], ["risk", "リスク", ShieldCheckIcon], ["oos", "OOS", ChartLineUpIcon],
+  ["portfolio", "ポートフォリオ", WalletIcon], ["oos", "OOS", ChartLineUpIcon],
   ["backtest", "バックテスト", ClockCounterClockwiseIcon],
-  ["schedule", "運用スケジュール", CalendarDotsIcon],
+  ["schedule", "設定", GearIcon],
 ] as const;
 const mobileTabLabels: Partial<Record<Tab, string>> = {
   portfolio: "保有",
   backtest: "検証",
-  schedule: "予定",
+  schedule: "設定",
 };
 const number = new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 2 });
 const pct = (value: number | null | undefined, digits = 1) => value == null ? "—" : `${(value * 100).toFixed(digits)}%`;
@@ -58,13 +58,6 @@ const usMarketOpenAt = (value: string | null | undefined) => {
   }
   return updatedAt(instant.toISOString()).slice(0, 16);
 };
-const stateLabel = (state: string) => ({
-  WAITING_RECOVERY: "RECOVERY",
-  READY_NEXT_OPEN: "NEXT OPEN",
-  LOCKED_MARKET: "MARKET LOCK",
-  LOCKED_STOP: "STOP LOCK",
-  LOCKED_CIRCUIT: "CIRCUIT LOCK",
-}[state] ?? state.replaceAll("_", " "));
 const NEXT_ACTIONS: Array<{ type: NextActionType; meaning: string }> = [
   { type: "BUY_NEXT_OPEN", meaning: "次の米国営業日の寄付きでTop2を新規購入します。" },
   { type: "SELL_ALL_NEXT_OPEN", meaning: "次の米国営業日の寄付きで全保有銘柄を売却します。" },
@@ -143,7 +136,6 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
         {tab === "universe" && <Universe data={data} />}
         {tab === "ranking" && <Ranking data={data} />}
         {tab === "portfolio" && <Portfolio data={data} />}
-        {tab === "risk" && <Risk data={data} />}
         {tab === "oos" && <Oos data={data} />}
         {tab === "backtest" && <Backtest data={data} />}
         {tab === "schedule" && <Schedule data={data} />}
@@ -182,10 +174,6 @@ function Ranking({ data }: { data: DashboardPayload }) {
 function Portfolio({ data }: { data: DashboardPayload }) {
   return <div className="dynamic-stack"><Section title="Target Portfolio"><Top2 signal={data.currentSignal} /></Section><Section title="Current Positions"><div className="table-scroll"><table className="dynamic-table"><thead><tr><th>Ticker</th><th>Target</th><th>Entry</th><th>Current</th><th>Since entry</th><th>Stop level</th></tr></thead><tbody>{data.liveState.currentPositions.map((position) => <tr key={position.symbol}><td><strong>{position.symbol}</strong></td><td>{pct(position.targetWeight, 0)}</td><td>{money(position.entryPrice)}</td><td>{money(position.currentPrice)}</td><td>{position.currentPrice ? pct(position.currentPrice / position.entryPrice - 1) : "—"}</td><td className="tone-bad">{money(position.stopLevel)}</td></tr>)}</tbody></table>{!data.liveState.currentPositions.length && <div className="empty-state">現在はCashです。</div>}</div></Section></div>;
 }
-function Risk({ data }: { data: DashboardPayload }) {
-  const state = data.liveState;
-  return <div className="dynamic-stack"><div className="dynamic-metric-grid"><Metric label="STATE" value={stateLabel(state.state)} /><Metric label="PORTFOLIO PEAK" value={state.portfolioPeak.toFixed(3)} /><Metric label="CURRENT EQUITY" value={state.currentEquity.toFixed(3)} /><Metric label="DRAWDOWN" value={pct(state.drawdown)} tone="bad" /></div><Section title="Persistent Risk Control"><div className="rules-grid"><div><span>Individual stop</span><strong>-17.5%</strong></div><div><span>Portfolio circuit</span><strong>-15.0%</strong></div><div><span>Recovery</span><strong>10 closes</strong></div><div><span>Execution cost</span><strong className="execution-cost">10 bp</strong></div></div></Section><Section title="Last Trigger"><p className="trigger-text">{state.lastTrigger ?? "トリガー履歴はありません。"}</p></Section></div>;
-}
 function Backtest({ data }: { data: DashboardPayload }) {
   return <PerformanceView stats={data.backtest.stats} equityCurve={data.backtest.equityCurve} title="Daily State-Machine Equity" gradientId="backtest-equity" expectedCagr={data.expectedCagr} />;
 }
@@ -197,5 +185,5 @@ function PerformanceView({ stats, equityCurve, title, gradientId, expectedCagr }
   return <div className="dynamic-stack"><div className="dynamic-metric-grid five"><Metric label="FINAL EQUITY" value={`${stats.finalEquity.toFixed(2)}x`} /><Metric label="CAGR" value={pct(stats.cagr)} tone="good" /><Metric label="MAX DD" value={pct(stats.maxDrawdown)} tone="bad" /><Metric label="ANNUALIZED VOL" value={pct(stats.annualizedVolatility)} /><Metric label="CALMAR" value={stats.calmar?.toFixed(2) ?? "—"} /></div><Section title={title} action={expectedCagr ? <span className="section-asof">Monte Carlo as-of {date(expectedCagr.sample.end)}</span> : undefined}><div className="equity-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chart}><defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#167a4b" stopOpacity={0.3}/><stop offset="100%" stopColor="#167a4b" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#dce1da" vertical={false}/><XAxis dataKey="date" minTickGap={60}/><YAxis scale="log" domain={["auto", "auto"]} allowDataOverflow tickFormatter={(value) => `${Number(value).toFixed(Number(value) < 10 ? 1 : 0)}x`}/><Tooltip formatter={(value) => Array.isArray(value) ? value.map((item) => `${Number(item).toFixed(3)}x`).join(" – ") : `${Number(value).toFixed(3)}x`}/><Legend verticalAlign="top" height={38}/>{expectedCagr && <><Area name="Central 90%" type="monotone" dataKey="central90" stroke="none" fill="#bfcac2" fillOpacity={0.34} isAnimationActive animationDuration={1_000}/><Area name="Central 50%" type="monotone" dataKey="central50" stroke="none" fill="#78aa8a" fillOpacity={0.42} isAnimationActive animationDuration={1_000}/><Line name="Expected CAGR" type="monotone" dataKey="expected" stroke="#52745f" strokeDasharray="6 5" strokeWidth={1.5} dot={false} isAnimationActive animationDuration={1_000}/></>}<Area name="Backtest" type="monotone" dataKey="strategy" stroke="#167a4b" fill={`url(#${gradientId})`} strokeWidth={2} isAnimationActive animationDuration={1_000}/></AreaChart></ResponsiveContainer></div>{expectedCagr && <div className="monte-carlo-note"><span>Central 50% {pct(expectedCagr.estimate.central50[0])}–{pct(expectedCagr.estimate.central50[1])}</span><span>Central 90% {pct(expectedCagr.estimate.central90[0])}–{pct(expectedCagr.estimate.central90[1])}</span><p>CAGRのブートストラップ区間を複利換算した参考帯です。将来価格の予測帯ではありません。</p></div>}</Section></div>;
 }
 function Schedule({ data }: { data: DashboardPayload }) {
-  return <div className="overview-two"><Section title="MONTHLY — 米国月末Close後"><ol className="workflow"><li>公開済みN-PORTだけでUniverseをfreeze</li><li>0/20/80 MomentumとQQQ比較</li><li>Top2・zGap・50/50または70/30を確定</li></ol></Section><Section title="DAILY — 米国Close後"><ol className="workflow"><li>-17.5% individual stopを判定</li><li>-15% portfolio circuitを判定</li><li>100DMA・20D momentum・回復連続日数を更新</li></ol></Section><Section title="Execution Contract"><div className="rules-grid execution-grid"><div><span>Signal</span><strong>CLOSE</strong></div><div><span>Order</span><strong>NEXT OPEN</strong></div><div><span>One-way cost</span><strong>{pct(data.config.execution.transactionCost, 1)}</strong></div></div></Section></div>;
+  return <div className="dynamic-stack"><div className="overview-two"><Section title="MONTHLY — 米国月末Close後"><ol className="workflow"><li>公開済みN-PORTだけでUniverseをfreeze</li><li>0/20/80 MomentumとQQQ比較</li><li>Top2・zGap・50/50または70/30を確定</li></ol></Section><Section title="DAILY — 米国Close後"><ol className="workflow"><li>-17.5% individual stopを判定</li><li>-15% portfolio circuitを判定</li><li>100DMA・20D momentum・回復連続日数を更新</li></ol></Section><Section title="Execution Contract"><div className="rules-grid execution-grid"><div><span>Signal</span><strong>CLOSE</strong></div><div><span>Order</span><strong>NEXT OPEN</strong></div><div><span>One-way cost</span><strong>{pct(data.config.execution.transactionCost, 1)}</strong></div></div></Section></div><Section title="Persistent Risk Control"><div className="rules-grid"><div><span>Individual stop</span><strong>-17.5%</strong></div><div><span>Portfolio circuit</span><strong>-15.0%</strong></div><div><span>Recovery</span><strong>10 closes</strong></div><div><span>Execution cost</span><strong className="execution-cost">10 bp</strong></div></div></Section><Section title="Last Trigger"><p className="trigger-text">{data.liveState.lastTrigger ?? "トリガー履歴はありません。"}</p></Section></div>;
 }
