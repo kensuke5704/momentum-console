@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-08-27T16:23:54.440Z",
+  "period": { "start": "2020-01-01", "end": "2025-12-31" },
+  "full": {
+    "NO_GATE": { "cagr": 0.49885880135546534, "maxDrawdown": -0.21928959365119693, "annualizedVolatility": 0.361168802883994, "calmar": 2.274885885141237, "finalEquity": 11.319898291858111 },
+    "TEN_M": { "cagr": 0.5060483761863153, "maxDrawdown": -0.21928959365119705, "annualizedVolatility": 0.3496312846059685, "calmar": 2.307671639864671, "finalEquity": 11.649390094965973 }
+  },
+  "windows": [
+    { "years": 3, "startYear": 2020, "endYear": 2022, "noGate": { "cagr": 0.33249879979722285, "maxDrawdown": -0.3124206636354111, "calmar": 1.0642663514255977 }, "tenM": { "cagr": 0.38114025919104066, "maxDrawdown": -0.3097355353645308, "calmar": 1.230534490472567 }, "cagrDifference": -0.04864145939381781 },
+    { "years": 3, "startYear": 2021, "endYear": 2023, "noGate": { "cagr": 0.385631759835789, "maxDrawdown": -0.36478003478709076, "calmar": 1.0571624624710305 }, "tenM": { "cagr": 0.44248075412787613, "maxDrawdown": -0.3097355353645308, "calmar": 1.4285760063246091 }, "cagrDifference": -0.05684899429208712 },
+    { "years": 3, "startYear": 2022, "endYear": 2024, "noGate": { "cagr": 0.47870502397670034, "maxDrawdown": -0.27366880908789337, "calmar": 1.7492129467445305 }, "tenM": { "cagr": 0.5391460817904337, "maxDrawdown": -0.16574718335846594, "calmar": 3.2528219838548194 }, "cagrDifference": -0.06044105781373332 },
+    { "years": 3, "startYear": 2023, "endYear": 2025, "noGate": { "cagr": 0.6884874675565971, "maxDrawdown": -0.3361248077357072, "calmar": 2.0483089962760213 }, "tenM": { "cagr": 0.6447158896666374, "maxDrawdown": -0.31525850764448904, "calmar": 2.045038830145295 }, "cagrDifference": 0.04377157788995967 },
+    { "years": 4, "startYear": 2020, "endYear": 2023, "noGate": { "cagr": 0.4711894700199093, "maxDrawdown": -0.36478003478709087, "calmar": 1.2917084957649225 }, "tenM": { "cagr": 0.5084445452337687, "maxDrawdown": -0.3097355353645308, "calmar": 1.641544114837761 }, "cagrDifference": -0.0372550752138594 },
+    { "years": 4, "startYear": 2021, "endYear": 2024, "noGate": { "cagr": 0.48948580633131367, "maxDrawdown": -0.36478003478709076, "calmar": 1.3418656715053203 }, "tenM": { "cagr": 0.5349282309635757, "maxDrawdown": -0.3097355353645308, "calmar": 1.72704830375376 }, "cagrDifference": -0.045442424632262 },
+    { "years": 4, "startYear": 2022, "endYear": 2025, "noGate": { "cagr": 0.4344421038678794, "maxDrawdown": -0.3361248077357073, "calmar": 1.2925023499291322 }, "tenM": { "cagr": 0.4520917596565108, "maxDrawdown": -0.31525850764448904, "calmar": 1.434035081350845 }, "cagrDifference": -0.017649655788631424 }
+  ]
+}
