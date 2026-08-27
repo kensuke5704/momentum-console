@@ -334,6 +334,17 @@
 .section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; white-space: nowrap; }
 .trigger-text { margin: 0; }
 .equity-chart { height: 430px; }
+.monthly-return-distribution-scroll { overflow-x: auto; }
+.monthly-return-distribution { height: 360px; min-width: 840px; }
+.monthly-return-summary {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding: 13px 18px !important;
+}
+.monthly-return-summary span { color: var(--text-soft); font-size: 12px; }
+.monthly-return-summary strong { color: var(--text); font-family: "Roboto Mono", monospace; }
 .monte-carlo-note {
   align-items: center;
   border-top: 1px solid var(--line);
