@@ -1,0 +1,30 @@
+name: Research Parameter Neighborhood
+
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-parameter-neighborhood.ts
+      - .github/workflows/research-parameter-neighborhood.yml
+      - src/lib/**
+      - data/universe-history.json
+      - public/data/market-data.json
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run parameter neighborhood audit
+        run: node --import tsx scripts/audit-parameter-neighborhood.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parameter-neighborhood
+          path: data/research/parameter-neighborhood.json
