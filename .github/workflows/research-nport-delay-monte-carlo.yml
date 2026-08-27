@@ -24,8 +24,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - name: Restore audited N-PORT bootstrap
-        run: npm run sync:sec
       - name: Run 10,000-path max-3-session Monte Carlo
         run: node --import tsx scripts/audit-nport-delay-monte-carlo.ts
       - uses: actions/upload-artifact@v4
