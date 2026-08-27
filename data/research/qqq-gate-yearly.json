@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-08-27T16:01:29.269Z",
+  "period": { "start": "2020-01-01", "end": "2026-08-25" },
+  "results": [
+    {
+      "label": "NO_GATE",
+      "stats": { "cagr": 0.643379830997405, "maxDrawdown": -0.21928959365119693, "annualizedVolatility": 0.37660276650809865, "calmar": 2.9339277814558224, "finalEquity": 27.134870353409923 },
+      "yearly": [
+        { "year": 2020, "return": 0.7075417982709391, "tradingDays": 253, "investedDays": 144, "exposure": 0.5691699604743083, "entries": 10, "exits": 9, "stopExits": 1, "circuitExits": 2 },
+        { "year": 2021, "return": 0.570456852307589, "tradingDays": 252, "investedDays": 202, "exposure": 0.8015873015873016, "entries": 12, "exits": 13, "stopExits": 0, "circuitExits": 2 },
+        { "year": 2022, "return": -0.11963149044197308, "tradingDays": 251, "investedDays": 63, "exposure": 0.250996015936255, "entries": 4, "exits": 4, "stopExits": 1, "circuitExits": 0 },
+        { "year": 2023, "return": 0.9759519196956861, "tradingDays": 250, "investedDays": 188, "exposure": 0.752, "entries": 10, "exits": 9, "stopExits": 1, "circuitExits": 0 },
+        { "year": 2024, "return": 0.8532103601591108, "tradingDays": 252, "investedDays": 166, "exposure": 0.6587301587301587, "entries": 11, "exits": 11, "stopExits": 1, "circuitExits": 2 },
+        { "year": 2025, "return": 0.3094218412312375, "tradingDays": 250, "investedDays": 128, "exposure": 0.512, "entries": 11, "exits": 11, "stopExits": 2, "circuitExits": 2 },
+        { "year": 2026, "return": 1.3970948902364966, "tradingDays": 162, "investedDays": 58, "exposure": 0.35802469135802467, "entries": 4, "exits": 5, "stopExits": 1, "circuitExits": 1 }
+      ]
+    },
+    {
+      "label": "10M",
+      "stats": { "cagr": 0.5524732652191693, "maxDrawdown": -0.21928959365119705, "annualizedVolatility": 0.3579441075175192, "calmar": 2.5193774862747733, "finalEquity": 18.59132040748182 },
+      "yearly": [
+        { "year": 2020, "return": 0.673522218872622, "tradingDays": 253, "investedDays": 138, "exposure": 0.5454545454545454, "entries": 10, "exits": 9, "stopExits": 1, "circuitExits": 2 },
+        { "year": 2021, "return": 0.5704568523075881, "tradingDays": 252, "investedDays": 202, "exposure": 0.8015873015873016, "entries": 12, "exits": 13, "stopExits": 0, "circuitExits": 2 },
+        { "year": 2022, "return": 0, "tradingDays": 251, "investedDays": 0, "exposure": 0, "entries": 0, "exits": 0, "stopExits": 0, "circuitExits": 0 },
+        { "year": 2023, "return": 0.9611226568523319, "tradingDays": 250, "investedDays": 181, "exposure": 0.724, "entries": 10, "exits": 9, "stopExits": 1, "circuitExits": 0 },
+        { "year": 2024, "return": 0.8532103601591112, "tradingDays": 252, "investedDays": 166, "exposure": 0.6587301587301587, "entries": 11, "exits": 11, "stopExits": 1, "circuitExits": 2 },
+        { "year": 2025, "return": 0.21959664315428995, "tradingDays": 250, "investedDays": 115, "exposure": 0.46, "entries": 10, "exits": 10, "stopExits": 2, "circuitExits": 2 },
+        { "year": 2026, "return": 0.5959050436052999, "tradingDays": 162, "investedDays": 43, "exposure": 0.2654320987654321, "entries": 3, "exits": 4, "stopExits": 1, "circuitExits": 1 }
+      ]
+    }
+  ]
+}
