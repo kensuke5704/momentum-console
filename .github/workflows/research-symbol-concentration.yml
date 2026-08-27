@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/audit-symbol-concentration.ts
       - scripts/audit-trade-attribution.ts
+      - scripts/audit-best-trades-removal.ts
       - .github/workflows/research-symbol-concentration.yml
       - src/lib/**
       - data/universe-history.json
@@ -28,9 +29,12 @@ jobs:
         run: node --import tsx scripts/audit-symbol-concentration.ts
       - name: Run trade attribution audit
         run: node --import tsx scripts/audit-trade-attribution.ts
+      - name: Run best-trades removal stress
+        run: node --import tsx scripts/audit-best-trades-removal.ts
       - uses: actions/upload-artifact@v4
         with:
           name: symbol-concentration-audit
           path: |
             data/research/symbol-concentration-audit.json
             data/research/trade-attribution.json
+            data/research/best-trades-removal.json
