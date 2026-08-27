@@ -1,0 +1,120 @@
+{
+  "generatedAt": "2026-08-27T17:08:00Z",
+  "period": {"start": "2020-01-01", "end": "2026-08-25"},
+  "strategyId": "momentum-dynamic-2026-08-v1",
+  "productionBaseline": {
+    "researchRecomputedCagr": 0.5524732652191693,
+    "frozenDisplayApproxCagr": 0.554,
+    "maxDrawdown": -0.21928959365119705
+  },
+  "sequence": [
+    {
+      "step": 1,
+      "name": "trade-level attribution",
+      "result": {
+        "tradeLots": 112,
+        "winners": 73,
+        "losers": 39,
+        "winRate": 0.6517857142857143,
+        "top1PositivePnlShare": 0.1029,
+        "top3PositivePnlShare": 0.2920,
+        "top5PositivePnlShare": 0.4272,
+        "muNetPnlShare": 0.3876,
+        "largestWinningLots": [
+          {"symbol":"MU","entry":"2026-01-02","exit":"2026-01-22","return":0.34126},
+          {"symbol":"MU","entry":"2026-05-14","exit":"2026-06-01","return":0.27943},
+          {"symbol":"PLTR","entry":"2024-11-01","exit":"2024-12-02","return":0.60518},
+          {"symbol":"HOOD","entry":"2025-09-02","exit":"2025-10-01","return":0.40500}
+        ]
+      },
+      "interpretation": "Direct realized P&L is right-tail concentrated. MU alone contributed about 38.8% of net P&L, while the top five winning lots supplied about 42.7% of all positive P&L."
+    },
+    {
+      "step": 2,
+      "name": "best-trades removal stress",
+      "methodCaveat": "Fixed-path hindsight excision: removed winning lots are replaced by 0% returns while all other historical trade paths remain fixed. This is a stress test, not a causal/tradable counterfactual.",
+      "result": {
+        "fixedPathBaselineCagr": 0.552192,
+        "removeTop1Cagr": 0.5000,
+        "removeTop3Cagr": 0.3842,
+        "removeTop5Cagr": 0.3195,
+        "removeTop10PercentOfWinningLotsCagr": 0.2202
+      },
+      "interpretation": "Historical compound growth materially depends on a small set of large winners, which is structurally consistent with momentum but makes 55% CAGR a fragile point estimate."
+    },
+    {
+      "step": 3,
+      "name": "entry/exit timing stress",
+      "methodCaveat": "Daily-OHLC fixed-path repricing only. The same historical symbols, signal/risk path and reasons are held fixed while entry and exit opens are shifted. Full-history +15m/+30m/VWAP data was unavailable, so no intraday result is fabricated.",
+      "result": {
+        "zeroExtraSessionCagr": 0.552192,
+        "plus1SessionCagr": 0.441298,
+        "plus1Difference": -0.1109,
+        "plus2SessionsCagr": 0.369707,
+        "plus2Difference": -0.1825
+      },
+      "interpretation": "Exact next-session-open execution is a material robustness concern. A full causal state-machine delayed-execution audit should precede any Production rule change."
+    },
+    {
+      "step": 4,
+      "name": "universe perturbation Monte Carlo",
+      "methodCaveat": "50 paths per scenario. Each point-in-time stored Top80 loses random members; there is no replacement from outside Top80 because universe-history stores only Top80. This tests missing/misclassified candidates, not true Top80 boundary noise.",
+      "result": {
+        "drop5Percent": {
+          "paths": 50,
+          "cagrMin": 0.3987983495454499,
+          "cagrP05": 0.47576721675750233,
+          "cagrMedian": 0.533298962129039,
+          "cagrMean": 0.5552230176456081,
+          "cagrP95": 0.690310350641622,
+          "probabilityCagrBelow50": 0.14,
+          "probabilityCagrBelowBaseline": 0.62,
+          "medianMaxDrawdown": -0.21928959365119705
+        },
+        "drop10Percent": {
+          "paths": 50,
+          "cagrMin": 0.3789901130437574,
+          "cagrP05": 0.41134302202136225,
+          "cagrMedian": 0.5179310486575666,
+          "cagrMean": 0.5212154118930084,
+          "cagrP95": 0.631611012177248,
+          "probabilityCagrBelow50": 0.46,
+          "probabilityCagrBelowBaseline": 0.68,
+          "medianMaxDrawdown": -0.21928959365119682
+        }
+      },
+      "interpretation": "The strategy generally survives moderate Universe omissions, but CAGR is sensitive to which candidates are missing. Five-percent omission is reasonably resilient; ten-percent omission creates materially wider downside dispersion."
+    },
+    {
+      "step": 5,
+      "name": "parameter neighborhood",
+      "methodCaveat": "One-factor-at-a-time in-sample neighborhood audit, not optimization. QQQ 10M MA was audited separately.",
+      "result": {
+        "baseline": {"cagr":0.5524732652191693,"maxDrawdown":-0.21928959365119705,"calmar":2.5193774862747733},
+        "momentum3m15_6m85": {"cagr":0.5637449452239531,"maxDrawdown":-0.21928959365119716},
+        "momentum3m25_6m75": {"cagr":0.5738065865489379,"maxDrawdown":-0.21928959365119693},
+        "individualStop15": {"cagr":0.5655469156431927,"maxDrawdown":-0.2046438141318354,"calmar":2.763567118031023},
+        "individualStop20": {"cagr":0.530403955031252,"maxDrawdown":-0.2690054838361362,"calmar":1.9717217190796967},
+        "portfolioCircuit12_5": {"cagr":0.5274377362584928,"maxDrawdown":-0.19173867614328455,"calmar":2.750815572880786},
+        "portfolioCircuit17_5": {"cagr":0.5844429442561441,"maxDrawdown":-0.22500784168316357,"calmar":2.59743367113003},
+        "recovery8": {"cagr":0.49426782121941226,"maxDrawdown":-0.21928959365119693},
+        "recovery12": {"cagr":0.479783456930587,"maxDrawdown":-0.21928959365119682}
+      },
+      "interpretation": "Most Production values are not isolated local maxima: nearby momentum weights and some stop/circuit alternatives are comparable or better in-sample. Recovery confirmation=10 is different: both 8 and 12 days are materially worse, so this parameter deserves specific overfit/OOS scrutiny rather than optimization toward the historical winner."
+    }
+  ],
+  "overallAssessment": {
+    "strengths": [
+      "N-PORT delay up to 3 sessions was previously robust.",
+      "QQQ 10M Gate was previously robust across nearby MA windows and rolling periods.",
+      "Moderate random Universe omissions generally preserve a high-CAGR strategy."
+    ],
+    "materialConcerns": [
+      "Large right-tail winner dependence.",
+      "Material sensitivity to exact next-session-open execution in fixed-path timing stress.",
+      "Technology/growth-factor concentration found in prior leave-one-out audit.",
+      "Recovery confirmation=10 behaves like a local in-sample peak relative to 8 and 12 days."
+    ],
+    "productionDecision": "No Production change from these tests alone. The most important next audit is a full state-machine delayed-execution simulation (+1 session), followed by OOS/walk-forward scrutiny of recovery confirmation days."
+  }
+}
