@@ -10,7 +10,7 @@ on:
       - .github/workflows/research-nport-delay-monte-carlo.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   monte-carlo:
@@ -32,3 +32,10 @@ jobs:
         with:
           name: nport-delay-monte-carlo
           path: data/research/nport-delay-monte-carlo.json
+      - name: Persist research result on research branch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add data/research/nport-delay-monte-carlo.json
+          git diff --cached --quiet || git commit -m "Record N-PORT delay Monte Carlo result"
+          git push
