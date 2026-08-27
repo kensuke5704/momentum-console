@@ -1,0 +1,35 @@
+name: Research Execution Timing Stress
+
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-trade-attribution.ts
+      - scripts/audit-entry-timing-stress.ts
+      - .github/workflows/research-execution-stress.yml
+      - src/lib/**
+      - data/universe-history.json
+      - public/data/market-data.json
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Rebuild trade attribution input
+        run: node --import tsx scripts/audit-trade-attribution.ts
+      - name: Run entry timing stress
+        run: node --import tsx scripts/audit-entry-timing-stress.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: execution-timing-stress
+          path: |
+            data/research/trade-attribution.json
+            data/research/entry-timing-stress.json
