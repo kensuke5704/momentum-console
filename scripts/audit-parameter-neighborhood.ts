@@ -22,7 +22,7 @@ async function main(){
  for(const v of [8,12] as const){const c=clone();c.recovery.confirmationDays=v;cases.push({label:`RECOVERY_${v}`,factor:"recoveryConfirmationDays",value:String(v),config:c});}
  const rows=cases.map(({label,factor,value,config})=>{const stats=runStrategySimulation({histories,universeHistory:history,config}).backtest.stats;return{label,factor,value,stats};});
  const baseline=rows[0].stats;
- const results=rows.map(r=>({...r,cagrDifferenceVsBaseline:r.stats.cagr-baseline.cagr,maxDrawdownDifferenceVsBaseline:r.stats.maxDrawdown-baseline.maxDrawdown,calmarDifferenceVsBaseline:r.stats.calmar-baseline.calmar}));
+ const results=rows.map(r=>({...r,cagrDifferenceVsBaseline:r.stats.cagr-baseline.cagr,maxDrawdownDifferenceVsBaseline:r.stats.maxDrawdown-baseline.maxDrawdown,calmarDifferenceVsBaseline:r.stats.calmar!=null&&baseline.calmar!=null?r.stats.calmar-baseline.calmar:null}));
  const byFactor=Object.fromEntries([...new Set(results.filter(r=>r.factor!=="baseline").map(r=>r.factor))].map(f=>[f,results.filter(r=>r.factor===f)]));
  const output={generatedAt:new Date().toISOString(),period:{start:START,end:END},strategyId:PRODUCTION_STRATEGY.strategyId,method:"One-factor-at-a-time neighborhood robustness audit; no optimization. All Production parameters remain fixed except the named nearby value. Momentum alternatives preserve 3M+6M weight=1. QQQ 10M MA was already separately audited and is not repeated here.",baseline,results,byFactor};
  const out=resolve("data/research/parameter-neighborhood.json");await mkdir(dirname(out),{recursive:true});await writeFile(out,JSON.stringify(output,null,2)+"\n");console.log(JSON.stringify(output,null,2));
