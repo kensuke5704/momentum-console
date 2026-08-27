@@ -1,9 +1,11 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { PRODUCTION_STRATEGY } from "../src/lib/config";
-import type { PricePoint } from "../src/lib/types";
+import { qqqMonthlyGate } from "../src/lib/strategy/momentum";
+import type { PricePoint, UniverseMonth } from "../src/lib/types";
 
 type MarketDataFile = { histories?: Record<string, PricePoint[]> };
+type UniverseFile = { history?: UniverseMonth[] };
 
 type Row = {
   date: string;
@@ -12,8 +14,14 @@ type Row = {
   momentum20: number | null;
   aboveSma100: boolean;
   momentum20Positive: boolean;
-  recoveryOk: boolean;
-  consecutive: number;
+  dailyRecoveryOk: boolean;
+  rawDailyConsecutive: number;
+  monthlySignalDate: boolean;
+  monthlyGateRiskOn: boolean;
+  monthlyGateClose: number | null;
+  monthlyGateMa: number | null;
+  effectiveRecoveryOk: boolean;
+  effectiveConsecutive: number;
 };
 
 const START = "2021-12-02";
@@ -21,17 +29,23 @@ const END = "2023-02-14";
 
 async function main() {
   const market = JSON.parse(await readFile(resolve("public/data/market-data.json"), "utf8")) as MarketDataFile;
+  const universeFile = JSON.parse(await readFile(resolve("data/universe-history.json"), "utf8")) as UniverseFile;
   const qqq = [...(market.histories?.QQQ ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  const universeHistory = [...(universeFile.history ?? [])].sort((a, b) => a.asOf.localeCompare(b.asOf));
   if (!qqq.length) throw new Error("QQQ history missing");
+  if (!universeHistory.length) throw new Error("Universe history missing");
 
+  const signalDates = new Set(universeHistory.map((u) => u.asOf));
   const smaDays = PRODUCTION_STRATEGY.recovery.qqqDailySmaDays;
   const momentumDays = PRODUCTION_STRATEGY.recovery.qqqMomentumDays;
   const confirmDays = PRODUCTION_STRATEGY.recovery.confirmationDays;
 
-  let consecutive = 0;
+  let rawDailyConsecutive = 0;
+  let effectiveConsecutive = 0;
+  let marketRiskOn = false;
+  let gateClose: number | null = null;
+  let gateMa: number | null = null;
   const rows: Row[] = [];
-  const qualifyingRuns: { start: string; end: string; length: number }[] = [];
-  let runStart: string | null = null;
 
   for (let i = 0; i < qqq.length; i++) {
     const point = qqq[i];
@@ -43,40 +57,73 @@ async function main() {
     const momentum20 = prior ? point.close / prior - 1 : null;
     const aboveSma100 = sma100 !== null && point.close > sma100;
     const momentum20Positive = momentum20 !== null && momentum20 > 0;
-    const recoveryOk = aboveSma100 && momentum20Positive;
+    const dailyRecoveryOk = aboveSma100 && momentum20Positive;
+    rawDailyConsecutive = dailyRecoveryOk ? rawDailyConsecutive + 1 : 0;
 
-    if (recoveryOk) {
-      if (!runStart) runStart = point.date;
-      consecutive += 1;
-    } else {
-      if (runStart && consecutive > 0) qualifyingRuns.push({ start: runStart, end: rows.at(-1)?.date ?? point.date, length: consecutive });
-      runStart = null;
-      consecutive = 0;
+    const monthlySignalDate = signalDates.has(point.date);
+    if (monthlySignalDate) {
+      const gate = qqqMonthlyGate(qqq, point.date, PRODUCTION_STRATEGY);
+      marketRiskOn = gate.riskOn;
+      gateClose = gate.close;
+      gateMa = gate.ma;
+      if (!marketRiskOn) effectiveConsecutive = 0;
     }
 
-    rows.push({ date: point.date, close: point.close, sma100, momentum20, aboveSma100, momentum20Positive, recoveryOk, consecutive });
-  }
-  if (runStart && consecutive > 0) qualifyingRuns.push({ start: runStart, end: rows.at(-1)!.date, length: consecutive });
+    const effectiveRecoveryOk = marketRiskOn && dailyRecoveryOk;
+    effectiveConsecutive = effectiveRecoveryOk ? effectiveConsecutive + 1 : 0;
 
-  const firstConfirm = rows.find((r) => r.consecutive >= confirmDays) ?? null;
+    rows.push({
+      date: point.date,
+      close: point.close,
+      sma100,
+      momentum20,
+      aboveSma100,
+      momentum20Positive,
+      dailyRecoveryOk,
+      rawDailyConsecutive,
+      monthlySignalDate,
+      monthlyGateRiskOn: marketRiskOn,
+      monthlyGateClose: gateClose,
+      monthlyGateMa: gateMa,
+      effectiveRecoveryOk,
+      effectiveConsecutive,
+    });
+  }
+
   const during2022 = rows.filter((r) => r.date.startsWith("2022-"));
-  const max2022 = Math.max(0, ...during2022.map((r) => r.consecutive));
-  const first10In2022 = during2022.find((r) => r.consecutive >= confirmDays) ?? null;
-  const aroundConfirm = firstConfirm ? rows.filter((r) => r.date >= rows[Math.max(0, rows.indexOf(firstConfirm) - 12)].date && r.date <= firstConfirm.date) : [];
+  const rawFirst10 = rows.find((r) => r.rawDailyConsecutive >= confirmDays) ?? null;
+  const effectiveFirst10 = rows.find((r) => r.effectiveConsecutive >= confirmDays) ?? null;
+  const gateChanges = rows.filter((r) => r.monthlySignalDate).map((r) => ({
+    date: r.date,
+    riskOn: r.monthlyGateRiskOn,
+    qqqClose: r.monthlyGateClose,
+    ma10: r.monthlyGateMa,
+    effectiveConsecutive: r.effectiveConsecutive,
+  }));
+  const aroundRawFirst10 = rawFirst10 ? rows.slice(Math.max(0, rows.indexOf(rawFirst10) - 12), rows.indexOf(rawFirst10) + 1) : [];
+  const aroundEffectiveFirst10 = effectiveFirst10 ? rows.slice(Math.max(0, rows.indexOf(effectiveFirst10) - 12), rows.indexOf(effectiveFirst10) + 1) : [];
 
   const summary = {
-    parameters: { smaDays, momentumDays, confirmDays },
+    parameters: { smaDays, momentumDays, confirmDays, monthlyMaMonths: PRODUCTION_STRATEGY.market.qqqMonthlyMaMonths },
     window: { start: START, end: END },
-    maxConsecutiveIn2022: max2022,
-    firstTenDayConfirmationIn2022: first10In2022,
-    firstTenDayConfirmationOverall: firstConfirm,
-    qualifyingRuns,
-    aroundFirstConfirmation: aroundConfirm,
+    rawDailyCondition: {
+      maxConsecutiveIn2022: Math.max(0, ...during2022.map((r) => r.rawDailyConsecutive)),
+      firstTenDayConfirmation: rawFirst10,
+    },
+    effectiveProductionCondition: {
+      maxConsecutiveIn2022: Math.max(0, ...during2022.map((r) => r.effectiveConsecutive)),
+      firstTenDayConfirmation: effectiveFirst10,
+    },
+    monthlyGateSignals: gateChanges,
+    aroundRawFirstTen: aroundRawFirst10,
+    aroundEffectiveFirstTen: aroundEffectiveFirst10,
     checks: {
       usesOnlyDataThroughSameClose: true,
       smaIncludesCurrentClose: true,
       momentumPriorIndex: `current index - ${momentumDays}`,
-      resetOnAnyFailure: true,
+      monthlyGateUpdatedOnlyOnUniverseSignalDates: true,
+      monthlyGateAppliedBeforeRecoveryCounterSameDay: true,
+      resetOnAnyDailyFailureOrRiskOff: true,
     },
   };
 
