@@ -1,0 +1,229 @@
+{
+  "generatedAt": "2026-08-27T14:50:52.328Z",
+  "start": "2020-01-01",
+  "paths": 1000,
+  "seed": 20260827,
+  "maxDelayTradingSessions": 3,
+  "assumptions": {
+    "delayDistribution": "Independent discrete uniform delay of 0, 1, 2, or 3 US trading sessions for each quarter-end N-PORT refresh.",
+    "fallback": "If delayed, the regular month-start rebalance uses the prior valid Universe.",
+    "delayedActivation": "On receipt, only the Universe changes; Momentum and QQQ gate remain fixed to the prior official month-end close; changed Top2/weights execute next open.",
+    "transactionCostPerSide": 0.001,
+    "caveat": "Historical user upload timestamps do not exist. This is a scenario Monte Carlo. The audited bootstrap starts in 2020 Q1, retaining the same Jan-Mar 2020 limitation as the Production-start comparison."
+  },
+  "baseline": {
+    "stats": {
+      "cagr": 0.5646151080932855,
+      "maxDrawdown": -0.21928959365119693,
+      "annualizedVolatility": 0.3580040198550085,
+      "calmar": 2.5747464742506887,
+      "finalEquity": 19.62711998786741
+    },
+    "monthlyReturns": {
+      "min": -0.17711530467518466,
+      "p05": -0.11505057345099216,
+      "p25": 0,
+      "median": 0,
+      "mean": 0.04489444916026382,
+      "p75": 0.09702888530205361,
+      "p95": 0.28559720412628176,
+      "max": 0.5701143269689606
+    }
+  },
+  "monteCarlo": {
+    "cagr": {
+      "min": 0.5282744393114394,
+      "p05": 0.5412138048260139,
+      "p25": 0.5549766044455029,
+      "median": 0.5666111857414573,
+      "mean": 0.5665280620538792,
+      "p75": 0.5749848992486706,
+      "p95": 0.5946439630019731,
+      "max": 0.5998901580792861
+    },
+    "maxDrawdown": {
+      "min": -0.2083028284581968,
+      "p05": -0.20830282845819648,
+      "p25": -0.20828477841149096,
+      "median": -0.2081656372366103,
+      "mean": -0.2078611557193335,
+      "p75": -0.20816563723660986,
+      "p95": -0.20665791391973343,
+      "max": -0.2066579139197332
+    },
+    "annualizedVolatility": {
+      "min": 0.3496457008968096,
+      "p05": 0.3511624319511942,
+      "p25": 0.3527332378491983,
+      "median": 0.3536930246654843,
+      "mean": 0.3535655226144792,
+      "p75": 0.35459700109350517,
+      "p95": 0.35517516579868896,
+      "max": 0.3556586349268093
+    },
+    "calmar": {
+      "min": 2.537760056483191,
+      "p05": 2.607786303235576,
+      "p25": 2.670286634365696,
+      "median": 2.723904978166149,
+      "mean": 2.725543356241219,
+      "p75": 2.771508928088177,
+      "p95": 2.860899409178306,
+      "max": 2.902101005722668
+    },
+    "finalEquity": {
+      "min": 16.787386982412013,
+      "p05": 17.755513104113916,
+      "p25": 18.836906988851226,
+      "median": 19.79424033572269,
+      "mean": 19.82562364277904,
+      "p75": 20.508565365635697,
+      "p95": 22.27216200947482,
+      "max": 22.763996041913636
+    },
+    "probabilityCagrBelow50Pct": 0,
+    "probabilityCagrBelowBaseline": 0.451,
+    "delayCounts": [
+      6629,
+      6553,
+      6402,
+      6416
+    ],
+    "monthlyReturns": {
+      "summary": {
+        "min": -0.2083028284581968,
+        "p05": -0.1270070937611713,
+        "p25": 0,
+        "median": 0,
+        "mean": 0.04549698073247985,
+        "p75": 0.09670844888035734,
+        "p95": 0.2902441511828807,
+        "max": 0.570114326968961
+      },
+      "positiveProbability": 0.4496,
+      "negativeProbability": 0.22195,
+      "zeroProbability": 0.32845,
+      "histogram5Pct": [
+        {
+          "from": -0.25,
+          "to": -0.2,
+          "label": "-25%〜-20%",
+          "count": 1000,
+          "probability": 0.0125
+        },
+        {
+          "from": -0.2,
+          "to": -0.15000000000000002,
+          "label": "-20%〜-15%",
+          "count": 1000,
+          "probability": 0.0125
+        },
+        {
+          "from": -0.15000000000000002,
+          "to": -0.10000000000000002,
+          "label": "-15%〜-10%",
+          "count": 7000,
+          "probability": 0.0875
+        },
+        {
+          "from": -0.10000000000000002,
+          "to": -0.05000000000000002,
+          "label": "-10%〜-5%",
+          "count": 5252,
+          "probability": 0.06565
+        },
+        {
+          "from": -0.05000000000000002,
+          "to": -1.3877787807814457e-17,
+          "label": "-5%〜-0%",
+          "count": 3504,
+          "probability": 0.0438
+        },
+        {
+          "from": -1.3877787807814457e-17,
+          "to": 0.04999999999999999,
+          "label": "-0%〜5%",
+          "count": 31485,
+          "probability": 0.3935625
+        },
+        {
+          "from": 0.04999999999999999,
+          "to": 0.09999999999999999,
+          "label": "5%〜10%",
+          "count": 11759,
+          "probability": 0.1469875
+        },
+        {
+          "from": 0.09999999999999999,
+          "to": 0.15,
+          "label": "10%〜15%",
+          "count": 5752,
+          "probability": 0.0719
+        },
+        {
+          "from": 0.15,
+          "to": 0.2,
+          "label": "15%〜20%",
+          "count": 3472,
+          "probability": 0.0434
+        },
+        {
+          "from": 0.2,
+          "to": 0.25,
+          "label": "20%〜25%",
+          "count": 2776,
+          "probability": 0.0347
+        },
+        {
+          "from": 0.25,
+          "to": 0.3,
+          "label": "25%〜30%",
+          "count": 4000,
+          "probability": 0.05
+        },
+        {
+          "from": 0.3,
+          "to": 0.35,
+          "label": "30%〜35%",
+          "count": 1000,
+          "probability": 0.0125
+        },
+        {
+          "from": 0.35,
+          "to": 0.39999999999999997,
+          "label": "35%〜40%",
+          "count": 0,
+          "probability": 0
+        },
+        {
+          "from": 0.39999999999999997,
+          "to": 0.44999999999999996,
+          "label": "40%〜45%",
+          "count": 1000,
+          "probability": 0.0125
+        },
+        {
+          "from": 0.44999999999999996,
+          "to": 0.49999999999999994,
+          "label": "45%〜50%",
+          "count": 234,
+          "probability": 0.002925
+        },
+        {
+          "from": 0.49999999999999994,
+          "to": 0.5499999999999999,
+          "label": "50%〜55%",
+          "count": 247,
+          "probability": 0.0030875
+        },
+        {
+          "from": 0.5499999999999999,
+          "to": 0.6,
+          "label": "55%〜60%",
+          "count": 519,
+          "probability": 0.0064875
+        }
+      ]
+    }
+  }
+}
