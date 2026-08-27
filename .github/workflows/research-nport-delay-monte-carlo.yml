@@ -1,0 +1,34 @@
+name: Research N-PORT Delay Monte Carlo
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/nport-delay-monte-carlo-20260827
+    paths:
+      - scripts/audit-nport-delay-monte-carlo.ts
+      - .github/workflows/research-nport-delay-monte-carlo.yml
+
+permissions:
+  contents: read
+
+jobs:
+  monte-carlo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Restore audited N-PORT bootstrap
+        run: npm run sync:sec
+      - name: Run 10,000-path max-3-session Monte Carlo
+        run: node --import tsx scripts/audit-nport-delay-monte-carlo.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nport-delay-monte-carlo
+          path: data/research/nport-delay-monte-carlo.json
