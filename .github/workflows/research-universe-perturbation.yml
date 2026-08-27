@@ -1,0 +1,30 @@
+name: Research Universe Perturbation
+
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-universe-perturbation.ts
+      - .github/workflows/research-universe-perturbation.yml
+      - src/lib/**
+      - data/universe-history.json
+      - public/data/market-data.json
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run universe perturbation Monte Carlo
+        run: node --import tsx scripts/audit-universe-perturbation.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: universe-perturbation
+          path: data/research/universe-perturbation.json
