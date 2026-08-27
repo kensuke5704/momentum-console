@@ -6,6 +6,7 @@ on:
       - research/qqq-ma-sensitivity-20260828
     paths:
       - scripts/audit-qqq-ma-sensitivity.ts
+      - scripts/audit-qqq-gate-yearly.ts
       - .github/workflows/research-qqq-ma-sensitivity.yml
       - src/lib/**
       - data/universe-history.json
@@ -24,7 +25,11 @@ jobs:
       - run: npm run typecheck
       - name: Run QQQ MA sensitivity audit
         run: node --import tsx scripts/audit-qqq-ma-sensitivity.ts
+      - name: Run yearly QQQ gate contribution audit
+        run: node --import tsx scripts/audit-qqq-gate-yearly.ts
       - uses: actions/upload-artifact@v4
         with:
           name: qqq-ma-sensitivity
-          path: data/research/qqq-ma-sensitivity.json
+          path: |
+            data/research/qqq-ma-sensitivity.json
+            data/research/qqq-gate-yearly.json
