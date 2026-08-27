@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-08-27T15:55:26.897Z",
+  "period": { "start": "2020-01-01", "end": "2026-08-25" },
+  "frozenProductionWindow": 10,
+  "results": [
+    {
+      "label": "NO_GATE",
+      "months": null,
+      "stats": {
+        "cagr": 0.643379830997405,
+        "maxDrawdown": -0.21928959365119693,
+        "annualizedVolatility": 0.37660276650809865,
+        "calmar": 2.9339277814558224,
+        "finalEquity": 27.134870353409923
+      },
+      "return2022": -0.11963149044197308,
+      "entries2022": 4,
+      "exits2022": 4
+    },
+    {
+      "label": "6M",
+      "months": 6,
+      "stats": {
+        "cagr": 0.49715770224575984,
+        "maxDrawdown": -0.21928959365119705,
+        "annualizedVolatility": 0.35462845201523724,
+        "calmar": 2.2671285671518957,
+        "finalEquity": 14.60869678019589
+      },
+      "return2022": 0,
+      "entries2022": 0,
+      "exits2022": 0
+    },
+    {
+      "label": "8M",
+      "months": 8,
+      "stats": {
+        "cagr": 0.49715770224575984,
+        "maxDrawdown": -0.21928959365119705,
+        "annualizedVolatility": 0.35462845201523724,
+        "calmar": 2.2671285671518957,
+        "finalEquity": 14.60869678019589
+      },
+      "return2022": 0,
+      "entries2022": 0,
+      "exits2022": 0
+    },
+    {
+      "label": "10M",
+      "months": 10,
+      "stats": {
+        "cagr": 0.5524732652191693,
+        "maxDrawdown": -0.21928959365119705,
+        "annualizedVolatility": 0.3579441075175192,
+        "calmar": 2.5193774862747733,
+        "finalEquity": 18.59132040748182
+      },
+      "return2022": 0,
+      "entries2022": 0,
+      "exits2022": 0
+    },
+    {
+      "label": "12M",
+      "months": 12,
+      "stats": {
+        "cagr": 0.546092452207275,
+        "maxDrawdown": -0.21928959365119705,
+        "annualizedVolatility": 0.35481763268311384,
+        "calmar": 2.4902798309521788,
+        "finalEquity": 18.08943263974733
+      },
+      "return2022": 0,
+      "entries2022": 0,
+      "exits2022": 0
+    }
+  ]
+}
