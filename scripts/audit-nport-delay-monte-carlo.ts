@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { performanceStats, runStrategySimulation } from "../src/lib/backtest";
 import { PRODUCTION_STRATEGY } from "../src/lib/config";
 import { buildMonthlySignal } from "../src/lib/strategy/momentum";
@@ -93,19 +94,29 @@ function histogram(values: number[], width = 0.05) {
   return bins;
 }
 
+async function loadAuditedFilings(): Promise<NportFiling[]> {
+  try {
+    const current = JSON.parse(await readFile(resolve("data/sec-nport/filings.json"), "utf8")) as { filings?: NportFiling[] };
+    if (current.filings?.length) return current.filings;
+  } catch {}
+  const bootstrap = JSON.parse(gunzipSync(await readFile(resolve("data/sec-nport/bootstrap.json.gz"))).toString("utf8")) as { snapshots?: NportFiling[] };
+  if (!bootstrap.snapshots?.length) throw new Error("Audited N-PORT bootstrap is empty");
+  return bootstrap.snapshots;
+}
+
 async function main() {
-  const quarterly = JSON.parse(await readFile(resolve("data/sec-nport/filings.json"), "utf8")) as { filings: NportFiling[] };
+  const filings = await loadAuditedFilings();
   const published = JSON.parse(await readFile(resolve("public/data/universe-history.json"), "utf8")) as { history: UniverseMonth[] };
   const qqq = await fetchYahooHistory("QQQ");
   const monthEnds = new Map<string, string>();
   for (const point of qqq) monthEnds.set(point.date.slice(0, 7), point.date);
   const lastMonth = published.history.at(-1)?.signalMonth ?? "9999-12";
   const months = [...monthEnds].filter(([month]) => month >= "2020-01" && month <= lastMonth).sort(([a], [b]) => a.localeCompare(b)) as Array<[string, string]>;
-  const fallbackHistory = buildFallbackHistory(quarterly.filings, months);
+  const fallbackHistory = buildFallbackHistory(filings, months);
   const quarterMonths = months.filter(([month]) => isQuarterEndMonth(month));
-  const quarterUniverses = quarterMonths.map(([signalMonth, monthEnd]) => buildPointInTimeUniverse(quarterly.filings.filter((f) => f.filingDate <= monthEnd), signalMonth, monthEnd, null));
+  const quarterUniverses = quarterMonths.map(([signalMonth, monthEnd]) => buildPointInTimeUniverse(filings.filter((f) => f.filingDate <= monthEnd), signalMonth, monthEnd, null));
   const symbols = [...new Set(["QQQ", "TQQQ", ...published.history.flatMap((m) => m.symbols.map((x) => x.symbol)), ...fallbackHistory.flatMap((m) => m.symbols.map((x) => x.symbol)), ...quarterUniverses.flatMap((m) => m.symbols.map((x) => x.symbol))])];
-  console.log(`Fetching histories for ${symbols.length} symbols`);
+  console.log(`Loaded ${filings.length} audited filings; fetching histories for ${symbols.length} symbols`);
   const histories = await fetchHistories(symbols, 8);
 
   const sortedQqq = [...(histories.QQQ ?? [])].sort((a, b) => a.date.localeCompare(b.date));
@@ -113,24 +124,21 @@ async function main() {
   const dateIndex = new Map(tradingDates.map((date, index) => [date, index]));
   const qqqPrefixes = tradingDates.map((_, index) => sortedQqq.slice(0, index + 1));
   const priceMaps = Object.fromEntries(Object.entries(histories).map(([symbol, points]) => [symbol, new Map(points.map((point) => [point.date, point]))]));
-  const regularUniverseByDate = new Map(fallbackHistory.map((month) => [month.asOf, month]));
   const regularSignals = new Map<string, MonthlySignal>();
-  for (const [date, universe] of regularUniverseByDate) {
-    const idx = dateIndex.get(date);
-    regularSignals.set(date, buildMonthlySignal({ universe, histories, qqq: sortedQqq, nextSessionDate: idx === undefined ? null : tradingDates[idx + 1] ?? null, config: PRODUCTION_STRATEGY }));
+  for (const universe of fallbackHistory) {
+    const idx = dateIndex.get(universe.asOf);
+    regularSignals.set(universe.asOf, buildMonthlySignal({ universe, histories, qqq: sortedQqq, nextSessionDate: idx === undefined ? null : tradingDates[idx + 1] ?? null, config: PRODUCTION_STRATEGY }));
   }
 
   const extraSignalOptions = quarterMonths.map(([signalMonth, monthEnd]) => {
     const idx = dateIndex.get(monthEnd);
     if (idx === undefined) return null;
-    const available = quarterly.filings.filter((f) => f.filingDate <= monthEnd);
-    const newUniverse = buildPointInTimeUniverse(available, signalMonth, monthEnd, null);
+    const newUniverse = buildPointInTimeUniverse(filings.filter((f) => f.filingDate <= monthEnd), signalMonth, monthEnd, null);
     const options = Array.from({ length: MAX_DELAY + 1 }, (_, delay) => {
       const receiptDate = tradingDates[idx + delay];
       const executionDate = tradingDates[idx + delay + 1];
       if (!receiptDate || !executionDate) return null;
-      const signal = buildMonthlySignal({ universe: newUniverse, histories, qqq: sortedQqq, nextSessionDate: executionDate, config: PRODUCTION_STRATEGY });
-      return { delay, receiptDate, signal };
+      return { delay, receiptDate, signal: buildMonthlySignal({ universe: newUniverse, histories, qqq: sortedQqq, nextSessionDate: executionDate, config: PRODUCTION_STRATEGY }) };
     });
     return { signalMonth, monthEnd, options };
   }).filter((value): value is NonNullable<typeof value> => Boolean(value));
@@ -168,7 +176,6 @@ async function main() {
     if ((path + 1) % 1000 === 0) console.log(`Completed ${path + 1}/${PATHS} paths`);
   }
 
-  const monthlySummary = summarize(pooledMonthlyReturns);
   const result = {
     generatedAt: new Date().toISOString(), start: START, paths: PATHS, seed: SEED, maxDelayTradingSessions: MAX_DELAY,
     assumptions: {
@@ -184,7 +191,7 @@ async function main() {
       probabilityCagrBelow50Pct: cagrs.filter((value) => value < 0.50).length / PATHS,
       probabilityCagrBelowBaseline: cagrs.filter((value) => value < baseline.stats.cagr).length / PATHS,
       delayCounts: pathDelayCounts,
-      monthlyReturns: { summary: monthlySummary, positiveProbability: pooledMonthlyReturns.filter((value) => value > 0).length / pooledMonthlyReturns.length, negativeProbability: pooledMonthlyReturns.filter((value) => value < 0).length / pooledMonthlyReturns.length, zeroProbability: pooledMonthlyReturns.filter((value) => value === 0).length / pooledMonthlyReturns.length, histogram5Pct: histogram(pooledMonthlyReturns, 0.05) }
+      monthlyReturns: { summary: summarize(pooledMonthlyReturns), positiveProbability: pooledMonthlyReturns.filter((value) => value > 0).length / pooledMonthlyReturns.length, negativeProbability: pooledMonthlyReturns.filter((value) => value < 0).length / pooledMonthlyReturns.length, zeroProbability: pooledMonthlyReturns.filter((value) => value === 0).length / pooledMonthlyReturns.length, histogram5Pct: histogram(pooledMonthlyReturns, 0.05) }
     }
   };
   await mkdir(resolve("data/research"), { recursive: true });
