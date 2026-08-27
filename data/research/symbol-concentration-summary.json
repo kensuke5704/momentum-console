@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-08-27T16:28:36.204Z",
+  "period": {"start": "2020-01-01", "end": "2026-08-25"},
+  "strategyId": "momentum-dynamic-2026-08-v1",
+  "baseline": {"cagr": 0.5524732652191693, "maxDrawdown": -0.21928959365119705, "calmar": 2.5193774862747733, "finalEquity": 18.59132040748182},
+  "topBaselineSelections": [
+    {"symbol": "NVDA", "entries": 18, "sector": "Technology"},
+    {"symbol": "TSLA", "entries": 13, "sector": "Consumer Cyclical"},
+    {"symbol": "HOOD", "entries": 8, "sector": "Financial Services"},
+    {"symbol": "COIN", "entries": 7, "sector": "Financial Services"},
+    {"symbol": "ZS", "entries": 6, "sector": "Technology"},
+    {"symbol": "CRWD", "entries": 6, "sector": "Technology"},
+    {"symbol": "PLTR", "entries": 6, "sector": "Technology"}
+  ],
+  "sectorSelectionShare": [
+    {"sector": "Technology", "share": 0.5089285714285714},
+    {"sector": "Financial Services", "share": 0.14285714285714285},
+    {"sector": "Consumer Cyclical", "share": 0.11607142857142858},
+    {"sector": "Unknown", "share": 0.10714285714285714},
+    {"sector": "Communication Services", "share": 0.08928571428571429},
+    {"sector": "Healthcare", "share": 0.026785714285714284},
+    {"sector": "Industrials", "share": 0.008928571428571428}
+  ],
+  "largestNegativeLeaveOneOut": [
+    {"symbol": "MU", "cagr": 0.3676680012103475, "cagrDifferenceVsBaseline": -0.1848052640088218},
+    {"symbol": "NVDA", "cagr": 0.4366883370326038, "cagrDifferenceVsBaseline": -0.1157849281865655},
+    {"symbol": "HOOD", "cagr": 0.463092346005892, "cagrDifferenceVsBaseline": -0.08938091921327729},
+    {"symbol": "NET", "cagr": 0.49244853849286185, "cagrDifferenceVsBaseline": -0.06002472672630743},
+    {"symbol": "INTC", "cagr": 0.5085060539812605, "cagrDifferenceVsBaseline": -0.04396721123790881},
+    {"symbol": "TSLA", "cagr": 0.51148685128246, "cagrDifferenceVsBaseline": -0.04098641393670932},
+    {"symbol": "PLTR", "cagr": 0.511848529057795, "cagrDifferenceVsBaseline": -0.0406247361613743}
+  ],
+  "largestPositiveLeaveOneOut": [
+    {"symbol": "ZS", "cagr": 0.639559362358264, "cagrDifferenceVsBaseline": 0.08708609713909476},
+    {"symbol": "COF", "cagr": 0.5763499319657372, "cagrDifferenceVsBaseline": 0.023876666746567965},
+    {"symbol": "QCOM", "cagr": 0.5721299471510686, "cagrDifferenceVsBaseline": 0.01965668193189929},
+    {"symbol": "AMAT", "cagr": 0.5717548392853316, "cagrDifferenceVsBaseline": 0.019281574066162266}
+  ],
+  "sectorLeaveOut": [
+    {"sector": "Technology", "cagr": 0.23814354629086498, "cagrDifferenceVsBaseline": -0.3143297189283043},
+    {"sector": "Financial Services", "cagr": 0.4499653095291434, "cagrDifferenceVsBaseline": -0.10250795569002591},
+    {"sector": "Consumer Cyclical", "cagr": 0.51148685128246, "cagrDifferenceVsBaseline": -0.04098641393670932},
+    {"sector": "Communication Services", "cagr": 0.5377803644198287, "cagrDifferenceVsBaseline": -0.014692900799340602},
+    {"sector": "Healthcare", "cagr": 0.5419603306801872, "cagrDifferenceVsBaseline": -0.010512934538982055},
+    {"sector": "Industrials", "cagr": 0.5497301652355537, "cagrDifferenceVsBaseline": -0.002743099983615549},
+    {"sector": "Unknown", "cagr": 0.5986490567339948, "cagrDifferenceVsBaseline": 0.04617579151482554}
+  ]
+}
