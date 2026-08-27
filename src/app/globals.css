@@ -334,8 +334,7 @@
 .section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; white-space: nowrap; }
 .trigger-text { margin: 0; }
 .equity-chart { height: 430px; }
-.monthly-return-distribution-scroll { overflow-x: auto; }
-.monthly-return-distribution { height: 360px; min-width: 840px; }
+.monthly-return-distribution { width: 100%; height: 340px; min-width: 0; }
 .monthly-return-summary {
   border-top: 1px solid var(--line);
   display: flex;
