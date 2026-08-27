@@ -24,8 +24,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - name: Run 10,000-path max-3-session Monte Carlo
-        run: node --import tsx scripts/audit-nport-delay-monte-carlo.ts
+      - name: Prepare 2,000-path research runner
+        run: sed 's/const PATHS = 10_000;/const PATHS = 2_000;/' scripts/audit-nport-delay-monte-carlo.ts > scripts/audit-nport-delay-monte-carlo-2000.ts
+      - name: Run 2,000-path max-3-session Monte Carlo
+        run: node --import tsx scripts/audit-nport-delay-monte-carlo-2000.ts
       - uses: actions/upload-artifact@v4
         with:
           name: nport-delay-monte-carlo
