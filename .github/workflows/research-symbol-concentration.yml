@@ -1,0 +1,31 @@
+name: Research Symbol Concentration
+
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-symbol-concentration.ts
+      - .github/workflows/research-symbol-concentration.yml
+      - src/lib/**
+      - data/universe-history.json
+      - public/data/market-data.json
+      - public/data/company-profiles.json
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run symbol concentration audit
+        run: node --import tsx scripts/audit-symbol-concentration.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: symbol-concentration-audit
+          path: data/research/symbol-concentration-audit.json
