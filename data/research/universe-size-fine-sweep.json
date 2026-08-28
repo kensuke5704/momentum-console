@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-08-28T04:46:26.428Z",
+  "period": {"start": "2020-01-01", "end": "2026-08-25"},
+  "strategyId": "momentum-dynamic-2026-08-v1",
+  "method": "Fine-grained deterministic Universe size sensitivity around Top80 using point-in-time N-PORT ranking. Top80 uses exact saved Production universe history. Other sizes use reconstructed Top100 ranking and only priced candidates. Full Production strategy state machine recomputed causally.",
+  "caveat": "Sizes above 80 can contain historical delisted/old tickers no longer available from Yahoo; unavailable symbols are replaced by next ranked priced candidates. This is a priced-candidate local sensitivity test, not a pristine historical reconstruction.",
+  "unavailableHistoryCount": 30,
+  "baseline": {"size": 80, "cagr": 0.5524732652191693, "maxDrawdown": -0.21928959365119705, "annualizedVolatility": 0.3579441075175192, "calmar": 2.5193774862747733, "finalEquity": 18.59132040748182},
+  "rows": [
+    {"size":72,"cagr":0.46658537560542346,"maxDrawdown":-0.21928959365119705,"calmar":2.1277132573266386,"finalEquity":12.737173631121657,"cagrDeltaVs80":-0.08588788961374583},
+    {"size":74,"cagr":0.466192119617578,"maxDrawdown":-0.21928959365119705,"calmar":2.125919939270375,"finalEquity":12.714496299507294,"cagrDeltaVs80":-0.08628114560159128},
+    {"size":76,"cagr":0.47043508768691655,"maxDrawdown":-0.21928959365119705,"calmar":2.1452686370297744,"finalEquity":12.960990177354855,"cagrDeltaVs80":-0.08203817753225273},
+    {"size":78,"cagr":0.5012258011055124,"maxDrawdown":-0.20464381413183552,"calmar":2.4492594766759623,"finalEquity":14.874491788762219,"cagrDeltaVs80":-0.05124746411365688},
+    {"size":80,"cagr":0.5524732652191693,"maxDrawdown":-0.21928959365119705,"calmar":2.5193774862747733,"finalEquity":18.59132040748182,"cagrDeltaVs80":0},
+    {"size":82,"cagr":0.510364201376607,"maxDrawdown":-0.20464381413183552,"calmar":2.4939146269421095,"finalEquity":15.486579209045699,"cagrDeltaVs80":-0.0421090638425623},
+    {"size":84,"cagr":0.5229906526640691,"maxDrawdown":-0.20464381413183552,"calmar":2.555614274893979,"finalEquity":16.367411584316788,"cagrDeltaVs80":-0.029482612555100207},
+    {"size":86,"cagr":0.43348175290861013,"maxDrawdown":-0.20464381413183552,"calmar":2.118225536147175,"finalEquity":10.944326309276777,"cagrDeltaVs80":-0.11899151231055916},
+    {"size":88,"cagr":0.40588987775956165,"maxDrawdown":-0.20464381413183552,"calmar":1.9833967592984731,"finalEquity":9.618369975129445,"cagrDeltaVs80":-0.14658338745960764}
+  ]
+}
