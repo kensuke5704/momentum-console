@@ -1,0 +1,25 @@
+name: Research Execution Delay Decomposition
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-execution-delay-decomposition.ts
+      - .github/workflows/research-execution-delay-decomposition.yml
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run execution delay decomposition audit
+        run: node --import tsx scripts/audit-execution-delay-decomposition.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: execution-delay-decomposition
+          path: data/research/execution-delay-decomposition.json
