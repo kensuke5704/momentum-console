@@ -1,0 +1,29 @@
+name: Period Jackknife
+
+on:
+  push:
+    branches:
+      - research/period-jackknife-20260828
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run period jackknife
+        run: node scripts/period-jackknife.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: period-jackknife
+          path: data/research/period-jackknife/
+          retention-days: 30
