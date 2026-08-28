@@ -1,0 +1,29 @@
+name: Winner Dependence Attribution
+
+on:
+  push:
+    branches:
+      - research/winner-dependence-20260828
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  attribute:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run winner dependence attribution
+        run: node --import tsx scripts/winner-dependence-attribution.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: winner-dependence-attribution
+          path: data/research/winner-dependence/
+          retention-days: 30
