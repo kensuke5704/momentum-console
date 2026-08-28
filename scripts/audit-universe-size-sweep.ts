@@ -13,8 +13,8 @@ type BootstrapFile = { snapshots: NportFiling[] };
 
 const START = "2020-01-01";
 const END = "2026-08-25";
-const SIZES = [60, 70, 80, 90, 100] as const;
-const MAX_SIZE = 120 as typeof PRODUCTION_STRATEGY.universe.size;
+const SIZES = [72, 74, 76, 78, 80, 82, 84, 86, 88] as const;
+const MAX_SIZE = 100 as typeof PRODUCTION_STRATEGY.universe.size;
 
 function overlap(a: UniverseMember[], b: UniverseMember[]) {
   const bs = new Set(b.map((x) => x.symbol));
@@ -27,11 +27,11 @@ async function main() {
   const bootstrap = JSON.parse(gunzipSync(await readFile(resolve("data/sec-nport/bootstrap.json.gz"))).toString("utf8")) as BootstrapFile;
   const baselineHistory = universe.history.filter((u) => u.asOf >= START && u.asOf <= END);
 
-  const top120ByDate = new Map<string, UniverseMonth>();
+  const top100ByDate = new Map<string, UniverseMonth>();
   const allSymbols = new Set<string>();
   for (const base of baselineHistory) {
     const u = buildPointInTimeUniverse(bootstrap.snapshots, base.signalMonth, base.asOf, null, MAX_SIZE);
-    top120ByDate.set(base.asOf, u);
+    top100ByDate.set(base.asOf, u);
     for (const row of u.symbols) allSymbols.add(row.symbol);
   }
 
@@ -40,7 +40,7 @@ async function main() {
   );
   const missing = [...allSymbols].filter((s) => !histories[s]?.length);
   if (missing.length) {
-    console.error(`Fetching ${missing.length} missing Top120 histories`);
+    console.error(`Fetching ${missing.length} missing Top100 histories`);
     const fetched = await fetchHistories(missing, 6);
     for (const [symbol, points] of Object.entries(fetched)) histories[symbol] = points.filter((p) => p.date <= END);
   }
@@ -50,7 +50,7 @@ async function main() {
   const rows = SIZES.map((size) => {
     const history: UniverseMonth[] = baselineHistory.map((base) => {
       if (size === 80) return base;
-      const source = top120ByDate.get(base.asOf);
+      const source = top100ByDate.get(base.asOf);
       if (!source) return base;
       const selected = source.symbols.filter((row) => histories[row.symbol]?.length).slice(0, size);
       return {
@@ -69,8 +69,8 @@ async function main() {
     generatedAt: new Date().toISOString(),
     period: { start: START, end: END },
     strategyId: PRODUCTION_STRATEGY.strategyId,
-    method: "Deterministic Universe size sensitivity using point-in-time N-PORT ranking. Top80 uses the exact saved Production universe history. Other sizes use reconstructed Top120 ranking, remove symbols with no usable Yahoo history, then take the first N priced candidates. Full Production strategy state machine is recomputed causally.",
-    caveat: "Top90/100 can contain historical delisted/old tickers no longer available from Yahoo; unavailable symbols are replaced by the next ranked priced candidate. Therefore this is a priced-candidate size sensitivity test, not a pristine historical reconstruction.",
+    method: "Fine-grained deterministic Universe size sensitivity around Top80 using point-in-time N-PORT ranking. Top80 uses the exact saved Production universe history. Other sizes use reconstructed Top100 ranking, remove symbols with no usable Yahoo history, then take the first N priced candidates. Full Production strategy state machine is recomputed causally.",
+    caveat: "Sizes above 80 can contain historical delisted/old tickers no longer available from Yahoo; unavailable symbols are replaced by the next ranked priced candidate. Therefore this is a priced-candidate local sensitivity test, not a pristine historical reconstruction.",
     unavailableHistoryCount: unavailable.length,
     unavailableSymbols: unavailable,
     baselineSize: 80,
