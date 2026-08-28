@@ -13,7 +13,7 @@ type BootstrapFile = { snapshots: NportFiling[] };
 
 const START = "2020-01-01";
 const END = "2026-08-25";
-const PATHS = 100;
+const PATHS = 50;
 const SEED = 20260828;
 const TOP100_SIZE = 100 as typeof PRODUCTION_STRATEGY.universe.size;
 
@@ -46,20 +46,15 @@ function quantile(xs: number[], q: number) {
 
 function summarize(xs: number[]) {
   return {
-    min: Math.min(...xs),
-    p05: quantile(xs, 0.05),
-    p25: quantile(xs, 0.25),
-    median: quantile(xs, 0.5),
-    mean: xs.reduce((s, x) => s + x, 0) / xs.length,
-    p75: quantile(xs, 0.75),
-    p95: quantile(xs, 0.95),
-    max: Math.max(...xs),
+    min: Math.min(...xs), p05: quantile(xs, 0.05), p25: quantile(xs, 0.25), median: quantile(xs, 0.5),
+    mean: xs.reduce((s, x) => s + x, 0) / xs.length, p75: quantile(xs, 0.75), p95: quantile(xs, 0.95), max: Math.max(...xs),
   };
 }
 
 function makeBoundaryHistory(args: {
   baseline: UniverseMonth[];
   top100ByDate: Map<string, UniverseMonth>;
+  histories: Record<string, PricePoint[]>;
   coreCount: number;
   poolStartRank: number;
   poolEndRank: number;
@@ -68,100 +63,87 @@ function makeBoundaryHistory(args: {
 }) {
   const r = rng(args.seed);
   let replacedSlots = 0;
+  let skippedMonthsInsufficientPool = 0;
   const history = args.baseline.map((base) => {
     const top100 = args.top100ByDate.get(base.asOf);
     if (!top100 || base.symbols.length < args.coreCount) return base;
     const core = base.symbols.slice(0, args.coreCount);
     const coreSymbols = new Set(core.map((row) => row.symbol));
-    const pool = top100.symbols.filter((row) => row.universeRank >= args.poolStartRank && row.universeRank <= args.poolEndRank && !coreSymbols.has(row.symbol));
+    const pool = top100.symbols.filter((row) =>
+      row.universeRank >= args.poolStartRank && row.universeRank <= args.poolEndRank &&
+      !coreSymbols.has(row.symbol) && (args.histories[row.symbol]?.length ?? 0) > 0,
+    );
     const selected = choose(pool, args.chooseCount, r);
-    if (selected.length < args.chooseCount) return base;
+    if (selected.length < args.chooseCount) {
+      skippedMonthsInsufficientPool += 1;
+      return base;
+    }
     const baselineBoundary = new Set(base.symbols.slice(args.coreCount).map((row) => row.symbol));
     replacedSlots += selected.filter((row) => !baselineBoundary.has(row.symbol)).length;
     const symbols: UniverseMember[] = [...core, ...selected].map((row, index) => ({ ...row, universeRank: index + 1 }));
     return { ...base, symbols };
   });
-  return { history, replacedSlots };
+  return { history, replacedSlots, skippedMonthsInsufficientPool };
 }
 
 async function main() {
   const market = JSON.parse(await readFile(resolve("public/data/market-data.json"), "utf8")) as MarketDataFile;
   const universe = JSON.parse(await readFile(resolve("data/universe-history.json"), "utf8")) as UniverseFile;
   const bootstrap = JSON.parse(gunzipSync(await readFile(resolve("data/sec-nport/bootstrap.json.gz"))).toString("utf8")) as BootstrapFile;
-
   const baselineHistory = universe.history.filter((u) => u.asOf >= START && u.asOf <= END);
   const top100ByDate = new Map<string, UniverseMonth>();
+  const top80Overlap: number[] = [];
   for (const base of baselineHistory) {
-    top100ByDate.set(base.asOf, buildPointInTimeUniverse(bootstrap.snapshots, base.signalMonth, base.asOf, null, TOP100_SIZE));
+    const top100 = buildPointInTimeUniverse(bootstrap.snapshots, base.signalMonth, base.asOf, null, TOP100_SIZE);
+    top100ByDate.set(base.asOf, top100);
+    const reconstructed80 = new Set(top100.symbols.slice(0, 80).map((r) => r.symbol));
+    top80Overlap.push(base.symbols.filter((r) => reconstructed80.has(r.symbol)).length / Math.max(1, base.symbols.length));
   }
 
   const boundarySymbols = new Set<string>();
-  for (const top100 of top100ByDate.values()) {
-    for (const row of top100.symbols) if (row.universeRank >= 76 && row.universeRank <= 90) boundarySymbols.add(row.symbol);
-  }
-
-  const histories: Record<string, PricePoint[]> = Object.fromEntries(
-    Object.entries(market.histories ?? {}).map(([symbol, points]) => [symbol, points.filter((p) => p.date <= END)]),
-  );
-  const missing = [...boundarySymbols].filter((symbol) => !histories[symbol]?.length);
-  if (missing.length) {
-    console.error(`Fetching ${missing.length} missing boundary histories`);
-    const fetched = await fetchHistories(missing, 6);
+  for (const top100 of top100ByDate.values()) for (const row of top100.symbols) if (row.universeRank >= 76 && row.universeRank <= 90) boundarySymbols.add(row.symbol);
+  const histories: Record<string, PricePoint[]> = Object.fromEntries(Object.entries(market.histories ?? {}).map(([symbol, points]) => [symbol, points.filter((p) => p.date <= END)]));
+  const initiallyMissing = [...boundarySymbols].filter((symbol) => !histories[symbol]?.length);
+  if (initiallyMissing.length) {
+    console.error(`Fetching ${initiallyMissing.length} missing boundary histories`);
+    const fetched = await fetchHistories(initiallyMissing, 6);
     for (const [symbol, points] of Object.entries(fetched)) histories[symbol] = points.filter((p) => p.date <= END);
   }
+  const unavailable = initiallyMissing.filter((symbol) => !histories[symbol]?.length);
+  console.error(`Unavailable after Yahoo fetch: ${unavailable.length}`);
 
   const baseline = runStrategySimulation({ histories, universeHistory: baselineHistory, config: PRODUCTION_STRATEGY }).backtest.stats;
   const scenarios = [
-    { label: "NARROW_78_83", coreCount: 77, poolStartRank: 78, poolEndRank: 83, chooseCount: 3, offset: 1000 },
-    { label: "MODERATE_76_90", coreCount: 75, poolStartRank: 76, poolEndRank: 90, chooseCount: 5, offset: 2000 },
+    { label: "NARROW_78_83", coreCount: 77, poolStartRank: 78, poolEndRank: 83, chooseCount: 3, offset: 3000 },
+    { label: "MODERATE_76_90", coreCount: 75, poolStartRank: 76, poolEndRank: 90, chooseCount: 5, offset: 4000 },
   ];
-
   const results = [];
   for (const scenario of scenarios) {
     const rows = [];
     for (let i = 0; i < PATHS; i++) {
-      const perturbed = makeBoundaryHistory({ baseline: baselineHistory, top100ByDate, ...scenario, seed: SEED + scenario.offset + i });
+      const perturbed = makeBoundaryHistory({ baseline: baselineHistory, top100ByDate, histories, ...scenario, seed: SEED + scenario.offset + i });
       const stats = runStrategySimulation({ histories, universeHistory: perturbed.history, config: PRODUCTION_STRATEGY }).backtest.stats;
-      rows.push({ path: i + 1, seed: SEED + scenario.offset + i, replacedSlots: perturbed.replacedSlots, ...stats });
-      if ((i + 1) % 20 === 0) console.error(`${scenario.label}: ${i + 1}/${PATHS}`);
+      rows.push({ path: i + 1, seed: SEED + scenario.offset + i, replacedSlots: perturbed.replacedSlots, skippedMonthsInsufficientPool: perturbed.skippedMonthsInsufficientPool, ...stats });
+      if ((i + 1) % 10 === 0) console.error(`${scenario.label}: ${i + 1}/${PATHS}`);
     }
-    results.push({
-      ...scenario,
-      paths: PATHS,
-      summary: {
-        cagr: summarize(rows.map((r) => r.cagr)),
-        maxDrawdown: summarize(rows.map((r) => r.maxDrawdown)),
-        calmar: summarize(rows.map((r) => r.calmar ?? 0)),
-        finalEquity: summarize(rows.map((r) => r.finalEquity)),
-        replacedSlots: summarize(rows.map((r) => r.replacedSlots)),
-        probabilityCagrBelow50: rows.filter((r) => r.cagr < 0.5).length / PATHS,
-        probabilityCagrBelowBaseline: rows.filter((r) => r.cagr < baseline.cagr).length / PATHS,
-      },
-      rows,
-    });
+    results.push({ ...scenario, paths: PATHS, summary: {
+      cagr: summarize(rows.map((r) => r.cagr)), maxDrawdown: summarize(rows.map((r) => r.maxDrawdown)), calmar: summarize(rows.map((r) => r.calmar ?? 0)), finalEquity: summarize(rows.map((r) => r.finalEquity)),
+      replacedSlots: summarize(rows.map((r) => r.replacedSlots)), skippedMonthsInsufficientPool: summarize(rows.map((r) => r.skippedMonthsInsufficientPool)),
+      probabilityCagrBelow50: rows.filter((r) => r.cagr < 0.5).length / PATHS, probabilityCagrBelowBaseline: rows.filter((r) => r.cagr < baseline.cagr).length / PATHS,
+    }, rows });
   }
 
   const output = {
-    generatedAt: new Date().toISOString(),
-    period: { start: START, end: END },
-    strategyId: PRODUCTION_STRATEGY.strategyId,
-    seed: SEED,
-    pathsPerScenario: PATHS,
-    method: "True Top80 boundary perturbation using the same point-in-time N-PORT bootstrap and production Universe scoring. Production ranks above the boundary are kept fixed; boundary slots are randomly resampled from reconstructed ranks near 80, including candidates outside the production Top80. Full production ranking, QQQ gate, stops, circuit, recovery, execution and costs are then recomputed causally.",
-    caveat: "Historical boundary candidates absent from stored market-data are fetched from Yahoo adjusted daily OHLC at audit time. This is a robustness simulation, not a reconstruction of alternative historical N-PORT filing errors.",
-    boundaryCandidateCount: boundarySymbols.size,
-    missingHistoriesFetched: missing.length,
-    baseline,
-    scenarios: results,
+    generatedAt: new Date().toISOString(), period: { start: START, end: END }, strategyId: PRODUCTION_STRATEGY.strategyId, seed: SEED, pathsPerScenario: PATHS,
+    method: "Top80 boundary perturbation using point-in-time N-PORT bootstrap and production Universe scoring. Boundary slots are resampled from reconstructed ranks near 80, including ranks outside Top80, but only where usable daily price history is available; full strategy state is recomputed causally.",
+    caveat: "Candidates whose historical prices are no longer available from Yahoo (typically delisted/old tickers) are excluded from random sampling instead of being treated as ineligible holes. This avoids missing-data downward bias but can introduce survivorship bias, so results are a priced-candidate robustness test rather than a pristine historical counterfactual.",
+    boundaryCandidateCount: boundarySymbols.size, initiallyMissingHistories: initiallyMissing.length, unavailableHistoryCount: unavailable.length, unavailableSymbols: unavailable,
+    reconstructedTop80Overlap: summarize(top80Overlap), baseline, scenarios: results,
   };
-
-  const out = resolve("data/research/universe-boundary-perturbation.json");
+  const out = resolve("data/research/universe-boundary-perturbation-priced.json");
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(output, null, 2) + "\n");
   console.log(JSON.stringify(output, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main().catch((error) => { console.error(error); process.exitCode = 1; });
