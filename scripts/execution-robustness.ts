@@ -17,7 +17,7 @@ function stats(curve: EquityPoint[]) {
   return { cagr, maxDrawdown: maxDD, calmar: cagr / Math.abs(maxDD), finalEquity: last.equity };
 }
 
-function run(histories: Record<string, PricePoint[]>, universeHistory: UniverseMonth[], cfg: StrategyConfig, executionLagSessions: number) {
+function run(histories: Record<string, PricePoint[]>, universeHistory: UniverseMonth[], cfg: StrategyConfig, monthlyLag: number, riskLag: number) {
   const qqq = [...(histories.QQQ ?? [])].sort((a,b)=>a.date.localeCompare(b.date));
   const tradingDates = qqq.map(p=>p.date);
   const dateIndex = new Map(tradingDates.map((d,i)=>[d,i]));
@@ -27,8 +27,9 @@ function run(histories: Record<string, PricePoint[]>, universeHistory: UniverseM
   const curve: EquityPoint[] = [];
   for (let i=0;i<tradingDates.length;i++) {
     const date = tradingDates[i]; if (date < cfg.backtestStart) continue;
-    const executionDate = tradingDates[i + executionLagSessions] ?? null;
     const universe = universeBySignalDate.get(date);
+    const lag = universe ? monthlyLag : riskLag;
+    const executionDate = tradingDates[i + lag] ?? null;
     const signal = universe ? buildMonthlySignal({ universe, histories, qqq, nextSessionDate: executionDate, config: cfg }) : null;
     const symbols = new Set(["QQQ", ...state.currentPositions.map(p=>p.symbol), ...(state.pendingSignal?.selectedSymbols ?? []), ...state.nextAction.symbols, ...(signal?.selectedSymbols ?? [])]);
     const prices = Object.fromEntries([...symbols].map(s=>[s,priceMaps[s]?.get(date)]));
@@ -41,24 +42,24 @@ function run(histories: Record<string, PricePoint[]>, universeHistory: UniverseM
 async function main(){
   const market = JSON.parse(await readFile(resolve("public/data/market-data.json"),"utf8")) as Market;
   const uf = JSON.parse(await readFile(resolve("data/universe-history.json"),"utf8")) as UF;
-  const costs = [0,0.001,0.0025,0.005];
-  const lags = [1,2,3];
+  const cfg = {...PRODUCTION_STRATEGY, execution:{...PRODUCTION_STRATEGY.execution, transactionCost:0.001}} as StrategyConfig;
+  const scenarios = [
+    {label:"baseline",monthlyLag:1,riskLag:1},
+    {label:"monthly+1",monthlyLag:2,riskLag:1},
+    {label:"monthly+2",monthlyLag:3,riskLag:1},
+    {label:"risk+1",monthlyLag:1,riskLag:2},
+    {label:"risk+2",monthlyLag:1,riskLag:3},
+    {label:"all+1",monthlyLag:2,riskLag:2},
+    {label:"all+2",monthlyLag:3,riskLag:3},
+  ];
   const rows:any[]=[];
-  for (const lag of lags) for (const cost of costs) {
-    const cfg = {...PRODUCTION_STRATEGY, execution:{...PRODUCTION_STRATEGY.execution, transactionCost:cost}} as StrategyConfig;
-    const s=run(market.histories,uf.history,cfg,lag);
-    rows.push({lag,cost,...s});
-    console.log(`done lag=${lag} cost=${cost} cagr=${s.cagr} dd=${s.maxDrawdown}`);
-  }
-  const base=rows.find(r=>r.lag===1&&r.cost===0.001);
-  for (const r of rows){r.deltaCagr=r.cagr-base.cagr;r.deltaFinalEquity=r.finalEquity-base.finalEquity;}
-  const result={generatedAt:new Date().toISOString(),purpose:"execution robustness; no optimization",base,rows};
-  await mkdir(resolve("data/research/execution-robustness"),{recursive:true});
-  await writeFile(resolve("data/research/execution-robustness/result.json"),JSON.stringify(result,null,2)+"\n");
-  const pct=(x:number)=>`${(x*100).toFixed(2)}%`;
-  let md="# Execution robustness\n\n| Lag sessions | Transaction cost / side | CAGR | Δ CAGR | Global MaxDD | Calmar | Final equity |\n|---:|---:|---:|---:|---:|---:|---:|\n";
-  for(const r of rows) md+=`| ${r.lag} | ${pct(r.cost)} | ${pct(r.cagr)} | ${pct(r.deltaCagr)} | ${pct(r.maxDrawdown)} | ${r.calmar.toFixed(2)} | ${r.finalEquity.toFixed(2)}x |\n`;
-  await writeFile(resolve("data/research/execution-robustness/result.md"),md);
-  console.log(md); console.log("RESULT_JSON="+JSON.stringify(result));
+  for(const sc of scenarios){const s=run(market.histories,uf.history,cfg,sc.monthlyLag,sc.riskLag);rows.push({...sc,...s});console.log(`done ${sc.label} cagr=${s.cagr} dd=${s.maxDrawdown}`)}
+  const base=rows[0]; for(const r of rows) r.deltaCagr=r.cagr-base.cagr;
+  const result={generatedAt:new Date().toISOString(),purpose:"separate monthly-signal execution lag from risk-exit lag; 0.10% transaction cost per side",base,rows};
+  await mkdir(resolve("data/research/execution-robustness-separated"),{recursive:true});
+  await writeFile(resolve("data/research/execution-robustness-separated/result.json"),JSON.stringify(result,null,2)+"\n");
+  const pct=(x:number)=>`${(x*100).toFixed(2)}%`; let md="# Execution delay decomposition\n\n| Scenario | Monthly lag | Risk lag | CAGR | Δ CAGR | Global MaxDD | Calmar | Final equity |\n|---|---:|---:|---:|---:|---:|---:|---:|\n";
+  for(const r of rows)md+=`| ${r.label} | ${r.monthlyLag} | ${r.riskLag} | ${pct(r.cagr)} | ${pct(r.deltaCagr)} | ${pct(r.maxDrawdown)} | ${r.calmar.toFixed(2)} | ${r.finalEquity.toFixed(2)}x |\n`;
+  await writeFile(resolve("data/research/execution-robustness-separated/result.md"),md);console.log(md);console.log("RESULT_JSON="+JSON.stringify(result));
 }
 main().catch(e=>{console.error(e);process.exit(1)});
