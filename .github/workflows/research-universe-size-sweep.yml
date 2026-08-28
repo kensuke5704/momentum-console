@@ -1,0 +1,21 @@
+name: Research Universe Size Sweep
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-universe-size-sweep.ts
+      - .github/workflows/research-universe-size-sweep.yml
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run Universe size sweep
+        run: node --import tsx scripts/audit-universe-size-sweep.ts
