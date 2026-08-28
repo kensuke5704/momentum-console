@@ -1,0 +1,30 @@
+name: Research Recovery Temporal Stability
+
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-recovery-temporal-stability.ts
+      - .github/workflows/research-recovery-temporal-stability.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run recovery temporal stability audit
+        run: node --import tsx scripts/audit-recovery-temporal-stability.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovery-temporal-stability
+          path: data/research/recovery-temporal-stability.json
