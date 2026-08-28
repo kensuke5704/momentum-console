@@ -1,0 +1,21 @@
+name: Execution Robustness
+on:
+  push:
+    branches: [research/execution-robustness-20260828]
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run execution robustness
+        run: node --import tsx scripts/execution-robustness.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: execution-robustness
+          path: data/research/execution-robustness/
+          retention-days: 30
