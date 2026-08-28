@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-08-28T00:07:08.827Z",
+  "period": {"start": "2020-01-01", "end": "2026-08-25"},
+  "strategyId": "momentum-dynamic-2026-08-v1",
+  "method": "Temporal stability audit of fixed recovery confirmation values 8/10/12. No parameter is optimized inside any window. Each configuration is simulated causally over the full history; performance is measured on fixed eras and 24-month rolling windows stepped every 6 months.",
+  "caveat": "Because recovery=10 was already selected using historical research, this is a temporal/pseudo-OOS robustness check, not a pristine untouched out-of-sample test.",
+  "fullPeriod": {
+    "recovery8": {"cagr": 0.49426782121941226, "maxDrawdown": -0.21928959365119693, "calmar": 2.25395018974588},
+    "recovery10": {"cagr": 0.5524732652191693, "maxDrawdown": -0.21928959365119705, "calmar": 2.5193774862747733},
+    "recovery12": {"cagr": 0.479783456930587, "maxDrawdown": -0.21928959365119682, "calmar": 2.1878988826698866}
+  },
+  "fixedWindows": [
+    {"label": "EARLY_2020_2022", "winner": 10, "cagr8": 0.33390277197550366, "cagr10": 0.38114025919104066, "cagr12": 0.33745726485484884, "cagr10MinusBestAlternative": 0.04368299433619183},
+    {"label": "MID_2023_2024", "winner": 10, "cagr8": 0.8660784582839622, "cagr10": 0.9106318546015968, "cagr12": 0.7741730150241659, "cagr10MinusBestAlternative": 0.04455339631763455},
+    {"label": "RECENT_2025_2026", "winner": 10, "cagr8": 0.4304772741394671, "cagr10": 0.5228088330648148, "cagr12": 0.45504790656407224, "cagr10MinusBestAlternative": 0.06776092650074261}
+  ],
+  "rolling24MonthSummary": {
+    "windows": 10,
+    "recovery10Wins": 6,
+    "recovery10WinRate": 0.6,
+    "recovery10Rank1or2": 9,
+    "recovery10Rank1or2Rate": 0.9,
+    "medianCagr10MinusBestAlternative": 0.013849326534436823,
+    "worstCagr10MinusBestAlternative": -0.04432013761569764,
+    "bestCagr10MinusBestAlternative": 0.10850852425009827
+  }
+}
