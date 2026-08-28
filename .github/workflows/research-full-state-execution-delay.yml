@@ -1,0 +1,30 @@
+name: Research Full State Execution Delay
+
+on:
+  push:
+    branches:
+      - research/symbol-concentration-audit-20260828
+    paths:
+      - scripts/audit-full-state-execution-delay.ts
+      - .github/workflows/research-full-state-execution-delay.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Run full state execution delay audit
+        run: node --import tsx scripts/audit-full-state-execution-delay.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-state-execution-delay
+          path: data/research/full-state-execution-delay.json
