@@ -15,6 +15,7 @@ const START = "2020-01-01";
 const END = "2026-08-25";
 const PATHS = 100;
 const SEED = 20260828;
+const TOP100_SIZE = 100 as typeof PRODUCTION_STRATEGY.universe.size;
 
 function rng(seed: number) {
   let a = seed >>> 0;
@@ -91,7 +92,7 @@ async function main() {
   const baselineHistory = universe.history.filter((u) => u.asOf >= START && u.asOf <= END);
   const top100ByDate = new Map<string, UniverseMonth>();
   for (const base of baselineHistory) {
-    top100ByDate.set(base.asOf, buildPointInTimeUniverse(bootstrap.snapshots, base.signalMonth, base.asOf, null, 100));
+    top100ByDate.set(base.asOf, buildPointInTimeUniverse(bootstrap.snapshots, base.signalMonth, base.asOf, null, TOP100_SIZE));
   }
 
   const boundarySymbols = new Set<string>();
