@@ -1,0 +1,56 @@
+name: CPCM Generator Sensitivity
+
+on:
+  push:
+    branches:
+      - research/cpcm-generator-sensitivity-20260828
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: generator_b20_r126
+            block: 20
+            radius: 126
+          - label: generator_b10_r126
+            block: 10
+            radius: 126
+          - label: generator_b40_r126
+            block: 40
+            radius: 126
+          - label: generator_b20_r63
+            block: 20
+            radius: 63
+          - label: generator_b20_r252
+            block: 20
+            radius: 252
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run CPCM generator sensitivity
+        env:
+          CPCM_PATHS: 1000
+          CPCM_LABEL: ${{ matrix.label }}
+          CPCM_STOP: 0.175
+          CPCM_RECOVERY_DAYS: 10
+          CPCM_SEED: 20260825
+          CPCM_BLOCK: ${{ matrix.block }}
+          CPCM_RADIUS: ${{ matrix.radius }}
+        run: node scripts/run-cpcm-generator-sensitivity.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpcm-${{ matrix.label }}-1000
+          path: data/research/structural-monte-carlo/cpcm-${{ matrix.label }}.json
+          retention-days: 30
