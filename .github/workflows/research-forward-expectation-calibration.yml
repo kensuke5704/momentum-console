@@ -1,0 +1,25 @@
+name: Forward Expectation Calibration
+on:
+  push:
+    branches: [research/forward-expectation-calibration-20260829]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run forward expectation calibration
+        run: node --import tsx scripts/forward-expectation-calibration.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward-expectation-calibration
+          path: data/research/forward-expectation-calibration/
+          retention-days: 30
