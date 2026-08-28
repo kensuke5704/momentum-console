@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-08-28T00:27:47.919Z",
+  "period": {"start": "2020-01-01", "end": "2026-08-25"},
+  "method": "Full state-machine decomposition of one-session execution delay. ENTRY/recovery/month-end rebalance delay and risk/RiskOff/fewer-candidate EXIT delay are perturbed separately, with causal downstream state recomputation.",
+  "baseline": {
+    "cagr": 0.5524732652191693,
+    "maxDrawdown": -0.21928959365119705,
+    "annualizedVolatility": 0.3579441075175192,
+    "calmar": 2.5193774862747733,
+    "finalEquity": 18.59132040748182,
+    "entries": 56,
+    "exits": 56
+  },
+  "entryRebalanceDelayOnly": {
+    "cagr": 0.4793501821198072,
+    "maxDrawdown": -0.2410174167369309,
+    "annualizedVolatility": 0.35837385456634235,
+    "calmar": 1.9888611728131462,
+    "finalEquity": 13.49216255175065,
+    "entries": 55,
+    "exits": 55
+  },
+  "riskExitDelayOnly": {
+    "cagr": 0.5270674146085377,
+    "maxDrawdown": -0.26029856329966417,
+    "annualizedVolatility": 0.3649302306616843,
+    "calmar": 2.0248571791069034,
+    "finalEquity": 16.660743931180086,
+    "entries": 56,
+    "exits": 56
+  },
+  "bothDelayed": {
+    "cagr": 0.51161919586982,
+    "maxDrawdown": -0.27231514479803376,
+    "annualizedVolatility": 0.36513136885507946,
+    "calmar": 1.8787761372922145,
+    "finalEquity": 15.572285717011038,
+    "entries": 55,
+    "exits": 55
+  },
+  "differencesVsBaseline": {
+    "entryCagr": -0.07312308309936211,
+    "entryMaxDD": -0.021727823085733844,
+    "exitCagr": -0.02540585061063161,
+    "exitMaxDD": -0.04100896964846712,
+    "bothCagr": -0.04085406934934932,
+    "bothMaxDD": -0.053025551146836714
+  }
+}
