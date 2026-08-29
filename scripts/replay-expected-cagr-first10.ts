@@ -9,8 +9,7 @@ type Market={histories:Record<string,PricePoint[]>};
 type UF={history:UniverseMonth[]};
 type DailyRow={date:string;equity:number;logReturn:number};
 type MonthlyRow={month:string;logReturn:number};
-const BLOCK_MONTHS=3, SEED=20260826;
-const avg=(x:number[])=>x.reduce((a,b)=>a+b,0)/x.length;
+const BLOCK_MONTHS=3, SEED=20260826, SAMPLE_COUNT=100;
 function quantile(x:number[],p:number){const a=[...x].sort((u,v)=>u-v),q=(a.length-1)*p,l=Math.floor(q),h=Math.ceil(q),w=q-l;return a[l]*(1-w)+a[h]*w}
 const median=(x:number[])=>quantile(x,.5);
 function mad(x:number[]){const m=median(x);return median(x.map(v=>Math.abs(v-m)))}
@@ -36,10 +35,10 @@ async function main(){
   const uf=JSON.parse(await readFile(resolve("data/universe-history.json"),"utf8")) as UF;
   const ms=monthly(reconstruct(market.histories,[...uf.history].sort((a,b)=>a.asOf.localeCompare(b.asOf))));
   const rng=rng32(SEED),n=ms.length,samples=[];
-  for(let b=0;b<10;b++){const picked:number[]=[];const blocks:{startIndex:number;months:string[]}[]=[];while(picked.length<n){const start=Math.floor(rng()*Math.max(1,n-BLOCK_MONTHS+1));const months:string[]=[];for(let j=0;j<BLOCK_MONTHS&&picked.length<n;j++){picked.push(ms[start+j].logReturn);months.push(ms[start+j].month)}blocks.push({startIndex:start,months})}samples.push({sample:b+1,cagr:annFromMonthlyLog(huberLocation(picked)),blocks});}
-  const out={seed:SEED,blockMonths:BLOCK_MONTHS,sampleStart:ms[0]?.month,sampleEnd:ms.at(-1)?.month,months:ms.length,first10:samples};
+  for(let b=0;b<SAMPLE_COUNT;b++){const picked:number[]=[];const blocks:{startIndex:number;months:string[]}[]=[];while(picked.length<n){const start=Math.floor(rng()*Math.max(1,n-BLOCK_MONTHS+1));const months:string[]=[];for(let j=0;j<BLOCK_MONTHS&&picked.length<n;j++){picked.push(ms[start+j].logReturn);months.push(ms[start+j].month)}blocks.push({startIndex:start,months})}samples.push({sample:b+1,cagr:annFromMonthlyLog(huberLocation(picked)),blocks});}
+  const out={seed:SEED,blockMonths:BLOCK_MONTHS,sampleStart:ms[0]?.month,sampleEnd:ms.at(-1)?.month,months:ms.length,sampleCount:SAMPLE_COUNT,first100:samples};
   await mkdir(resolve("data/research/expected-cagr-replay"),{recursive:true});
-  await writeFile(resolve("data/research/expected-cagr-replay/first10.json"),JSON.stringify(out,null,2));
+  await writeFile(resolve("data/research/expected-cagr-replay/first100.json"),JSON.stringify(out,null,2));
   console.log(JSON.stringify(out));
 }
 main().catch(e=>{console.error(e);process.exit(1)});
