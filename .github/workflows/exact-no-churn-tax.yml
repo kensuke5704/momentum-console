@@ -1,0 +1,23 @@
+name: Exact no-churn tax research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/exact-no-churn-tax.ts'
+      - '.github/workflows/exact-no-churn-tax.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/exact-no-churn-tax.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exact-no-churn-tax-result
+          path: data/research/exact-no-churn-tax/result.json
