@@ -1,0 +1,33 @@
+name: MaxDD and Selection Audit
+
+on:
+  push:
+    branches:
+      - research/maxdd-selection-audit-20260829
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch research refs
+        run: git fetch origin '+refs/heads/research/*:refs/remotes/origin/research/*'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run audit
+        run: node --import tsx scripts/audit-maxdd-selection.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maxdd-selection-audit
+          path: data/research/maxdd-selection-audit/
+          retention-days: 30
