@@ -1,0 +1,23 @@
+name: Hybrid allocation neighborhood
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/allocation-hybrid-neighborhood.ts'
+      - '.github/workflows/allocation-hybrid-neighborhood.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/allocation-hybrid-neighborhood.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: allocation-hybrid-neighborhood-result
+          path: data/research/allocation-hybrid-neighborhood/result.json
