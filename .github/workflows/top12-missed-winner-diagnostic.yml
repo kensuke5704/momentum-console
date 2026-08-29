@@ -1,0 +1,23 @@
+name: Top1 Top2 missed-winner diagnostic
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/top12-missed-winner-diagnostic.ts'
+      - '.github/workflows/top12-missed-winner-diagnostic.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/top12-missed-winner-diagnostic.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: top12-missed-winner-diagnostic-result
+          path: data/research/top12-missed-winner-diagnostic/result.json
