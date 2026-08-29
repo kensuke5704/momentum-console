@@ -17,7 +17,12 @@ export function performanceStats(curve: EquityPoint[]): PerformanceStats {
   const years = Math.max(1 / 365.25, (Date.parse(last.date) - Date.parse(first.date)) / (365.25 * 86_400_000));
   const returns = curve.slice(1).map((point, index) => point.equity / curve[index].equity - 1);
   const cagr = (last.equity / first.equity) ** (1 / years) - 1;
-  const maxDrawdown = Math.min(0, ...curve.map((point) => point.drawdown));
+  let peak = curve[0].equity;
+  let maxDrawdown = 0;
+  for (const point of curve) {
+    peak = Math.max(peak, point.equity);
+    maxDrawdown = Math.min(maxDrawdown, point.equity / peak - 1);
+  }
   return { cagr, maxDrawdown, annualizedVolatility: stdev(returns) * Math.sqrt(252), calmar: maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : null, finalEquity: last.equity };
 }
 
