@@ -5,7 +5,7 @@ on:
     branches:
       - research/anchored-walkforward-20260830
     paths:
-      - 'scripts/walkforward-parameter-transfer.ts'
+      - 'scripts/walkforward-parameter-transfer-fast.ts'
       - '.github/workflows/walkforward-parameter-transfer.yml'
       - 'src/lib/**'
       - 'public/data/market-data.json'
@@ -25,7 +25,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx tsx scripts/walkforward-parameter-transfer.ts
+      - run: npx tsx scripts/walkforward-parameter-transfer-fast.ts
       - uses: actions/upload-artifact@v4
         with:
           name: walkforward-parameter-transfer
