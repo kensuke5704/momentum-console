@@ -36,7 +36,8 @@ async function main(){
   const universeSizes=[40,60,80],maMonths=[8,10,12],stops=[.15,.175,.20],circuits=[.125,.15,.175],recoveryDays=[5,10,15];
   const marketRaw=JSON.parse(await fs.readFile(path.join(process.cwd(),"public/data/market-data.json"),"utf8")) as MarketData;
   const histories=extractHistories(marketRaw);
-  const universeHistoryRaw=JSON.parse(await fs.readFile(path.join(process.cwd(),"data/universe-history.json"),"utf8")) as UniverseMonth[];
+  const universeFile=JSON.parse(await fs.readFile(path.join(process.cwd(),"data/universe-history.json"),"utf8")) as {history:UniverseMonth[]};
+  const universeHistoryRaw=[...universeFile.history].sort((a,b)=>a.asOf.localeCompare(b.asOf));
   const configs:Array<{id:string;config:StrategyConfig;universeSize:number}>=[];
   for(const mw of momentumWeights)for(const universeSize of universeSizes)for(const ma of maMonths)for(const stop of stops)for(const circuit of circuits)for(const recovery of recoveryDays){
     const id=`mw${mw.label}-u${universeSize}-ma${ma}-s${stop}-c${circuit}-r${recovery}`;
