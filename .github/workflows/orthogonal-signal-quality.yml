@@ -1,0 +1,22 @@
+name: Orthogonal signal quality research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/orthogonal-signal-quality.ts
+      - .github/workflows/orthogonal-signal-quality.yml
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/orthogonal-signal-quality.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orthogonal-signal-quality-result
+          path: data/research/orthogonal-signal-quality/result.json
