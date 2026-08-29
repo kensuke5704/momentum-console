@@ -3,6 +3,11 @@ import type { PricePoint } from "./types";
 type YahooChartResponse = {
   chart?: {
     result?: Array<{
+      meta?: {
+        regularMarketPrice?: number;
+        regularMarketTime?: number;
+        exchangeTimezoneName?: string;
+      };
       timestamp?: number[];
       indicators?: {
         adjclose?: Array<{ adjclose?: Array<number | null> }>;
@@ -22,7 +27,96 @@ const START_UNIX = Math.floor(
   new Date("2018-01-01T00:00:00Z").getTime() / 1000,
 );
 
-export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
+export type YahooPendingDailyPoint = {
+  date: string;
+  open: number;
+  high?: number;
+  low?: number;
+};
+
+export type YahooHistorySnapshot = {
+  points: PricePoint[];
+  pendingLatest?: YahooPendingDailyPoint;
+  regularMarketPrice?: number;
+  regularMarketTime?: string;
+};
+
+const positive = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+const localParts = (timestamp: string) => Object.fromEntries(
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(timestamp)).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
+);
+
+const localDate = (timestamp: string) => {
+  const parts = localParts(timestamp);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
+const closeEnough = (left: number, right: number, absoluteTolerance: number) =>
+  Math.abs(left - right) <= Math.max(absoluteTolerance, Math.max(left, right) * 0.00001);
+
+/**
+ * Builds a provisional daily row only when independent Yahoo fields agree on
+ * the completed regular-session close. It deliberately fails closed when any
+ * timestamp, price, opening-auction, or bar-coverage check is inconsistent.
+ */
+export function validatedRegularCloseFallback(
+  snapshot: YahooHistorySnapshot,
+  intraday: IntradayPricePoint[],
+  now = new Date(),
+): PricePoint | null {
+  const pending = snapshot.pendingLatest;
+  const marketTime = snapshot.regularMarketTime;
+  const marketPrice = snapshot.regularMarketPrice;
+  if (!pending || !marketTime || !positive(marketPrice)) return null;
+  if (localDate(marketTime) !== pending.date) return null;
+
+  const time = localParts(marketTime);
+  const isNormalClose = time.hour === "16" && time.minute === "00";
+  const isEarlyClose = time.hour === "13" && time.minute === "00";
+  if (!isNormalClose && !isEarlyClose) return null;
+  if (now.getTime() < Date.parse(marketTime) + 15 * 60_000) return null;
+
+  const session = intraday
+    .filter((point) => localDate(point.timestamp) === pending.date && point.timestamp <= marketTime)
+    .sort((left, right) => left.timestamp.localeCompare(right.timestamp));
+  // A full early-close session has at least seven 30-minute bars plus Yahoo's
+  // closing marker; a normal session has fourteen observations.
+  if (session.length < 8) return null;
+  const first = session[0], last = session.at(-1)!;
+  const firstTime = localParts(first.timestamp);
+  if (firstTime.hour !== "09" || firstTime.minute !== "30") return null;
+  // Yahoo regularMarketTime can trail its synthetic 16:00 closing marker by
+  // one second. Permit only a tiny metadata skew, never a missing final bar.
+  if (Math.abs(Date.parse(last.timestamp) - Date.parse(marketTime)) > 5_000) return null;
+  if (!closeEnough(first.open, pending.open, 0.02)) return null;
+  if (!closeEnough(last.close, marketPrice, 0.02)) return null;
+
+  const highs = session.map((point) => point.high);
+  const lows = session.map((point) => point.low);
+  if (positive(pending.high)) highs.push(pending.high);
+  if (positive(pending.low)) lows.push(pending.low);
+  return {
+    date: pending.date,
+    open: pending.open,
+    close: marketPrice,
+    high: Math.max(...highs),
+    low: Math.min(...lows),
+    provisional: true,
+    source: "yahoo-validated-regular-close",
+  };
+}
+
+export async function fetchYahooHistorySnapshot(symbol: string): Promise<YahooHistorySnapshot> {
   const endUnix = Math.floor(Date.now() / 1000) + 86400;
   const yahooSymbol = encodeURIComponent(symbol.replace(".", "-"));
   let body: YahooChartResponse | null = null;
@@ -43,21 +137,25 @@ export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
   }
 
   const quote = result.indicators?.quote?.[0];
-  const closes =
-    result.indicators?.adjclose?.[0]?.adjclose ??
-    quote?.close ??
-    [];
-
-  return result.timestamp
-    .map((timestamp, index) => {
-      const close = closes[index];
-      if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) {
-        return null;
-      }
-
+  const adjustedCloses = result.indicators?.adjclose?.[0]?.adjclose;
+  let pendingLatest: YahooPendingDailyPoint | undefined;
+  const points = result.timestamp
+    .map<PricePoint | null>((timestamp, index) => {
+      const close = adjustedCloses ? adjustedCloses[index] : quote?.close?.[index];
       const rawClose = quote?.close?.[index];
       const rawOpen = quote?.open?.[index];
-      if (typeof rawClose !== "number" || rawClose <= 0 || typeof rawOpen !== "number" || rawOpen <= 0) return null;
+      if (!positive(close) || !positive(rawClose) || !positive(rawOpen)) {
+        if (index === result.timestamp!.length - 1 && positive(rawOpen)) {
+          const rawHigh = quote?.high?.[index], rawLow = quote?.low?.[index];
+          pendingLatest = {
+            date: new Date(timestamp * 1000).toISOString().slice(0, 10),
+            open: rawOpen,
+            ...(positive(rawHigh) ? { high: rawHigh } : {}),
+            ...(positive(rawLow) ? { low: rawLow } : {}),
+          };
+        }
+        return null;
+      }
       // Yahoo's adjusted close incorporates splits/dividends. Apply the same
       // factor to OHLC so a split cannot create a false stop or impossible
       // adjusted-close/unadjusted-open execution return.
@@ -76,37 +174,46 @@ export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
       };
     })
     .filter((point): point is PricePoint => point !== null);
+  const regularMarketTime = result.meta?.regularMarketTime;
+  return {
+    points,
+    ...(pendingLatest ? { pendingLatest } : {}),
+    ...(positive(result.meta?.regularMarketPrice) ? { regularMarketPrice: result.meta.regularMarketPrice } : {}),
+    ...(typeof regularMarketTime === "number" ? { regularMarketTime: new Date(regularMarketTime * 1000).toISOString() } : {}),
+  };
+}
+
+export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
+  return (await fetchYahooHistorySnapshot(symbol)).points;
+}
+
+export async function fetchHistorySnapshots(
+  symbols: string[],
+  concurrency = 6,
+): Promise<Record<string, YahooHistorySnapshot>> {
+  const output: Record<string, YahooHistorySnapshot> = {};
+  let cursor = 0;
+  async function worker() {
+    while (cursor < symbols.length) {
+      const symbol = symbols[cursor++];
+      try {
+        output[symbol] = await fetchYahooHistorySnapshot(symbol);
+      } catch (error) {
+        console.warn(error instanceof Error ? error.message : `${symbol}: price fetch failed`);
+        output[symbol] = { points: [] };
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, symbols.length) }, () => worker()));
+  return output;
 }
 
 export async function fetchHistories(
   symbols: string[],
   concurrency = 6,
 ): Promise<Record<string, PricePoint[]>> {
-  const output: Record<string, PricePoint[]> = {};
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < symbols.length) {
-      const index = cursor;
-      cursor += 1;
-      const symbol = symbols[index];
-      try {
-        output[symbol] = await fetchYahooHistory(symbol);
-      } catch (error) {
-        console.warn(error instanceof Error ? error.message : `${symbol}: price fetch failed`);
-        output[symbol] = [];
-      }
-    }
-  }
-
-  await Promise.all(
-    Array.from(
-      { length: Math.min(concurrency, symbols.length) },
-      () => worker(),
-    ),
-  );
-
-  return output;
+  const snapshots = await fetchHistorySnapshots(symbols, concurrency);
+  return Object.fromEntries(symbols.map((symbol) => [symbol, snapshots[symbol]?.points ?? []]));
 }
 
 export type IntradayPricePoint = {

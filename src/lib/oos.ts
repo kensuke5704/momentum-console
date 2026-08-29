@@ -17,17 +17,22 @@ export function emptyForwardOos(strategyId: string): ForwardOosResult {
   };
 }
 
-export function updateForwardOos(backtest: BacktestResult, existing?: ForwardOosResult | null): ForwardOosResult {
+export function updateForwardOos(backtest: BacktestResult, existing?: ForwardOosResult | null, provisionalDates: string[] = []): ForwardOosResult {
   const compatible = existing?.strategyId === backtest.strategyId && existing.startedAt === OOS_START_DATE;
   const prior = compatible ? existing : emptyForwardOos(backtest.strategyId);
   const actual = backtest.equityCurve.filter((point) => point.date >= OOS_START_DATE);
   const baseline = prior.baselineBacktestEquity ?? actual[0]?.equity ?? null;
   const byDate = new Map(prior.equityCurve.map((point) => [point.date, point]));
+  const previouslyProvisional = new Set(prior.provisionalDates ?? []);
+  const currentlyProvisional = new Set(provisionalDates);
 
-  // The input is rebuilt from the latest confirmed Yahoo OHLC, but recorded OOS dates are immutable.
+  // Confirmed OOS dates are immutable. A validated regular-close fallback is
+  // replaceable exactly once, when Yahoo publishes the completed adjusted row.
   if (baseline != null) {
     for (const point of actual) {
-      if (!byDate.has(point.date)) byDate.set(point.date, { date: point.date, equity: point.equity / baseline, drawdown: 0 });
+      if (!byDate.has(point.date) || previouslyProvisional.has(point.date)) {
+        byDate.set(point.date, { date: point.date, equity: point.equity / baseline, drawdown: 0 });
+      }
     }
   }
 
@@ -42,9 +47,12 @@ export function updateForwardOos(backtest: BacktestResult, existing?: ForwardOos
     strategyId: backtest.strategyId,
     startedAt: OOS_START_DATE,
     asOf: lastActual ?? null,
-    source: "Yahoo Finance adjusted OHLC",
+    source: provisionalDates.length
+      ? "Yahoo Finance adjusted OHLC + validated regular-session close"
+      : "Yahoo Finance adjusted OHLC",
     baselineBacktestEquity: baseline,
     equityCurve,
     stats: performanceStats(equityCurve),
+    provisionalDates: [...currentlyProvisional].filter((date) => byDate.has(date)).sort(),
   };
 }

@@ -9,6 +9,10 @@ on:
     - cron: "20 22 * * 1-5"
     # Pre-open refresh publishes a month-start fallback or delayed N-PORT plan.
     - cron: "30 8 * * 1-5"
+    # Retry completed daily bars before the next US open. 12:30 UTC remains
+    # pre-open in both EDT (08:30) and EST (07:30).
+    - cron: "30 10 * * 1-5"
+    - cron: "30 12 * * 1-5"
 
 permissions:
   contents: read
@@ -36,6 +40,10 @@ jobs:
         run: npm ci
 
       - name: Fetch market data
+        env:
+          # The final pre-open attempt fails visibly instead of deploying a
+          # partial/stale risk transition when validated close data is absent.
+          REQUIRE_LATEST_DAILY_CLOSE: ${{ github.event.schedule == '30 12 * * 1-5' }}
         run: npm run sync:data
 
       - name: Update Forward OOS with actual daily prices
