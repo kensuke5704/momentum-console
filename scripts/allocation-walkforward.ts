@@ -1,0 +1,28 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { PRODUCTION_STRATEGY } from "../src/lib/config";
+import { buildMonthlySignal } from "../src/lib/strategy/momentum";
+import { initialEngineState, transitionDay } from "../src/lib/strategy/state-machine";
+import { performanceStats } from "../src/lib/backtest";
+import { nextUsTradingSession } from "../src/lib/trading-calendar";
+import type { EquityPoint, PricePoint, StrategyConfig, UniverseMonth } from "../src/lib/types";
+
+type Result={weight:number;curve:EquityPoint[];full:ReturnType<typeof performanceStats>};
+const WEIGHTS=[0.5,0.6,0.7,0.8,0.9,1.0] as const;
+function configFor(w:number):StrategyConfig{return {...PRODUCTION_STRATEGY,allocation:{...PRODUCTION_STRATEGY.allocation,baseTop1Weight:w,concentratedTop1Weight:w,concentrationZGap:999,maxTop1Weight:w}} as StrategyConfig;}
+function statsSlice(curve:EquityPoint[],start:string,end:string){const xs=curve.filter(p=>p.date>=start&&p.date<=end);if(xs.length<2)return null;const prev=[...curve].reverse().find(p=>p.date<start);const rows=prev?[prev,...xs]:xs;const b=rows[0].equity;return performanceStats(rows.map(p=>({...p,equity:p.equity/b})));}
+function simulate(hist:Record<string,PricePoint[]>,universe:UniverseMonth[],w:number):Result{
+ const cfg=configFor(w),qqq=[...(hist.QQQ??[])].sort((a,b)=>a.date.localeCompare(b.date)),dates=qqq.map(p=>p.date),idx=new Map(dates.map((d,i)=>[d,i])),pm=Object.fromEntries(Object.entries(hist).map(([s,ps])=>[s,new Map(ps.map(p=>[p.date,p]))])),um=new Map(universe.map(u=>[u.asOf,u]));let st=initialEngineState(cfg);const curve:EquityPoint[]=[];
+ for(let i=0;i<dates.length;i++){
+  const date=dates[i];if(date<cfg.backtestStart)continue;const next=dates[i+1]??nextUsTradingSession(date),u=um.get(date),sig=u?buildMonthlySignal({universe:u,histories:hist,qqq,nextSessionDate:next,config:cfg}):null;const sy=new Set(["QQQ",...st.currentPositions.map(p=>p.symbol),...(st.pendingSignal?.selectedSymbols??[]),...st.nextAction.symbols,...(sig?.selectedSymbols??[])]);const prices:any=Object.fromEntries([...sy].map(s=>[s,pm[s]?.get(date)?{...pm[s]?.get(date)}:undefined]));
+  // Research-only correction for 100/0: zero-weight Top2 must not create a spurious individual-stop exit.
+  if(w===1){for(const p of st.currentPositions){if(p.targetWeight===0&&prices[p.symbol])prices[p.symbol]={...prices[p.symbol],close:p.entryPrice};}const buyToday=(st.nextAction.type==="BUY_NEXT_OPEN"||st.nextAction.type==="MONTH_END_REBALANCE_NEXT_OPEN")&&st.nextAction.executionDate===date;if(buyToday&&st.pendingSignal?.selectedSymbols[1]){const z=st.pendingSignal.selectedSymbols[1];if(prices[z]?.open)prices[z]={...prices[z],close:prices[z].open};}}
+  st=transitionDay(st,{date,prices,qqqHistoryThroughClose:qqq.slice(0,(idx.get(date)??i)+1),monthlySignal:sig,nextSessionDate:next},cfg);curve.push({date,equity:st.currentEquity,drawdown:st.drawdown});
+ }
+ return{weight:w,curve,full:performanceStats(curve)};
+}
+function metric(s:any){return Number.isFinite(s?.calmar)?s.calmar:-Infinity;}
+async function main(){const market=JSON.parse(await fs.readFile(path.join(process.cwd(),"public/data/market-data.json"),"utf8")) as {histories:Record<string,PricePoint[]>},uf=JSON.parse(await fs.readFile(path.join(process.cwd(),"data/universe-history.json"),"utf8")) as {history:UniverseMonth[]},universe=[...uf.history].sort((a,b)=>a.asOf.localeCompare(b.asOf)),results=WEIGHTS.map(w=>simulate(market.histories,universe,w)),lastDate=results[0].curve.at(-1)!.date;
+ const splits=[2021,2022,2023,2024,2025].map(trainEnd=>{const trainStart="2020-01-01",trainEndDate=`${trainEnd}-12-31`,testStart=`${trainEnd+1}-01-01`,testEnd=trainEnd+1<2026?`${trainEnd+1}-12-31`:lastDate;const candidates=results.map(r=>({weight:r.weight,train:statsSlice(r.curve,trainStart,trainEndDate),oos:statsSlice(r.curve,testStart,testEnd)})).filter(x=>x.train&&x.oos);candidates.sort((a,b)=>metric(b.train)-metric(a.train)||a.weight-b.weight);const selected=candidates[0];const prod=candidates.find(x=>x.weight===0.5)!;return{trainThrough:trainEndDate,oosYear:trainEnd+1,selectedWeight:selected.weight,selectedTrainCalmar:selected.train!.calmar,selectedOos:selected.oos,production50Oos:prod.oos,oosCagrDeltaVs50:(selected.oos?.cagr??0)-(prod.oos?.cagr??0),ranking:candidates.map(x=>({weight:x.weight,trainCalmar:x.train!.calmar,trainCagr:x.train!.cagr,trainMaxDD:x.train!.maxDrawdown,oosCagr:x.oos!.cagr,oosMaxDD:x.oos!.maxDrawdown}))};});
+ const selectedDeltas=splits.map(s=>s.oosCagrDeltaVs50);const output={generatedAt:new Date().toISOString(),validity:{researchOnly:true,trueOOS:false,architectureHindsightRemains:true,noLeverage:true,selectionRule:"At each split choose highest training-only Calmar among six predeclared fixed Top1 weights; apply to next calendar year.",weights:WEIGHTS,zeroWeightHandling:"For 100/0 only, zero-weight rank2 price is neutralized for stop checks so a 0% leg cannot trigger a portfolio exit."},full:results.map(r=>({weight:r.weight,stats:r.full})),splits,transferSummary:{years:splits.length,selectedBeat50:splits.filter(s=>s.oosCagrDeltaVs50>0).length,selectedTied50:splits.filter(s=>Math.abs(s.oosCagrDeltaVs50)<1e-12).length,selectedLost50:splits.filter(s=>s.oosCagrDeltaVs50<0).length,medianOosCagrDeltaVs50:[...selectedDeltas].sort((a,b)=>a-b)[Math.floor(selectedDeltas.length/2)],meanOosCagrDeltaVs50:selectedDeltas.reduce((a,b)=>a+b,0)/selectedDeltas.length}};const dir=path.join(process.cwd(),"data/research/allocation-walkforward");await fs.mkdir(dir,{recursive:true});await fs.writeFile(path.join(dir,"result.json"),JSON.stringify(output,null,2));console.log(JSON.stringify(output,null,2));}
+main().catch(e=>{console.error(e);process.exit(1)});
