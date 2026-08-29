@@ -58,10 +58,14 @@ async function main() {
   ]);
   const histories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
   const intraday = mergeIntraday(existing.intraday ?? {}, fetchedIntraday, intradaySymbols);
+  const latestPrices = Object.fromEntries(intradaySymbols.flatMap((symbol) => {
+    const point = fetchedIntraday[symbol]?.at(-1);
+    return point ? [[symbol, { price: point.close, asOf: point.timestamp }]] : [];
+  }));
   const oos = await optionalJson<ForwardOosResult>(resolve("public/data/oos-performance.json"));
   const frozen = await optionalJson<{ backtest?: BacktestResult }>(resolve("public/data/backtest-frozen.json"));
   const nportOperations = await optionalJson<NportOperations>(resolve("data/nport-operations.json"));
-  const dashboard = buildDashboardPayload(histories, universeHistory, "live", { oos, frozenBacktest: frozen?.backtest, nportOperations });
+  const dashboard = buildDashboardPayload(histories, universeHistory, "live", { oos, frozenBacktest: frozen?.backtest, nportOperations, latestPrices });
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify({ generatedAt: dashboard.generatedAt, histories, intraday, dashboard })}\n`);
   await writeFile(resolve("public/data/dashboard.json"), `${JSON.stringify({ dashboard })}\n`);
