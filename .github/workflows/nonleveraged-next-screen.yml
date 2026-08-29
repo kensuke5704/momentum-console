@@ -1,0 +1,23 @@
+name: Nonleveraged next-stage research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/nonleveraged-next-screen.ts'
+      - '.github/workflows/nonleveraged-next-screen.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/nonleveraged-next-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nonleveraged-next-screen-result
+          path: data/research/nonleveraged-next-screen/result.json
