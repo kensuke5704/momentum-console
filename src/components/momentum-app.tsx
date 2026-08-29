@@ -102,8 +102,8 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
       const body = await response.json() as { dashboard?: DashboardPayload };
       if (!body.dashboard) throw new Error("最新版のdashboardが見つかりませんでした。");
       setData(body.dashboard);
-      setLastLoadedAt(new Date().toISOString());
-      if (interactive) setRefreshMessage(`GitHub Actions生成版を取得しました（${date(body.dashboard.generatedAt.slice(0, 10))}）。`);
+      setLastLoadedAt(body.dashboard.generatedAt);
+      if (interactive) setRefreshMessage(`GitHub Actions生成版を取得しました（${updatedAt(body.dashboard.generatedAt)}）。`);
     } catch (error) {
       if (interactive) setRefreshMessage(error instanceof Error ? error.message : "最新データの取得に失敗しました。");
     } finally {
