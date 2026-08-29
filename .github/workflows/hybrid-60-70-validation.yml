@@ -1,0 +1,42 @@
+name: Hybrid 60-70 validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - '.github/workflows/hybrid-60-70-validation.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Prepare Hybrid 60-70 research scripts
+        shell: bash
+        run: |
+          mkdir -p scripts/generated data/research/hybrid-60-70
+          for src in structural-stress theme-dependence tax-aware-10y-monte-carlo; do
+            cp "scripts/${src}.ts" "scripts/generated/hybrid-${src}.ts"
+            sed -i 's#import { PRODUCTION_STRATEGY } from "../src/lib/config";#import { PRODUCTION_STRATEGY as BASE_STRATEGY } from "../../src/lib/config";\nconst PRODUCTION_STRATEGY = { ...BASE_STRATEGY, strategyId: "momentum-hybrid-60-70-research", allocation: { ...BASE_STRATEGY.allocation, baseTop1Weight: 0.6, concentratedTop1Weight: 0.7, concentrationZGap: 0.25, maxTop1Weight: 0.7 } };#' "scripts/generated/hybrid-${src}.ts"
+            sed -i 's#from "../src/lib/#from "../../src/lib/#g' "scripts/generated/hybrid-${src}.ts"
+          done
+      - name: Structural stress
+        run: |
+          npx tsx scripts/generated/hybrid-structural-stress.ts
+          cp data/research/structural-stress/result.json data/research/hybrid-60-70/structural-stress.json
+      - name: Theme dependence
+        run: |
+          npx tsx scripts/generated/hybrid-theme-dependence.ts
+          cp data/research/theme-dependence/result.json data/research/hybrid-60-70/theme-dependence.json
+      - name: Tax-aware 10y Monte Carlo
+        run: |
+          npx tsx scripts/generated/hybrid-tax-aware-10y-monte-carlo.ts
+          cp data/research/tax-aware-10y/result.json data/research/hybrid-60-70/tax-aware-10y.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-60-70-validation-result
+          path: data/research/hybrid-60-70/*.json
