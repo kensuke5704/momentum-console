@@ -1,4 +1,6 @@
 export type PricePoint = { date: string; open: number; close: number; high?: number; low?: number };
+/** Latest display-only quote from the intraday feed. It must never be used for signals or backtests. */
+export type LatestPrice = { price: number; asOf: string };
 
 export type StrategyConfig = {
   strategyId: string;
@@ -138,6 +140,7 @@ export type DashboardPayload = {
   generatedAt: string;
   source: "live" | "snapshot";
   warning?: string;
+  latestPrices?: Record<string, LatestPrice>;
   config: StrategyConfig;
   currentUniverse: UniverseMonth | null;
   currentSignal: MonthlySignal | null;
