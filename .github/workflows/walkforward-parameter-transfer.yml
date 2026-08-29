@@ -1,0 +1,43 @@
+name: Walk-forward parameter transfer
+
+on:
+  push:
+    branches:
+      - research/anchored-walkforward-20260830
+    paths:
+      - 'scripts/walkforward-parameter-transfer.ts'
+      - '.github/workflows/walkforward-parameter-transfer.yml'
+      - 'src/lib/**'
+      - 'public/data/market-data.json'
+      - 'data/universe-history.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/walkforward-parameter-transfer.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: walkforward-parameter-transfer
+          path: data/research/walkforward-parameter-transfer/result.json
+      - name: Persist result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/research/walkforward-parameter-transfer/result.json
+          if git diff --cached --quiet; then
+            echo "No result changes"
+          else
+            git commit -m "research: persist walk-forward parameter-transfer result"
+            git push
+          fi
