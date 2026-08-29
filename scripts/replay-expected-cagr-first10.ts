@@ -9,7 +9,9 @@ type Market={histories:Record<string,PricePoint[]>};
 type UF={history:UniverseMonth[]};
 type DailyRow={date:string;equity:number;logReturn:number};
 type MonthlyRow={month:string;logReturn:number};
-const BLOCK_MONTHS=3, SEED=20260826, SAMPLE_COUNT=100;
+type SampledMonth={monthIndex:number;sourceMonth:string;logReturn:number;simpleReturn:number};
+type WealthMonth=SampledMonth&{equityBefore:number;equityAfterGrowth:number;withdrawal:number;equityAfter:number};
+const BLOCK_MONTHS=3, SEED=20260826, SAMPLE_COUNT=100, TEN_YEAR_MONTHS=120, INITIAL_INVESTMENT=1, ANNUAL_WITHDRAWAL=0.075;
 function quantile(x:number[],p:number){const a=[...x].sort((u,v)=>u-v),q=(a.length-1)*p,l=Math.floor(q),h=Math.ceil(q),w=q-l;return a[l]*(1-w)+a[h]*w}
 const median=(x:number[])=>quantile(x,.5);
 function mad(x:number[]){const m=median(x);return median(x.map(v=>Math.abs(v-m)))}
@@ -30,15 +32,26 @@ function reconstruct(histories:Record<string,PricePoint[]>, universeHistory:Univ
   }return rows;
 }
 function monthly(rows:DailyRow[]):MonthlyRow[]{const by=new Map<string,DailyRow[]>();for(const r of rows){const m=r.date.slice(0,7),a=by.get(m)??[];a.push(r);by.set(m,a)}return [...by.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([month,rs])=>({month,logReturn:rs.reduce((s,r)=>s+r.logReturn,0)}))}
+function sampleMonths(ms:MonthlyRow[],rng:()=>number,count:number){const out:SampledMonth[]=[];const blocks:{startIndex:number;months:string[]}[]=[];while(out.length<count){const start=Math.floor(rng()*Math.max(1,ms.length-BLOCK_MONTHS+1));const blockMonths:string[]=[];for(let j=0;j<BLOCK_MONTHS&&out.length<count;j++){const row=ms[start+j];out.push({monthIndex:out.length+1,sourceMonth:row.month,logReturn:row.logReturn,simpleReturn:Math.exp(row.logReturn)-1});blockMonths.push(row.month)}blocks.push({startIndex:start,months:blockMonths})}return{months:out,blocks}}
+function wealthPath(sampled:SampledMonth[]){let equity=INITIAL_INVESTMENT;const out:WealthMonth[]=[];for(const row of sampled){const equityBefore=equity,equityAfterGrowth=equityBefore*Math.exp(row.logReturn),withdrawal=row.monthIndex%12===0?ANNUAL_WITHDRAWAL:0;equity=Math.max(0,equityAfterGrowth-withdrawal);out.push({...row,equityBefore,equityAfterGrowth,withdrawal,equityAfter:equity})}return out}
 async function main(){
   const market=JSON.parse(await readFile(resolve("public/data/market-data.json"),"utf8")) as Market;
   const uf=JSON.parse(await readFile(resolve("data/universe-history.json"),"utf8")) as UF;
   const ms=monthly(reconstruct(market.histories,[...uf.history].sort((a,b)=>a.asOf.localeCompare(b.asOf))));
-  const rng=rng32(SEED),n=ms.length,samples=[];
-  for(let b=0;b<SAMPLE_COUNT;b++){const picked:number[]=[];const blocks:{startIndex:number;months:string[]}[]=[];while(picked.length<n){const start=Math.floor(rng()*Math.max(1,n-BLOCK_MONTHS+1));const months:string[]=[];for(let j=0;j<BLOCK_MONTHS&&picked.length<n;j++){picked.push(ms[start+j].logReturn);months.push(ms[start+j].month)}blocks.push({startIndex:start,months})}samples.push({sample:b+1,cagr:annFromMonthlyLog(huberLocation(picked)),blocks});}
-  const out={seed:SEED,blockMonths:BLOCK_MONTHS,sampleStart:ms[0]?.month,sampleEnd:ms.at(-1)?.month,months:ms.length,sampleCount:SAMPLE_COUNT,first100:samples};
+
+  // Replay the original expected-CAGR bootstrap exactly: first 100 samples, each with the original 80-month length.
+  const replayRng=rng32(SEED),replaySamples=[];
+  for(let b=0;b<SAMPLE_COUNT;b++){const sampled=sampleMonths(ms,replayRng,ms.length);replaySamples.push({sample:b+1,cagr:annFromMonthlyLog(huberLocation(sampled.months.map(x=>x.logReturn))),blocks:sampled.blocks,monthly:sampled.months});}
+  const replayOut={seed:SEED,blockMonths:BLOCK_MONTHS,sampleStart:ms[0]?.month,sampleEnd:ms.at(-1)?.month,months:ms.length,sampleCount:SAMPLE_COUNT,first100:replaySamples};
+
+  // Separate 10-year monthly-path simulation using the same historical monthly-return pool and same 3-month block bootstrap.
+  const tenYearRng=rng32(SEED),tenYearSamples=[];
+  for(let b=0;b<SAMPLE_COUNT;b++){const sampled=sampleMonths(ms,tenYearRng,TEN_YEAR_MONTHS);const monthlyPath=wealthPath(sampled.months);tenYearSamples.push({sample:b+1,blocks:sampled.blocks,monthly:monthlyPath,terminalEquity:monthlyPath.at(-1)?.equityAfter??INITIAL_INVESTMENT,totalWithdrawn:Math.floor(TEN_YEAR_MONTHS/12)*ANNUAL_WITHDRAWAL});}
+  const tenYearOut={seed:SEED,blockMonths:BLOCK_MONTHS,sourceSampleStart:ms[0]?.month,sourceSampleEnd:ms.at(-1)?.month,sourceMonths:ms.length,sampleCount:SAMPLE_COUNT,projectionMonths:TEN_YEAR_MONTHS,initialInvestment:INITIAL_INVESTMENT,annualWithdrawal:ANNUAL_WITHDRAWAL,withdrawalTiming:"after month-end return in months 12,24,...,120",first100:tenYearSamples};
+
   await mkdir(resolve("data/research/expected-cagr-replay"),{recursive:true});
-  await writeFile(resolve("data/research/expected-cagr-replay/first100.json"),JSON.stringify(out,null,2));
-  console.log(JSON.stringify(out));
+  await writeFile(resolve("data/research/expected-cagr-replay/first100.json"),JSON.stringify(replayOut,null,2));
+  await writeFile(resolve("data/research/expected-cagr-replay/first100-monthly-10y.json"),JSON.stringify(tenYearOut,null,2));
+  console.log(JSON.stringify({replaySamples:replaySamples.length,tenYearSamples:tenYearSamples.length,firstTenYearTerminal:tenYearSamples[0]?.terminalEquity}));
 }
 main().catch(e=>{console.error(e);process.exit(1)});
