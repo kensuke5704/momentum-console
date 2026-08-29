@@ -1,0 +1,72 @@
+name: Normalize static global MaxDD
+
+on:
+  push:
+    branches: [fix/normalize-static-global-maxdd-20260829]
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Normalize generated performance stats
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const files = [
+            'public/data/dashboard.json',
+            'public/data/backtest-frozen.json',
+            'public/data/oos-performance.json',
+          ].filter(fs.existsSync);
+
+          function globalDd(curve) {
+            if (!Array.isArray(curve) || curve.length === 0) return 0;
+            let peak = curve[0].equity;
+            let dd = 0;
+            for (const p of curve) {
+              peak = Math.max(peak, p.equity);
+              dd = Math.min(dd, p.equity / peak - 1);
+            }
+            return dd;
+          }
+
+          function visit(node) {
+            if (!node || typeof node !== 'object') return;
+            if (Array.isArray(node)) {
+              for (const item of node) visit(item);
+              return;
+            }
+            if (Array.isArray(node.equityCurve) && node.stats && typeof node.stats === 'object') {
+              const maxDrawdown = globalDd(node.equityCurve);
+              node.stats.maxDrawdown = maxDrawdown;
+              if (typeof node.stats.cagr === 'number') {
+                node.stats.calmar = maxDrawdown < 0 ? node.stats.cagr / Math.abs(maxDrawdown) : null;
+              }
+            }
+            for (const value of Object.values(node)) visit(value);
+          }
+
+          for (const file of files) {
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            visit(data);
+            fs.writeFileSync(file, JSON.stringify(data) + '\n');
+            console.log(`normalized ${file}`);
+          }
+          NODE
+      - name: Commit normalized snapshots
+        run: |
+          if git diff --quiet -- public/data/dashboard.json public/data/backtest-frozen.json public/data/oos-performance.json; then
+            echo "No snapshot changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/dashboard.json public/data/backtest-frozen.json public/data/oos-performance.json
+          git commit -m "fix: normalize static MaxDD snapshots"
+          git push
