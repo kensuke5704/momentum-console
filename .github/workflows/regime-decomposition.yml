@@ -1,0 +1,32 @@
+name: Regime decomposition research
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/anchored-walkforward-20260830
+    paths:
+      - 'scripts/regime-decomposition.ts'
+      - '.github/workflows/regime-decomposition.yml'
+      - 'src/lib/**'
+      - 'public/data/market-data.json'
+      - 'data/universe-history.json'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/regime-decomposition.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: regime-decomposition-result
+          path: data/research/regime-decomposition/result.json
