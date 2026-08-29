@@ -176,7 +176,7 @@ function Portfolio({ data }: { data: DashboardPayload }) {
   return <div className="dynamic-stack"><Section title="Target Portfolio"><Top2 signal={data.currentSignal} /></Section><Section title="Current Positions"><div className="table-scroll"><table className="dynamic-table"><thead><tr><th>Ticker</th><th>Target</th><th>Entry</th><th>Current</th><th>Since entry</th><th>Stop level</th></tr></thead><tbody>{data.liveState.currentPositions.map((position) => <tr key={position.symbol}><td><strong>{position.symbol}</strong></td><td>{pct(position.targetWeight, 0)}</td><td>{money(position.entryPrice)}</td><td>{money(position.currentPrice)}</td><td>{position.currentPrice ? pct(position.currentPrice / position.entryPrice - 1) : "—"}</td><td className="tone-bad">{money(position.stopLevel)}</td></tr>)}</tbody></table>{!data.liveState.currentPositions.length && <div className="empty-state">現在はCashです。</div>}</div></Section></div>;
 }
 function Backtest({ data }: { data: DashboardPayload }) {
-  return <div className="dynamic-stack"><PerformanceView stats={nportDelayMonteCarlo.baseline.stats} equityCurve={data.backtest.equityCurve} title="Daily State-Machine Equity" gradientId="backtest-equity" expectedCagr={data.expectedCagr} /><MonthlyReturnDistribution /></div>;
+  return <div className="dynamic-stack"><PerformanceView stats={data.backtest.stats} equityCurve={data.backtest.equityCurve} title="Daily State-Machine Equity" gradientId="backtest-equity" expectedCagr={data.expectedCagr} /><MonthlyReturnDistribution /></div>;
 }
 function Oos({ data }: { data: DashboardPayload }) {
   return <PerformanceView stats={data.oos.stats} equityCurve={data.oos.equityCurve} title="Forward OOS Equity" gradientId="oos-equity" />;
