@@ -5,11 +5,16 @@ on:
     branches: [research/expected-cagr-replay-first10-20260829]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   replay:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: research/expected-cagr-replay-first10-20260829
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -20,3 +25,10 @@ jobs:
         with:
           name: expected-cagr-first100
           path: data/research/expected-cagr-replay/first100.json
+      - name: Persist first 100 samples to research branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/research/expected-cagr-replay/first100.json
+          git commit -m "research: persist first 100 expected CAGR bootstrap samples [skip ci]" || exit 0
+          git push origin HEAD:research/expected-cagr-replay-first10-20260829
