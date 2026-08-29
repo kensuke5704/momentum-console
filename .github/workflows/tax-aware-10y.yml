@@ -1,0 +1,22 @@
+name: Tax-aware 10y research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/tax-aware-10y-monte-carlo.ts'
+      - '.github/workflows/tax-aware-10y.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx tsx scripts/tax-aware-10y-monte-carlo.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tax-aware-10y-result
+          path: data/research/tax-aware-10y/result.json
