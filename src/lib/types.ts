@@ -1,4 +1,13 @@
-export type PricePoint = { date: string; open: number; close: number; high?: number; low?: number };
+export type PricePoint = {
+  date: string;
+  open: number;
+  close: number;
+  high?: number;
+  low?: number;
+  /** Replaced automatically once Yahoo publishes the completed adjusted daily row. */
+  provisional?: boolean;
+  source?: "yahoo-daily-adjusted" | "yahoo-validated-regular-close";
+};
 /** Latest display-only quote from the intraday feed. It must never be used for signals or backtests. */
 export type LatestPrice = { price: number; asOf: string };
 
@@ -112,11 +121,13 @@ export type ForwardOosResult = {
   strategyId: string;
   startedAt: string;
   asOf: string | null;
-  source: "Yahoo Finance adjusted OHLC";
+  source: "Yahoo Finance adjusted OHLC" | "Yahoo Finance adjusted OHLC + validated regular-session close";
   baselineBacktestEquity: number | null;
   equityCurve: EquityPoint[];
   stats: PerformanceStats;
   records: OosRecord[];
+  /** OOS dates that may be replaced once the completed adjusted daily row arrives. */
+  provisionalDates?: string[];
 };
 export type NportOperations = {
   activeQuarter: string | null;

@@ -26,7 +26,8 @@ async function main() {
   };
   const records = [...oos.records.filter((row) => row.signalMonth !== record.signalMonth), record].sort((a, b) => a.signalMonth.localeCompare(b.signalMonth));
   const actualBacktest = runBacktest({ histories: market.histories, universeHistory: universe.history });
-  const updated = { ...updateForwardOos(actualBacktest, oos), records };
+  const provisionalDates = [...new Set(Object.values(market.histories).flatMap((points) => points.filter((point) => point.provisional).map((point) => point.date)))];
+  const updated = { ...updateForwardOos(actualBacktest, oos, provisionalDates), records };
   await mkdir(resolve("public/data"), { recursive: true });
   await writeFile(path, `${JSON.stringify(updated)}\n`);
   const patchedDashboard = { ...dashboard, oos: updated };

@@ -42,3 +42,19 @@ test("committed backtest snapshot is frozen on the OOS start date", async () => 
   assert.equal(frozen.frozenAt, OOS_START_DATE);
   assert.ok(frozen.backtest?.equityCurve.length);
 });
+
+test("validated fallback OOS is replaceable when the completed adjusted daily row arrives", () => {
+  const provisional = updateForwardOos(backtest([
+    { date: "2026-08-25", equity: 20, drawdown: 0 },
+    { date: "2026-08-26", equity: 22, drawdown: 0 },
+  ]), null, ["2026-08-26"]);
+  assert.deepEqual(provisional.provisionalDates, ["2026-08-26"]);
+  assert.equal(provisional.equityCurve.at(-1)?.equity, 1.1);
+
+  const confirmed = updateForwardOos(backtest([
+    { date: "2026-08-25", equity: 20, drawdown: 0 },
+    { date: "2026-08-26", equity: 21, drawdown: 0 },
+  ]), provisional);
+  assert.deepEqual(confirmed.provisionalDates, []);
+  assert.equal(confirmed.equityCurve.at(-1)?.equity, 1.05);
+});

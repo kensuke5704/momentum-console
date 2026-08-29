@@ -71,3 +71,12 @@ export function nextUsTradingSession(date: string): string {
   }
   throw new Error(`Unable to resolve the next US trading session after ${date}`);
 }
+
+export function previousUsTradingSession(date: string): string {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  for (let offset = 1; offset <= 14; offset++) {
+    const candidate = toIsoDate(new Date(parsed.getTime() - offset * DAY_MS));
+    if (isUsTradingSession(candidate)) return candidate;
+  }
+  throw new Error(`Unable to resolve the previous US trading session before ${date}`);
+}

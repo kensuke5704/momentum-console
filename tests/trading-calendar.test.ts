@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { nextUsTradingSession } from "../src/lib/trading-calendar";
+import { nextUsTradingSession, previousUsTradingSession } from "../src/lib/trading-calendar";
 
 test("returns the next weekday when it is a regular US trading session", () => {
   assert.equal(nextUsTradingSession("2026-08-25"), "2026-08-26");
@@ -20,4 +20,12 @@ test("skips Christmas and the following weekend", () => {
 
 test("skips Good Friday", () => {
   assert.equal(nextUsTradingSession("2026-04-02"), "2026-04-06");
+});
+
+test("returns the prior Friday before a Monday pre-open refresh", () => {
+  assert.equal(previousUsTradingSession("2026-08-31"), "2026-08-28");
+});
+
+test("previous session skips a Monday market holiday", () => {
+  assert.equal(previousUsTradingSession("2026-09-08"), "2026-09-04");
 });

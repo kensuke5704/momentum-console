@@ -52,9 +52,9 @@ npm run sync:data
 npm run sync:oos
 ```
 
-`import:nport`はZIP構造と必須headerを検証して正規化済みfiling cacheを更新し、Universe、atlas、market data、OOS、tests/typecheck/lint/buildまで一括実行します。詳細は[`docs/runbooks/manual-nport-update.md`](docs/runbooks/manual-nport-update.md)を参照してください。`sync:universe`はQQQのofficial trading close dateをsignal dateとしてPIT Universe historyを再生成します。`sync:data`はYahoo Financeのadjusted closeと同一adjustment factorをOpen/High/Lowへ適用し、splitによる偽stopを防ぎます。
+`import:nport`はZIP構造と必須headerを検証して正規化済みfiling cacheを更新し、Universe、atlas、market data、OOS、tests/typecheck/lint/buildまで一括実行します。詳細は[`docs/runbooks/manual-nport-update.md`](docs/runbooks/manual-nport-update.md)を参照してください。`sync:universe`はQQQのofficial trading close dateをsignal dateとしてPIT Universe historyを再生成します。`sync:data`はYahoo Financeのadjusted closeと同一adjustment factorをOpen/High/Lowへ適用し、splitによる偽stopを防ぎます。Yahooの日足`close`/`adjclose`がClose後も未生成の場合は、16:00 ET（短縮日は13:00 ET）のregular-market時刻、`regularMarketPrice`、30分足の始値・全session coverage・closing markerが一致した場合だけ、検証済み暫定日足を使用します。不一致時はQQQをstrategy clockとして当日stateをatomicに進めず、部分更新を残しません。暫定OOS点は正式なadjusted日足到着時に自動置換します。
 
-GitHub Actionsは22:20 UTCに実行します。これはESTで17:20、EDTで18:20となり、DSTのどちらでも米国Close後です。画面の「最新データを読込」はActionsが公開した`market-data.json`をcache無効で再取得します。ブラウザ内に別のsignalロジックはありません。
+GitHub ActionsはClose後の22:20 UTCに加え、次回Open前の08:30 / 10:30 / 12:30 UTCにも再取得します。最終12:30 UTCはEDTで08:30、ESTで07:30です。この最終試行でも必要な日足または検証済みfallbackが揃わなければworkflowを失敗させ、古い価格を混ぜたstateを公開しません。画面の「最新データを読込」はActionsが公開した`market-data.json`をcache無効で再取得します。ブラウザ内に別のsignalロジックはありません。
 
 月初のUniverse workflowは最後に手動取込・検証されたN-PORT sourceからUniverse historyを再構築し、日次workflowはstop/circuit/recoveryとNext Actionを更新します。
 
@@ -79,7 +79,7 @@ Production signalとhistorical backtestは[`src/lib/strategy/state-machine.ts`](
 
 Backtest表示は`2026-08-25`に凍結した[`public/data/backtest-frozen.json`](public/data/backtest-frozen.json)だけを参照し、日次価格同期では変更しません。
 
-Forward OOSは`2026-08-25`から新Strategy IDで独立して開始し、旧戦略や凍結Backtestのequityへ接続しません。平日の米国市場Close後にGitHub ActionsがYahoo Financeの実OHLCを取得し、Productionと同じstate machine・next-open約定・取引コストで日次OOS equityを更新します。確定済みのOOS日次点は上書きせず、新しい取引日だけを追加します。signal、Universe、ranking、target weights、market/risk state、execution、trigger historyも保存します。
+Forward OOSは`2026-08-25`から新Strategy IDで独立して開始し、旧戦略や凍結Backtestのequityへ接続しません。平日の米国市場Close後にGitHub ActionsがYahoo Financeの実OHLCを取得し、Productionと同じstate machine・next-open約定・取引コストで日次OOS equityを更新します。確定済みのOOS日次点は上書きせず、新しい取引日だけを追加します。検証済みregular-close fallbackを使った日だけは暫定として記録し、Yahooの正式なadjusted日足到着時に置換します。signal、Universe、ranking、target weights、market/risk state、execution、trigger historyも保存します。
 
 Benchmarkは利用可能な期間のactual `TQQQ Buy & Hold`です。将来synthetic proxyを追加する場合は`Synthetic 3x QQQ proxy`と明示し、actual TQQQと混同しません。
 
