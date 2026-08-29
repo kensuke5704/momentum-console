@@ -1,0 +1,26 @@
+{
+  "asOf": "2026-08-29",
+  "productionUnchanged": true,
+  "existingBootstrap": {
+    "startQuarter": "2020q1",
+    "endQuarter": "2026q2",
+    "filingCount": 12411,
+    "minFilingDate": "2020-01-23",
+    "maxFilingDate": "2026-06-29"
+  },
+  "pre2020UsingExistingBootstrap": {
+    "fullTop80Months": 0,
+    "earliestFullTop80": null
+  },
+  "secOfficialBulkDatasetBoundary": {
+    "earliestQuarter": "2019q4",
+    "publishedTemporalStart": "2019-10",
+    "note": "SEC Form N-PORT bulk data downloads begin at 2019 Q4. The existing repository bootstrap omits this quarter."
+  },
+  "extensionStatus": {
+    "candidateWindow": "2019 Q4 only",
+    "bulkDownloadFromGithubActions": "blocked_by_sec",
+    "backtestCompleted": false,
+    "interpretation": "A PIT extension before 2020 is potentially possible only for the late-2019 window, but it is not yet validated with the official 2019 Q4 ZIP in this repository."
+  }
+}
