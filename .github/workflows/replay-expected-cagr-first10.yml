@@ -1,0 +1,22 @@
+name: Replay expected CAGR first 10
+
+on:
+  push:
+    branches: [research/expected-cagr-replay-first10-20260829]
+  workflow_dispatch:
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/replay-expected-cagr-first10.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: expected-cagr-first10
+          path: data/research/expected-cagr-replay/first10.json
