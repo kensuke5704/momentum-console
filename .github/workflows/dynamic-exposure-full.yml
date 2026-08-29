@@ -1,0 +1,20 @@
+name: Dynamic exposure full research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/dynamic-exposure-full.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-exposure-full-result
+          path: data/research/dynamic-exposure-full/result.json
