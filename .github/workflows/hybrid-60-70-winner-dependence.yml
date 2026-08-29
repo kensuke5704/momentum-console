@@ -1,0 +1,30 @@
+name: Hybrid 60-70 winner dependence
+on:
+  workflow_dispatch:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - '.github/workflows/hybrid-60-70-winner-dependence.yml'
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Prepare Hybrid script
+        run: |
+          mkdir -p scripts/generated data/research/hybrid-60-70
+          cp scripts/rolling-winner-dependence.ts scripts/generated/hybrid-rolling-winner-dependence.ts
+          sed -i 's#import { PRODUCTION_STRATEGY } from "../src/lib/config";#import { PRODUCTION_STRATEGY as BASE_STRATEGY } from "../../src/lib/config";\nconst PRODUCTION_STRATEGY = { ...BASE_STRATEGY, strategyId: "momentum-hybrid-60-70-research", allocation: { ...BASE_STRATEGY.allocation, baseTop1Weight: 0.6, concentratedTop1Weight: 0.7, concentrationZGap: 0.25, maxTop1Weight: 0.7 } };#' scripts/generated/hybrid-rolling-winner-dependence.ts
+          sed -i 's#from "../src/lib/#from "../../src/lib/#g' scripts/generated/hybrid-rolling-winner-dependence.ts
+      - run: |
+          npx tsx scripts/generated/hybrid-rolling-winner-dependence.ts
+          cp data/research/rolling-winner-dependence/result.json data/research/hybrid-60-70/winner-dependence.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-60-70-winner-dependence-result
+          path: data/research/hybrid-60-70/winner-dependence.json
