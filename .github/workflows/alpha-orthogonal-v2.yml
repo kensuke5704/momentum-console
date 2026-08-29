@@ -1,0 +1,22 @@
+name: Orthogonal alpha v2 research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/alpha-orthogonal-v2.ts
+      - .github/workflows/alpha-orthogonal-v2.yml
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/alpha-orthogonal-v2.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alpha-orthogonal-v2-result
+          path: data/research/alpha-orthogonal-v2/result.json
