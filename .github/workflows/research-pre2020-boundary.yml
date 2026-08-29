@@ -15,10 +15,21 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Inspect bootstrap and 2019 PIT universe feasibility
+      - name: Inspect existing bootstrap boundary
         run: |
           npx tsx scripts/research-pre2020-boundary.ts | tee pre2020-boundary.txt
+      - name: Download official SEC 2019 Q4 N-PORT dataset
+        run: |
+          curl -L --fail --retry 3 --retry-delay 3 \
+            -A "MomentumConsole research contact: github.com/kensuke5704/momentum-console" \
+            -o 2019q4_nport.zip \
+            https://www.sec.gov/files/dera/data/form-n-port-data-sets/2019q4_nport.zip
+      - name: Run 2019 Q4 PIT extension backtest
+        run: |
+          npx tsx scripts/research-pre2020-backtest.ts 2019q4_nport.zip | tee pre2020-backtest.txt
       - uses: actions/upload-artifact@v4
         with:
           name: pre2020-boundary
-          path: pre2020-boundary.txt
+          path: |
+            pre2020-boundary.txt
+            pre2020-backtest.txt
