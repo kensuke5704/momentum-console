@@ -1,0 +1,139 @@
+{
+  "generatedAt": "2026-08-29T16:21:25.840Z",
+  "method": "anchored yearly pseudo-OOS using current Production strategy; expanding train window and next-calendar-year test window",
+  "sample": {
+    "start": "2020-01-02",
+    "end": "2026-08-25",
+    "tradingDays": 1670
+  },
+  "full": {
+    "start": "2020-01-02",
+    "end": "2026-08-25",
+    "tradingDays": 1670,
+    "totalReturn": 17.59132040748182,
+    "cagr": 0.5524732652191693,
+    "maxDD": -0.31525850764448893
+  },
+  "splits": [
+    {
+      "trainThrough": "2020-12-31",
+      "train": {
+        "start": "2020-01-02",
+        "end": "2020-12-31",
+        "tradingDays": 253,
+        "totalReturn": 0.673522218872622,
+        "cagr": 0.6764841351831856,
+        "maxDD": -0.2834943299534384
+      },
+      "pseudoOOS": {
+        "start": "2020-12-31",
+        "end": "2021-12-31",
+        "tradingDays": 253,
+        "totalReturn": 0.5704568523075881,
+        "cagr": 0.5709424422390861,
+        "maxDD": -0.3097355353645308
+      },
+      "note": "Current Production rules are held fixed; no refit/selection is performed at each split. This is a temporal pseudo-OOS decomposition, not a historically frozen strategy reconstruction."
+    },
+    {
+      "trainThrough": "2021-12-31",
+      "train": {
+        "start": "2020-01-02",
+        "end": "2021-12-31",
+        "tradingDays": 505,
+        "totalReturn": 1.6281944361175085,
+        "cagr": 0.6227831595912967,
+        "maxDD": -0.3097355353645308
+      },
+      "pseudoOOS": {
+        "start": "2021-12-31",
+        "end": "2022-12-30",
+        "tradingDays": 252,
+        "totalReturn": 0,
+        "cagr": 0,
+        "maxDD": 0
+      },
+      "note": "Current Production rules are held fixed; no refit/selection is performed at each split. This is a temporal pseudo-OOS decomposition, not a historically frozen strategy reconstruction."
+    },
+    {
+      "trainThrough": "2022-12-30",
+      "train": {
+        "start": "2020-01-02",
+        "end": "2022-12-30",
+        "tradingDays": 756,
+        "totalReturn": 1.6281944361175085,
+        "cagr": 0.38114025919104066,
+        "maxDD": -0.3097355353645308
+      },
+      "pseudoOOS": {
+        "start": "2022-12-30",
+        "end": "2023-12-29",
+        "tradingDays": 251,
+        "totalReturn": 0.9611226568523319,
+        "cagr": 0.9656637911513364,
+        "maxDD": -0.12832393677361909
+      },
+      "note": "Current Production rules are held fixed; no refit/selection is performed at each split. This is a temporal pseudo-OOS decomposition, not a historically frozen strategy reconstruction."
+    },
+    {
+      "trainThrough": "2023-12-29",
+      "train": {
+        "start": "2020-01-02",
+        "end": "2023-12-29",
+        "tradingDays": 1006,
+        "totalReturn": 4.154211655283285,
+        "cagr": 0.5084445452337687,
+        "maxDD": -0.3097355353645308
+      },
+      "pseudoOOS": {
+        "start": "2023-12-29",
+        "end": "2024-12-31",
+        "tradingDays": 253,
+        "totalReturn": 0.8532103601591112,
+        "cagr": 0.8446864792178188,
+        "maxDD": -0.16452246861348696
+      },
+      "note": "Current Production rules are held fixed; no refit/selection is performed at each split. This is a temporal pseudo-OOS decomposition, not a historically frozen strategy reconstruction."
+    },
+    {
+      "trainThrough": "2024-12-31",
+      "train": {
+        "start": "2020-01-02",
+        "end": "2024-12-31",
+        "tradingDays": 1258,
+        "totalReturn": 8.551838438023825,
+        "cagr": 0.5709112580273188,
+        "maxDD": -0.3097355353645308
+      },
+      "pseudoOOS": {
+        "start": "2024-12-31",
+        "end": "2025-12-31",
+        "tradingDays": 251,
+        "totalReturn": 0.21959664315428995,
+        "cagr": 0.21976248631243278,
+        "maxDD": -0.2731619383389201
+      },
+      "note": "Current Production rules are held fixed; no refit/selection is performed at each split. This is a temporal pseudo-OOS decomposition, not a historically frozen strategy reconstruction."
+    },
+    {
+      "trainThrough": "2025-12-31",
+      "train": {
+        "start": "2020-01-02",
+        "end": "2025-12-31",
+        "tradingDays": 1508,
+        "totalReturn": 10.649390094965973,
+        "cagr": 0.5060483761863153,
+        "maxDD": -0.31525850764448893
+      },
+      "pseudoOOS": {
+        "start": "2025-12-31",
+        "end": "2026-08-25",
+        "tradingDays": 163,
+        "totalReturn": 0.5959050436052999,
+        "cagr": 1.055238025855846,
+        "maxDD": -0.1678864227423047
+      },
+      "note": "Current Production rules are held fixed; no refit/selection is performed at each split. This is a temporal pseudo-OOS decomposition, not a historically frozen strategy reconstruction."
+    }
+  ]
+}
