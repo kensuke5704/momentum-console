@@ -1,7 +1,9 @@
 import { performanceStats } from "./backtest";
 import type { BacktestResult, EquityPoint, ForwardOosResult } from "./types";
 
-export const OOS_START_DATE = "2026-08-25";
+// Fixed60 was frozen on 2026-08-30. The first post-freeze US signal session is
+// 2026-08-31; execution remains next-session-open (2026-09-01 when applicable).
+export const OOS_START_DATE = "2026-08-31";
 
 export function emptyForwardOos(strategyId: string): ForwardOosResult {
   const equityCurve: EquityPoint[] = [{ date: OOS_START_DATE, equity: 1, drawdown: 0 }];

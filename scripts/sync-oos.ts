@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PRODUCTION_STRATEGY } from "../src/lib/config";
 import { runBacktest } from "../src/lib/backtest";
-import { updateForwardOos } from "../src/lib/oos";
+import { OOS_START_DATE, updateForwardOos } from "../src/lib/oos";
 import type { DashboardPayload, ForwardOosResult, OosRecord, PricePoint, UniverseMonth } from "../src/lib/types";
 async function main() {
   const generated = JSON.parse(await readFile(resolve("public/data/dashboard.json"), "utf8")) as { dashboard: DashboardPayload };
@@ -15,7 +15,7 @@ async function main() {
   let oos = dashboard.oos;
   try {
     const existing = JSON.parse(await readFile(path, "utf8")) as ForwardOosResult;
-    if (existing.strategyId === PRODUCTION_STRATEGY.strategyId) oos = existing;
+    if (existing.strategyId === PRODUCTION_STRATEGY.strategyId && existing.startedAt === OOS_START_DATE) oos = existing;
   } catch { /* New strategy starts a separate Forward OOS series. */ }
   const record: OosRecord = {
     strategyId: PRODUCTION_STRATEGY.strategyId, signalMonth: signal.signalMonth, signalDate: signal.signalDate, executionDate: signal.executionDate,
@@ -24,7 +24,9 @@ async function main() {
     entryPrices: Object.fromEntries(dashboard.liveState.currentPositions.map((position) => [position.symbol, position.entryPrice])), exitPrices: {}, return: null, equity: null,
     triggerHistory: dashboard.backtest.events.filter((event) => event.date >= signal.signalDate),
   };
-  const records = [...oos.records.filter((row) => row.signalMonth !== record.signalMonth), record].sort((a, b) => a.signalMonth.localeCompare(b.signalMonth));
+  const records = signal.signalDate >= OOS_START_DATE
+    ? [...oos.records.filter((row) => row.signalMonth !== record.signalMonth), record].sort((a, b) => a.signalMonth.localeCompare(b.signalMonth))
+    : oos.records;
   const actualBacktest = runBacktest({ histories: market.histories, universeHistory: universe.history });
   const provisionalDates = [...new Set(Object.values(market.histories).flatMap((points) => points.filter((point) => point.provisional).map((point) => point.date)))];
   const updated = { ...updateForwardOos(actualBacktest, oos, provisionalDates), records };
@@ -33,6 +35,8 @@ async function main() {
   const patchedDashboard = { ...dashboard, oos: updated };
   await writeFile(resolve("public/data/dashboard.json"), `${JSON.stringify({ dashboard: patchedDashboard })}\n`);
   await writeFile(marketPath, `${JSON.stringify({ ...market, dashboard: { ...market.dashboard, oos: updated } })}\n`);
-  console.log(`Forward OOS ${record.signalMonth}: ${record.selectedSymbols.join(", ") || "CASH"}`);
+  console.log(signal.signalDate >= OOS_START_DATE
+    ? `Forward OOS ${record.signalMonth}: ${record.selectedSymbols.join(", ") || "CASH"}`
+    : `Forward OOS not started: current signal ${signal.signalDate} precedes ${OOS_START_DATE}`);
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

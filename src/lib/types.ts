@@ -62,7 +62,7 @@ export type MonthlySignal = {
   selectedSymbols: string[];
   targetWeights: number[];
   zGap: number | null;
-  allocationMode: "CASH" | "50/50" | "70/30";
+  allocationMode: "CASH" | "50/50" | "60/40" | "70/30";
 };
 
 export type RiskState = "INVESTED" | "LOCKED_MARKET" | "LOCKED_STOP" | "LOCKED_CIRCUIT" | "WAITING_RECOVERY" | "READY_NEXT_OPEN" | "CASH";
