@@ -34,7 +34,23 @@ Historical W70 comparison:
 
 The historical after-tax increment is about +2.59 points, but K1 timing sensitivity is material and K3/K5 do not preserve the improvement. 2022 bridge behavior was also adverse relative to cash.
 
-**Forward credit: heavily discounted / unproven.** The bridge has a frozen True Forward operating specification, but historical improvement is not added mechanically to the Forward center.
+Run `33307173895` integrated the exact Recovery bridge lifecycle with Production-momentum Fixed60, cash carry, the same tax approximation, and K1/K3/K5 timing falsification. At 50% of historical BIL carry:
+
+- Fixed60 without bridge: after-tax CAGR ~51.434%.
+- Fixed60 + K1 bridge: after-tax CAGR ~53.409%.
+- Fixed60 + K3 bridge: after-tax CAGR ~50.419%.
+- Fixed60 + K5 bridge: after-tax CAGR ~49.619%.
+
+At 100% of historical BIL carry:
+
+- Fixed60 without bridge: after-tax CAGR ~52.227%.
+- K1: ~54.040%.
+- K3: ~51.083%.
+- K5: ~50.306%.
+
+The K1 advantage therefore remains strongly timing-dependent; cash carry does not cure the K1/K3/K5 instability. In 2022, K1 remained negative even with carry: approximately -3.79% after tax at 50% carry and -3.33% at 100% carry, while Fixed60 cash carry without bridge was positive.
+
+**Forward credit: heavily discounted / unproven.** The bridge has a frozen True Forward operating specification, but historical improvement is not added mechanically to the Forward center. Cash carry on the bridge's unused 50% is economically sensible if the bridge is operated, but it does not validate K1 itself.
 
 ### Cash carry on idle strategy cash
 
@@ -51,8 +67,10 @@ The increment was positive in every reported calendar slice from 2022 through 20
 Run `33307069862` added a simplified 20.315% tax approximation and a predeclared rate-level stress:
 
 - 0% of historical BIL carry: after-tax CAGR ~50.647%.
-- 50% of historical BIL carry: after-tax CAGR ~51.454%, increment ~+0.808 points.
-- 100% of historical BIL carry: after-tax CAGR ~52.267%, increment ~+1.620 points.
+- 50% of historical BIL carry: after-tax CAGR ~51.434–51.454% depending on the independent rerun implementation, increment about +0.79–0.81 points.
+- 100% of historical BIL carry: after-tax CAGR ~52.227–52.267%, increment about +1.58–1.62 points.
+
+The independent integrated rerun reproduces the no-carry baseline exactly and the carry result to within implementation-level cash-income timing differences, supporting the conclusion that the effect is not an artifact of one script.
 
 The cash-income tax model is intentionally simplified and does not model US withholding, Japanese account type, distribution timing, tax lots, or broker-specific money-market mechanics.
 
@@ -64,10 +82,23 @@ The following were tested under diagnostic-first or fixed-rule procedures and di
 
 SEC 13F accumulation was not rejected on signal quality; it is blocked because the available free research mirror does not retain reliable historical `filed_at` before late 2024, preventing a 2020–2023 PIT test.
 
+## Residual Forward gap
+
+The existing ~25% Forward planning center is a judgmental center, not an estimate that can be arithmetically updated. Still, the scale of the gap is informative:
+
+- Target after-tax Forward CAGR: ~40%.
+- Prior planning center: ~25%.
+- Gap: ~15 percentage points.
+- The most defensible new operational effect, cash carry, contributes only about +0.8 points historically under the 50%-rate stress after tax.
+- Fixed60's historical allocation increment receives no automatic Forward credit because direct transferability evidence is weak.
+- Recovery K1 receives no automatic Forward credit because K3/K5 timing perturbations erase or reverse its advantage.
+
+Thus the evidence added on 2026-08-30 does not materially close the ~15-point planning gap. If one chooses to recognize some cash-carry benefit in planning, a center in roughly the **25–26%** area is more defensible than a jump toward 40%, but this range remains a planning judgment, not a fitted expected-return model.
+
 ## Current Forward conclusion
 
 The 40% after-tax Forward target is **not evidence-supported yet**.
 
 Fixed60 improves historical results but lacks direct transferability evidence. Recovery K1 adds historical performance but is timing-fragile. Cash carry is a credible operational enhancement and survives tax/rate stress, but its plausible Forward contribution is only on the order of a small number of percentage points, not the roughly 15-point gap from the existing ~25% planning center.
 
-Further work should not reopen local allocation weights, momentum weights, Stop/Circuit/Recovery thresholds, SEC form variants, or rejected factor inversions merely to force the target. The next admissible work is either (a) integration/operational validation of cash carry and the frozen bridge, or (b) a genuinely independent, free-PIT alpha source with a predeclared hypothesis and sufficient historical coverage.
+Further work should not reopen local allocation weights, momentum weights, Stop/Circuit/Recovery thresholds, SEC form variants, or rejected factor inversions merely to force the target. The next admissible work is either (a) operational implementation/shadow validation of cash carry and the frozen bridge, or (b) a genuinely independent, free-PIT alpha source with a predeclared hypothesis and sufficient historical coverage.
