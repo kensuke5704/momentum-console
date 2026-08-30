@@ -1,0 +1,17 @@
+name: Risk-off macro robustness
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths: [scripts/riskoff-macro-robustness.ts, .github/workflows/riskoff-macro-robustness.yml]
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20, cache: npm}
+      - run: npm ci
+      - run: npx tsx scripts/riskoff-macro-robustness.ts
+      - uses: actions/upload-artifact@v4
+        with: {name: riskoff-macro-robustness-result, path: data/research/riskoff-macro-robustness/result.json}
