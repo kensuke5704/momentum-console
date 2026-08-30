@@ -1,0 +1,23 @@
+name: Hybrid trailing stop screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/hybrid-trailing-stop-screen.ts'
+      - '.github/workflows/hybrid-trailing-stop-screen.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/hybrid-trailing-stop-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-trailing-stop-screen-result
+          path: data/research/hybrid-trailing-stop-screen/result.json
