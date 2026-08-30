@@ -1,0 +1,23 @@
+name: W25 circuit 17.5 screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/hybrid-circuit175-screen.ts'
+      - '.github/workflows/hybrid-circuit175-screen.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/hybrid-circuit175-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-circuit175-screen-result
+          path: data/research/hybrid-circuit175-screen/result.json
