@@ -1,0 +1,25 @@
+name: SEC macOS access probe
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - '.github/workflows/sec-macos-probe.yml'
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe SEC endpoints
+        shell: bash
+        run: |
+          set -u
+          UA='momentum-console research contact kensuke5704@users.noreply.github.com'
+          for URL in \
+            'https://www.sec.gov/files/company_tickers.json' \
+            'https://data.sec.gov/api/xbrl/companyfacts/CIK0001045810.json' \
+            'https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip'; do
+            echo "URL=$URL"
+            code=$(curl --http1.1 -L -A "$UA" -H 'Range: bytes=0-1023' -sS -o /tmp/sec-probe.bin -w '%{http_code}' "$URL" || true)
+            echo "HTTP=$code BYTES=$(wc -c </tmp/sec-probe.bin 2>/dev/null || echo 0)"
+          done
