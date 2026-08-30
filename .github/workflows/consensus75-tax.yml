@@ -1,0 +1,23 @@
+name: Consensus75 tax
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/consensus75-tax.ts
+      - .github/workflows/consensus75-tax.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/consensus75-tax.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: consensus75-tax-result
+          path: data/research/consensus75-tax/result.json
