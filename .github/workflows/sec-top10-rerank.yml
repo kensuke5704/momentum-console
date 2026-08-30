@@ -1,0 +1,24 @@
+name: SEC Top10 rerank
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/sec-top10-rerank.ts'
+      - '.github/workflows/sec-top10-rerank.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/sec-top10-rerank.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-top10-rerank-result
+          path: data/research/sec-top10-rerank/result.json
