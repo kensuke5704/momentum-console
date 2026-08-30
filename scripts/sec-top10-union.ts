@@ -33,4 +33,5 @@ async function main(){
   console.log('SEC_TOP10_UNION_COUNT',symbols.length);
   console.log('SEC_TOP10_UNION_SYMBOLS',symbols.join(','));
 }
+// research rerun 2026-08-30: rebuild PIT candidate union before external SEC acquisition
 main().catch(e=>{console.error(e);process.exit(1)});
