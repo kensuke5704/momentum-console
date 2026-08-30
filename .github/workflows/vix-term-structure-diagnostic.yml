@@ -1,0 +1,23 @@
+name: VIX term structure diagnostic
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/vix-term-structure-diagnostic.ts
+      - .github/workflows/vix-term-structure-diagnostic.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/vix-term-structure-diagnostic.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vix-term-structure-diagnostic-result
+          path: data/research/vix-term-structure-diagnostic/result.json
