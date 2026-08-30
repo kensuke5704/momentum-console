@@ -1,8 +1,7 @@
 import duckdb, json
 BASE='https://huggingface.co/datasets/zalizedata/us-public-company-financials-dataset/resolve/main/data/filings'
-# Probe dataset layout using wildcard parquet path exposed by HF resolve.
 URL=f'{BASE}/filings-*.parquet?download=true'
-con=duckdb.connect(); con.execute('INSTALL httpfs; LOAD httpfs;')
+con=duckdb.connect(); con.execute('INSTALL httpfs; LOAD httpfs;'); con.execute('SET allow_asterisks_in_http_paths=true;')
 try:
     schema=con.execute(f"DESCRIBE SELECT * FROM read_parquet('{URL}')").fetchall()
     sample=con.execute(f"SELECT * FROM read_parquet('{URL}') WHERE upper(form_type) LIKE 'SC 13%' LIMIT 10").fetchall()
