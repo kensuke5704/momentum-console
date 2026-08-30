@@ -1,0 +1,26 @@
+name: SEC Top10 rerank fixed
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - '.github/workflows/sec-top10-rerank-fixed.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Fix local variable collision without changing research definition
+        run: |
+          sed -i 's/const fs:F\[\]/const factors:F[]/g; s/fs\.map/factors.map/g' scripts/sec-top10-rerank.ts
+      - run: npx tsx scripts/sec-top10-rerank.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-top10-rerank-fixed-result
+          path: data/research/sec-top10-rerank/result.json
