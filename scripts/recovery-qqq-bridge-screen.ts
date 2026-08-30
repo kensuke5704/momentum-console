@@ -10,7 +10,7 @@ import type {EquityPoint,PricePoint,UniverseMonth} from '../src/lib/types';
 type Mode='BASE'|'BR50_STICKY'|'BR100_STICKY'|'BR50_ACTIVE'|'BR100_ACTIVE';
 type Shadow={mode:Mode,equity:number,peak:number,curve:EquityPoint[],bridgeWeight:number,bridgeOn:boolean,scheduledEntry:boolean,scheduledExit:boolean,trades:number,bridgeDays:number};
 const MODES:Mode[]=['BASE','BR50_STICKY','BR100_STICKY','BR50_ACTIVE','BR100_ACTIVE'];
-const weight=(m:Mode)=>m.includes('100')?1:m.includes('50')?.5:0;
+const weight=(m:Mode)=>m.includes('100')?1:m.includes('50')?0.5:0;
 const activeOnly=(m:Mode)=>m.includes('ACTIVE');
 function mark(s:Shadow,date:string){s.peak=Math.max(s.peak,s.equity);s.curve.push({date,equity:s.equity,drawdown:s.equity/s.peak-1});}
 function baseFactor(prevEq:number,curEq:number){return prevEq>0?curEq/prevEq:1}
@@ -38,30 +38,14 @@ async function main(){
    for(const m of MODES){
      const s=ss.get(m)!;
      if(m==='BASE'){s.equity*=baseFactor(prevBaselineEq,st.currentEquity);mark(s,d);continue}
-     // Execute scheduled bridge trades at today's open before close marking.
-     if(s.scheduledExit&&s.bridgeOn&&qo&&prevQClose){
-       const w=s.bridgeWeight,ret=qo/prevQClose;
-       s.equity*=((1-w)+w*ret*(1-C.execution.transactionCost));s.bridgeOn=false;s.scheduledExit=false;s.trades++;
-     }
-     if(s.scheduledEntry&&!s.bridgeOn&&qo&&qc){
-       const w=s.bridgeWeight;s.equity*=((1-w)+w*(1-C.execution.transactionCost)*(qc/qo));s.bridgeOn=true;s.scheduledEntry=false;s.trades++;s.bridgeDays++;
-     } else if(s.bridgeOn&&qc&&prevQClose){
-       const w=s.bridgeWeight;s.equity*=((1-w)+w*(qc/prevQClose));s.bridgeDays++;
-     } else if(baselineWasInvested||baselineInvestedAfter){
-       s.equity*=baseFactor(prevBaselineEq,st.currentEquity);
-     }
-     // Top2 entry supersedes bridge at same open. The bridge liquidation open move must be applied first, then baseline top2 day's return.
+     if(s.scheduledExit&&s.bridgeOn&&qo&&prevQClose){const w=s.bridgeWeight,ret=qo/prevQClose;s.equity*=((1-w)+w*ret*(1-C.execution.transactionCost));s.bridgeOn=false;s.scheduledExit=false;s.trades++;}
+     if(s.scheduledEntry&&!s.bridgeOn&&qo&&qc){const w=s.bridgeWeight;s.equity*=((1-w)+w*(1-C.execution.transactionCost)*(qc/qo));s.bridgeOn=true;s.scheduledEntry=false;s.trades++;s.bridgeDays++;}
+     else if(s.bridgeOn&&qc&&prevQClose){const w=s.bridgeWeight;s.equity*=((1-w)+w*(qc/prevQClose));s.bridgeDays++;}
+     else if(baselineWasInvested||baselineInvestedAfter){s.equity*=baseFactor(prevBaselineEq,st.currentEquity);}
      if(enteredTop2){
-       if(s.bridgeOn&&qo&&qc){
-         // Undo today's close marking for bridge and replace with prev-close->open bridge + top2 open->close factor.
-         const w=s.bridgeWeight,dayBridge=((1-w)+w*(qc/(prevQClose??qc)));
-         if(dayBridge>0)s.equity/=dayBridge;
-         s.equity*=((1-w)+w*(qo/(prevQClose??qo))*(1-C.execution.transactionCost));
-         const top2Day=beforeEq>0?st.currentEquity/beforeEq:1;s.equity*=top2Day;s.bridgeOn=false;s.trades++;
-       }
+       if(s.bridgeOn&&qo&&qc){const w=s.bridgeWeight,dayBridge=((1-w)+w*(qc/(prevQClose??qc)));if(dayBridge>0)s.equity/=dayBridge;s.equity*=((1-w)+w*(qo/(prevQClose??qo))*(1-C.execution.transactionCost));const top2Day=beforeEq>0?st.currentEquity/beforeEq:1;s.equity*=top2Day;s.bridgeOn=false;s.trades++;}
        s.scheduledEntry=false;s.scheduledExit=false;
      }
-     // Close decisions for next open.
      if(!baselineInvestedAfter&&st.state==='WAITING_RECOVERY'&&st.recoveryConsecutiveDays===1&&!s.bridgeOn&&!s.scheduledEntry)s.scheduledEntry=true;
      if(activeOnly(m)&&s.bridgeOn&&st.state==='WAITING_RECOVERY'&&st.recoveryConsecutiveDays===0)s.scheduledExit=true;
      if(!st.marketRiskOn&&s.bridgeOn)s.scheduledExit=true;
