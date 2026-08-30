@@ -1,0 +1,23 @@
+name: RiskOn insufficient candidates diagnostic
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/riskon-insufficient-candidates-diagnostic.ts
+      - .github/workflows/riskon-insufficient-candidates-diagnostic.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/riskon-insufficient-candidates-diagnostic.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riskon-insufficient-candidates-diagnostic-result
+          path: data/research/riskon-insufficient-candidates/result.json
