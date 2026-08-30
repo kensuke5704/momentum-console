@@ -1,3 +1,4 @@
+# research rerun: trigger dedicated accession PIT recovery probe
 import duckdb, json
 BASE='https://huggingface.co/datasets/zalizedata/us-public-company-financials-dataset/resolve/main/data'
 FIL=[f'{BASE}/filings/filings-0000{i}-of-00003.parquet?download=true' for i in range(3)]
