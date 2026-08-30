@@ -1,0 +1,26 @@
+name: Fixed60 structural stress
+
+on:
+  push:
+    branches:
+      - research/anchored-walkforward-20260830
+    paths:
+      - scripts/fixed60-structural-stress.ts
+      - .github/workflows/fixed60-structural-stress.yml
+  workflow_dispatch:
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/fixed60-structural-stress.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixed60-structural-stress-result
+          path: data/research/fixed60-structural-stress/result.json
