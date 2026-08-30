@@ -29,7 +29,25 @@ Leave-one-symbol-out research reduced but did not remove winner dependence. MU a
 
 The pre-existing fixed allocation grid `[0.5, 0.6, 0.7, 0.8, 0.9, 1.0]` was rerun without refining it. Fixed60 slightly underperformed 50/50 in the reported 2023 slice, then was the training-Calmar choice in the three latest expanding windows and beat 50/50 in the following 2024, 2025, and 2026-partial slices.
 
-This supports allocation stability but remains historical pseudo-OOS because the broader architecture was developed with historical information. It does not establish an expected Forward return.
+This supports allocation stability relative to the fixed 50/50 comparator but remains historical pseudo-OOS because the broader architecture was developed with historical information. It does not establish an expected Forward return.
+
+## Direct transferability versus Production
+
+Run `33306488603` reran the predeclared comparison among Production 50/70, Fixed60, and Hybrid60/70 using training-only Calmar selection and next-calendar-year evaluation.
+
+Full-sample Fixed60 remained stronger historically: gross CAGR ~61.998% versus Production ~55.247%, and after-tax approximation ~50.647% versus ~45.167%.
+
+However, the year-by-year transfer evidence versus Production was weak:
+
+- 2023: Fixed60 gross CAGR advantage about +3.83 percentage points.
+- 2024: Fixed60 gross CAGR disadvantage about -6.47 points.
+- 2025: Fixed60 gross CAGR advantage about +5.58 points.
+- 2026 partial: Fixed60 gross CAGR disadvantage about -23.45 points.
+- 2022 was effectively cash/no-return for both in this comparison.
+
+For the training-Calmar selected rule, after-tax incremental CAGR versus Production across the five reported OOS years was: wins 2, tie 1, losses 2, median 0, mean approximately **-3.12 percentage points**.
+
+This is not True Forward OOS, but it is materially adverse to treating the full-sample Fixed60 increment of +6.75 points as transferable. The +6.75-point historical increment should therefore receive no automatic positive Forward credit. Any Forward uplift for Fixed60 requires independent post-freeze evidence or a separate robust alpha engine.
 
 ## Structural edge-retention stress
 
@@ -62,7 +80,7 @@ On that same scale:
 - Production historical gross CAGR: ~55.25%.
 - Fixed60 historical gross CAGR: ~61.998%.
 - Historical Fixed60 increment over Production: ~+6.75 percentage points.
-- Even an intentionally generous 100% transfer of that historical increment to the 25% Production planning center gives only ~31.75% gross Forward planning CAGR before any transfer haircut.
+- Direct transferability evidence does not justify adding this +6.75-point increment to the Forward center.
 
 The handoff further estimated that an after-tax Forward CAGR near 40% would require roughly **50% gross Forward CAGR**. Therefore Fixed60 allocation improvement alone does not justify the target.
 
@@ -89,6 +107,6 @@ Research-only shadow implementation:
 
 ## Research decision
 
-Fixed60 remains the preferred allocation candidate relative to Production/W70 on the historical evidence, but **the Forward 40% target is not met** under the authoritative planning framework. Local allocation/threshold tuning should not resume merely to force the target. The next research stage is an independent PIT alpha engine that can improve security selection and demonstrate stable early/late transfer before integration.
+Fixed60 remains a historical allocation candidate, but **the Forward 40% target is not met** and its full-sample increment should not be credited to Forward expectations without new evidence. Local allocation/threshold tuning should not resume merely to force the target. The next research stage is an independent PIT alpha engine that can improve security selection and demonstrate stable early/late transfer before integration.
 
 Production/main remains unchanged pending separate approval.
