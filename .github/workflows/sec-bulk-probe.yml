@@ -1,0 +1,24 @@
+name: SEC bulk access probe
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - '.github/workflows/sec-bulk-probe.yml'
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe SEC bulk archive
+        shell: bash
+        run: |
+          set -euxo pipefail
+          UA='momentum-console research contact kensuke5704@users.noreply.github.com'
+          URL='https://www.sec.gov/Archives/edgar/daily-index/xbrl/companyfacts.zip'
+          curl --http1.1 -L --fail-with-body --retry 2 --retry-delay 3 \
+            -A "$UA" -H 'Accept: application/zip' -H 'Range: bytes=0-1023' \
+            -D headers.txt -o probe.bin "$URL"
+          cat headers.txt
+          wc -c probe.bin
+          file probe.bin
