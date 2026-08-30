@@ -21,3 +21,4 @@ jobs:
         with:
           name: w70-recovery-bridge-tax-result
           path: data/research/w70-recovery-bridge-tax/result.json
+# research rerun: 2026-08-30 handoff priority 1
