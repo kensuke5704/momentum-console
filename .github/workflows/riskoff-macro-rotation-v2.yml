@@ -1,0 +1,17 @@
+name: Risk-off macro rotation v2
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths: [scripts/riskoff-macro-rotation-v2.ts, .github/workflows/riskoff-macro-rotation-v2.yml]
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20, cache: npm}
+      - run: npm ci
+      - run: npx tsx scripts/riskoff-macro-rotation-v2.ts
+      - uses: actions/upload-artifact@v4
+        with: {name: riskoff-macro-rotation-v2-result, path: data/research/riskoff-macro-rotation-v2/result.json}
