@@ -1,0 +1,30 @@
+name: SEC filing archive access probe
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - '.github/workflows/sec-filing-archive-probe.yml'
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe SEC archive and inline XBRL
+        shell: bash
+        run: |
+          set -u
+          UA='momentum-console research contact kensuke5704@users.noreply.github.com'
+          URLS=(
+            'https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/nvda-20260426.htm'
+            'https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/FilingSummary.xml'
+            'https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/MetaLinks.json'
+            'https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/index.json'
+            'https://www.sec.gov/Archives/edgar/data/1045810/000104581026000052/0001045810-26-000052.txt'
+          )
+          for URL in "${URLS[@]}"; do
+            echo "URL=$URL"
+            code=$(curl --http1.1 -L -A "$UA" -sS -o /tmp/sec-probe.bin -w '%{http_code}' "$URL" || true)
+            echo "HTTP=$code BYTES=$(wc -c </tmp/sec-probe.bin 2>/dev/null || echo 0) TYPE=$(file -b --mime-type /tmp/sec-probe.bin 2>/dev/null || true)"
+            head -c 120 /tmp/sec-probe.bin | tr '\n' ' '; echo
+          done
