@@ -24,6 +24,18 @@ Fixed60 historical gross CAGR was approximately 62.0%, versus approximately 59.0
 
 Leave-one-symbol-out research showed materially reduced single-winner dependence versus W70, but dependence remains. MU and NVDA removals were the two strongest single-name stresses, and a post-hoc semiconductor/hardware group removal reduced Fixed60 gross CAGR below 40%. That group-removal test is descriptive stress only and must not be converted into a semiconductor-specific optimization rule.
 
+## Allocation-only anchored walk-forward falsification
+
+A pre-existing allocation walk-forward was rerun without expanding its fixed grid `[0.5, 0.6, 0.7, 0.8, 0.9, 1.0]`. At each split, the highest training-only Calmar weight is selected and then observed in the following calendar year. This remains historical pseudo-OOS because architecture hindsight remains; it is not True Forward OOS and is used only as a falsification/stability check for the already-frozen 60/40 rule.
+
+- Training through 2021 selected 50/50 for 2022; all tested rules were flat in the reported 2022 OOS slice.
+- Training through 2022 selected 50/50 for 2023. Fixed60 produced 100.40% reported OOS CAGR versus 102.95% for 50/50, a small underperformance.
+- Training through 2023 selected Fixed60 for 2024. Fixed60 produced 77.99% versus 66.85% for 50/50.
+- Training through 2024 selected Fixed60 for 2025. Fixed60 produced 27.56% versus 21.88% for 50/50.
+- Training through 2025 selected Fixed60 for the 2026 partial-year OOS slice. Fixed60 produced 82.07% annualized versus 58.09% for 50/50; this short partial-year annualization is descriptive only.
+
+Thus Fixed60 was the training-Calmar choice in the three latest expanding windows, and its following-period result beat 50/50 in each of those three slices. The earlier 2023 slice slightly favored 50/50. This does not prove 60/40 is optimal, but it fails to falsify the frozen Fixed60 candidate and argues against the result being solely a full-sample allocation artifact. The weight grid must not now be refined on the basis of these outcomes.
+
 ## Structural edge-retention stress
 
 A descriptive counterfactual was run on the 2020-01-03 through 2026-08-25 Fixed60 path. "Good regime" was defined before the haircut calculation as QQQ above its 200-day moving average with 20-day realized volatility below 30%. Approximately 74.1% of tested days met that condition.
@@ -71,6 +83,8 @@ Research-only implementation:
 
 The workflow rebuilds the PIT universe through completed signal months and refreshes Yahoo market data inside the ephemeral runner before evaluating the frozen Fixed60 rule. It uploads a research artifact and does not commit refreshed data or modify Production/main.
 
+A verification run on 2026-08-30 refreshed market data through 2026-08-28 and found the latest completed PIT universe signal at 2026-07-31. The Fixed60 result correctly reported `oosClass=TRUE_FORWARD_ELIGIBLE`, `hasObservations=false`, `asOf=null`, and zero return observations. This is the correct temporal state before the 2026-08-31 close signal can exist; it is not a missing-data failure.
+
 Before a post-freeze return exists, the result is labeled `TRUE_FORWARD_ELIGIBLE` with `hasObservations=false`; it must not be described as a True Forward OOS result. Once the first eligible next-open execution and subsequent market observation exist, only those post-freeze observations qualify as Fixed60-specific True Forward evidence.
 
 ## Forward evaluation
@@ -91,4 +105,4 @@ Fixed60 remains a promising research candidate rather than a Production rule. Pr
 
 The 40% Forward CAGR target is a planning objective, not a backtest acceptance threshold. Historical CAGR must not be translated directly into expected Forward CAGR. Edge-retention stress, tax drag, concentration dependence, theme dependence, execution costs, and future True Forward OOS observations must all be incorporated before stating a central Forward CAGR estimate.
 
-At this freeze, the evidence supports describing Fixed60 as materially closer to a defensible 40% Forward target than W70, but does not support claiming a central Forward CAGR of 40% or higher. The key unresolved empirical requirement is Fixed60-specific True Forward OOS evidence after 2026-08-30.
+At this freeze, the evidence supports describing Fixed60 as materially closer to a defensible 40% Forward target than W70, but does not support claiming a central Forward CAGR of 40% or higher. Historical parameter tuning is now closed for Fixed60. The key unresolved empirical requirement is Fixed60-specific True Forward OOS evidence after 2026-08-30.
