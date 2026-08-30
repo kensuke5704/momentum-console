@@ -1,0 +1,23 @@
+name: FINRA short-volume diagnostic
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/finra-short-volume-diagnostic.py'
+      - '.github/workflows/finra-short-volume-diagnostic.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pandas scipy
+      - run: python scripts/finra-short-volume-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: finra-short-volume-diagnostic-result
+          path: data/research/finra-short-volume-diagnostic/result.json
