@@ -19,7 +19,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx tsx scripts/fixed60-forward-shadow.ts
+      - name: Rebuild PIT universe through completed signal months
+        run: npm run sync:universe
+      - name: Refresh market data in ephemeral runner
+        run: npm run sync:data
+      - name: Evaluate frozen Fixed60 shadow
+        run: npx tsx scripts/fixed60-forward-shadow.ts
       - uses: actions/upload-artifact@v4
         with:
           name: fixed60-forward-shadow-result
