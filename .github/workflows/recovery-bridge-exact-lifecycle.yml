@@ -6,6 +6,7 @@ on:
       - scripts/recovery-bridge-exact-lifecycle.ts
       - .github/workflows/recovery-bridge-exact-lifecycle.yml
   workflow_dispatch:
+# research rerun: 2026-08-30 current-data K1/K3/K5 transferability
 jobs:
   run:
     runs-on: ubuntu-latest
