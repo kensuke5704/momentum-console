@@ -1,0 +1,24 @@
+name: W70 fixed regime entry gate research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/regime-entry-gate-w70.ts'
+      - '.github/workflows/regime-entry-gate-w70.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/regime-entry-gate-w70.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: regime-entry-gate-w70-result
+          path: data/research/regime-entry-gate-w70/result.json
