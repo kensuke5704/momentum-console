@@ -1,3 +1,4 @@
+// research rerun trigger: fixed structural stress, no parameter change
 import fs from "node:fs/promises";
 import path from "node:path";
 import { runBacktest } from "../src/lib/backtest";
