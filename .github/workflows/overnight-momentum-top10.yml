@@ -17,6 +17,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Fix research-local variable shadowing
+        run: sed -i 's/const fs:F\[\]/const variants:F[]/; s/fs\.map/variants.map/g' scripts/overnight-momentum-top10.ts
       - run: npx tsx scripts/overnight-momentum-top10.ts
       - uses: actions/upload-artifact@v4
         with:
