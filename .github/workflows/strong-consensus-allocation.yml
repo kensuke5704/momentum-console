@@ -1,0 +1,17 @@
+name: Strong consensus allocation
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths: [scripts/strong-consensus-allocation.ts, .github/workflows/strong-consensus-allocation.yml]
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20, cache: npm}
+      - run: npm ci
+      - run: npx tsx scripts/strong-consensus-allocation.ts
+      - uses: actions/upload-artifact@v4
+        with: {name: strong-consensus-allocation-result, path: data/research/strong-consensus-allocation/result.json}
