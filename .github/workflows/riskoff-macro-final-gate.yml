@@ -12,6 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: 20, cache: npm}
       - run: npm ci
-      - run: npx tsx scripts/riskoff-macro-final-gate.ts
+      - run: |
+          sed -i 's/cost:C,tax/cost:COST,tax/' scripts/riskoff-macro-final-gate.ts
+          npx tsx scripts/riskoff-macro-final-gate.ts
       - uses: actions/upload-artifact@v4
         with: {name: riskoff-macro-final-gate-result, path: data/research/riskoff-macro-final-gate/result.json}
