@@ -1,0 +1,23 @@
+name: Hybrid N-PORT initiation screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/hybrid-nport-initiation-screen.ts'
+      - '.github/workflows/hybrid-nport-initiation-screen.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/hybrid-nport-initiation-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-nport-initiation-screen-result
+          path: data/research/hybrid-nport-initiation-screen/result.json
