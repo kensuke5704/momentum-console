@@ -1,0 +1,23 @@
+name: Rank2 quality screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/rank2-quality-screen.ts'
+      - '.github/workflows/rank2-quality-screen.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/rank2-quality-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rank2-quality-screen-result
+          path: data/research/rank2-quality-screen/result.json
