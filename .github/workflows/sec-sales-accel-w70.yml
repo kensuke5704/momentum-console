@@ -1,0 +1,32 @@
+name: SEC SALES_ACCEL W70 research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/sec-sales-accel-w70.ts'
+      - '.github/workflows/sec-sales-accel-w70.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npx tsx scripts/production-top10-monthly.ts
+      - name: Rebuild fixed PIT facts from OpenFundex
+        run: |
+          sed -i 's/select cik,upper(ticker) ticker/select d.cik,upper(d.ticker) ticker/' scripts/openfundex-fundamental-diagnostic.py
+          python scripts/openfundex-fundamental-diagnostic.py
+      - run: npx tsx scripts/sec-sales-accel-w70.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-sales-accel-w70-result
+          path: data/research/sec-sales-accel-w70/result.json
