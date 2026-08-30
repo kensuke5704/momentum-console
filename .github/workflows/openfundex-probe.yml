@@ -1,0 +1,26 @@
+name: OpenFundex SEC mirror probe
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/openfundex-probe.py'
+      - '.github/workflows/openfundex-probe.yml'
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: Build current Momentum Top10 union
+        run: npx tsx scripts/sec-top10-union.ts
+      - name: Probe OpenFundex transport, provenance samples, coverage
+        run: python scripts/openfundex-probe.py
