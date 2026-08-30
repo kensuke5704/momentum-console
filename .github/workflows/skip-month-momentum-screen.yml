@@ -1,0 +1,23 @@
+name: Skip-month momentum screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/skip-month-momentum-screen.ts
+      - .github/workflows/skip-month-momentum-screen.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/skip-month-momentum-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skip-month-momentum-screen-result
+          path: data/research/skip-month-momentum-screen/result.json
