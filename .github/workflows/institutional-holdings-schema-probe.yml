@@ -1,0 +1,20 @@
+name: Institutional holdings schema probe
+
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/institutional-holdings-schema-probe.py'
+      - '.github/workflows/institutional-holdings-schema-probe.yml'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install duckdb
+      - run: python scripts/institutional-holdings-schema-probe.py
