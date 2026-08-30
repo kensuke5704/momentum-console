@@ -70,6 +70,13 @@ export function buildMonthlySignal(args: {
   const zGap = validSelection && dispersion > 0 ? (selected[0].score - selected[1].score) / dispersion : validSelection ? 0 : null;
   const concentrated = zGap !== null && zGap >= config.allocation.concentrationZGap;
   const top1 = Math.min(config.allocation.maxTop1Weight, concentrated ? config.allocation.concentratedTop1Weight : config.allocation.baseTop1Weight);
+  const allocationMode: MonthlySignal["allocationMode"] = !validSelection
+    ? "CASH"
+    : Math.abs(top1 - 0.6) < 1e-12
+      ? "60/40"
+      : concentrated
+        ? "70/30"
+        : "50/50";
   return {
     strategyId: config.strategyId,
     signalMonth: args.universe.signalMonth,
@@ -84,6 +91,6 @@ export function buildMonthlySignal(args: {
     selectedSymbols: validSelection ? selected.map((row) => row.symbol) : [],
     targetWeights: validSelection ? [top1, 1 - top1] : [],
     zGap,
-    allocationMode: !validSelection ? "CASH" : concentrated ? "70/30" : "50/50",
+    allocationMode,
   };
 }
