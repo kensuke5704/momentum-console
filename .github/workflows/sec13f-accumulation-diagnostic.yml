@@ -1,0 +1,30 @@
+name: SEC 13F accumulation diagnostic
+
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/sec13f-accumulation-diagnostic.py'
+      - '.github/workflows/sec13f-accumulation-diagnostic.yml'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npx tsx scripts/production-top10-monthly.ts
+      - run: pip install duckdb pandas scipy
+      - run: python scripts/sec13f-accumulation-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec13f-accumulation-diagnostic-result
+          path: data/research/sec13f-accumulation-diagnostic/result.json
