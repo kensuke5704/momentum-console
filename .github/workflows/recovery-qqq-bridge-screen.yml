@@ -1,0 +1,23 @@
+name: Recovery QQQ bridge screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/recovery-qqq-bridge-screen.ts
+      - .github/workflows/recovery-qqq-bridge-screen.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/recovery-qqq-bridge-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovery-qqq-bridge-screen-result
+          path: data/research/recovery-qqq-bridge-screen/result.json
