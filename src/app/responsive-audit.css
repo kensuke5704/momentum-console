@@ -1,0 +1,31 @@
+/* Responsive hardening for the Fixed60 console. Keep this file after globals.css. */
+.sidebar-foot > strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 520px) {
+  .dynamic-card > header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding-bottom: 10px;
+    padding-top: 10px;
+  }
+
+  .dynamic-card > header .section-asof {
+    flex-basis: 100%;
+    line-height: 1.35;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .monthly-return-distribution .recharts-xAxis .recharts-cartesian-axis-tick:nth-child(even) {
+    display: none;
+  }
+
+  .monthly-return-summary {
+    gap: 8px 14px;
+  }
+}
