@@ -1,0 +1,23 @@
+name: Corrected risk-off sleeve
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/riskoff-sleeve-corrected.ts
+      - .github/workflows/riskoff-sleeve-corrected.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/riskoff-sleeve-corrected.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riskoff-sleeve-corrected-result
+          path: data/research/riskoff-sleeve-corrected/result.json
