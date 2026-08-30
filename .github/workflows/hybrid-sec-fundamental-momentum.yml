@@ -22,3 +22,4 @@ jobs:
         with:
           name: hybrid-sec-fundamental-momentum-result
           path: data/research/hybrid-sec-fundamental-momentum/result.json
+          # rerun 2026-08-30
