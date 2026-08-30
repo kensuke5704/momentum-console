@@ -1,0 +1,23 @@
+name: Hybrid ranking frequency screen
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/hybrid-ranking-frequency-screen.ts'
+      - '.github/workflows/hybrid-ranking-frequency-screen.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/hybrid-ranking-frequency-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-ranking-frequency-screen-result
+          path: data/research/hybrid-ranking-frequency-screen/result.json
