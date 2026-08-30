@@ -53,15 +53,15 @@ test("1M return at +80% is excluded", () => {
 });
 test("stock score at or below QQQ is excluded", () => assert.equal(signal({ AAA: Array.from({ length: 12 }, (_, index) => point(`2024-${String(index + 1).padStart(2, "0")}-28`, 100 + index)) }).candidates[0].exclusionReason, "NOT_ABOVE_QQQ"));
 test("only Top2 are selected", () => assert.deepEqual(signal({ AAA: monthlyHistory(.08), BBB: monthlyHistory(.06), CCC: monthlyHistory(.04) }).selectedSymbols.length, 2));
-test("zGap below .25 produces 50/50", () => {
+test("zGap below .25 still produces Fixed60", () => {
   const result = signal({ AAA: monthlyHistory(.0500), BBB: monthlyHistory(.0499), CCC: monthlyHistory(.01) });
-  assert.ok((result.zGap ?? 1) < .25); assert.deepEqual(result.targetWeights, [.5, .5]);
+  assert.ok((result.zGap ?? 1) < .25); assert.deepEqual(result.targetWeights, [.6, .4]); assert.equal(result.allocationMode, "60/40");
 });
-test("zGap at or above .25 produces 70/30", () => {
+test("zGap at or above .25 still produces Fixed60", () => {
   const result = signal({ AAA: monthlyHistory(.20), BBB: monthlyHistory(.05), CCC: monthlyHistory(.049) });
-  assert.ok((result.zGap ?? 0) >= .25); assert.deepEqual(result.targetWeights, [.7, .30000000000000004]);
+  assert.ok((result.zGap ?? 0) >= .25); assert.deepEqual(result.targetWeights, [.6, .4]); assert.equal(result.allocationMode, "60/40");
 });
-test("Top1 weight never exceeds 70%", () => assert.ok(Math.max(...signal({ AAA: monthlyHistory(.5), BBB: monthlyHistory(.01), CCC: monthlyHistory(.009) }).targetWeights) <= .7));
+test("Top1 production weight never exceeds 60%", () => assert.ok(Math.max(...signal({ AAA: monthlyHistory(.5), BBB: monthlyHistory(.01), CCC: monthlyHistory(.009) }).targetWeights) <= .6));
 
 const baseSignal: MonthlySignal = { strategyId: PRODUCTION_STRATEGY.strategyId, signalMonth: "2024-12", signalDate: "2024-12-31", executionDate: "2025-01-02", marketRiskOn: true, qqqClose: 120, qqqMonthlyMa: 110, qqqScore: .1, universe: ["AAA", "BBB"], candidates: [], selectedSymbols: ["AAA", "BBB"], targetWeights: [.5, .5], zGap: 0, allocationMode: "50/50" };
 const qqqRecovery = Array.from({ length: 120 }, (_, index) => point(`2024-01-${String(index + 1).padStart(3, "0")}`, 100 + index));
