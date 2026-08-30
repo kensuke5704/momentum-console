@@ -1,0 +1,27 @@
+name: Fixed60 falsification core
+
+on:
+  push:
+    branches:
+      - research/anchored-walkforward-20260830
+    paths:
+      - scripts/fixed60-falsification-core.ts
+      - .github/workflows/fixed60-falsification-core.yml
+  workflow_dispatch:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/fixed60-falsification-core.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixed60-falsification-core-result
+          path: data/research/fixed60-falsification-core/result.json
