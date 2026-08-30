@@ -1,3 +1,4 @@
+// research rerun: 2026-08-30 Fixed60 transferability refresh
 import fs from "node:fs/promises";
 import path from "node:path";
 import { PRODUCTION_STRATEGY } from "../src/lib/config";
