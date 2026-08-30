@@ -1,0 +1,23 @@
+name: W70 recovery bridge tax
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/w70-recovery-bridge-tax.ts'
+      - '.github/workflows/w70-recovery-bridge-tax.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/w70-recovery-bridge-tax.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w70-recovery-bridge-tax-result
+          path: data/research/w70-recovery-bridge-tax/result.json
