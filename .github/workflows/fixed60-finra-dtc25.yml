@@ -1,0 +1,23 @@
+name: Fixed60 FINRA DTC25 integration
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/fixed60-finra-dtc25.ts
+      - .github/workflows/fixed60-finra-dtc25.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/fixed60-finra-dtc25.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixed60-finra-dtc25-result
+          path: data/research/fixed60-finra-dtc25/result.json
