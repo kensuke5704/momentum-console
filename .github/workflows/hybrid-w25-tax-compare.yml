@@ -1,0 +1,23 @@
+name: Hybrid W25 tax compare
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/hybrid-w25-tax-compare.ts'
+      - '.github/workflows/hybrid-w25-tax-compare.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/hybrid-w25-tax-compare.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-w25-tax-compare-result
+          path: data/research/hybrid-w25-tax-compare/result.json
