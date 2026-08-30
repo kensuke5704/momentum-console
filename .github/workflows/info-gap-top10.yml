@@ -1,0 +1,24 @@
+name: Information gap Top10 research
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/info-gap-top10.ts'
+      - '.github/workflows/info-gap-top10.yml'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/info-gap-top10.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: info-gap-top10-result
+          path: data/research/info-gap-top10/result.json
