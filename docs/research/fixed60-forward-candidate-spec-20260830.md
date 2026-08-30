@@ -40,6 +40,8 @@ The test removes a fixed fraction of the historical mean daily log return observ
 
 Thus the tested gross historical path remains above 40% at 70% edge retention, but this must not be interpreted as a 70% probability of achieving 40%. The separate historical after-tax CAGR of approximately 50.65% implies that a simple proportional calculation would require roughly 79% retention to remain at 40% after tax; this proportional calculation is not an exact tax-under-decay simulation.
 
+The same stress was rerun on W70 using the identical regime definition and sample. W70 baseline gross CAGR was 59.00%; 80% retention produced 45.15%, 75% retention produced 41.88%, and the next tested point, 50%, produced 26.60%. On the fixed grid, W70 therefore required 75% retention to remain above 40%, versus 70% for Fixed60. This relative comparison supports greater structural margin for Fixed60, but both series remain descriptive counterfactuals rather than calibrated Forward forecasts.
+
 ## Recovery bridge
 
 The QQQ50 Recovery bridge remains an optional research overlay, not part of the Fixed60 core rule.
@@ -53,9 +55,23 @@ The QQQ50 Recovery bridge remains an optional research overlay, not part of the 
 
 Fixed60 was identified using historical information on 2026-08-30. Therefore historical data before this freeze date cannot be called True Forward OOS for Fixed60.
 
-- Fixed60-specific ex-ante clock begins after the 2026-08-30 freeze.
+- Rule freeze: 2026-08-30.
+- First eligible US signal session after freeze: 2026-08-31 close.
+- First eligible execution: 2026-09-01 next US-session open, if the frozen strategy generates an executable position.
+- The Fixed60 shadow starts from a fresh state after freeze; no historical Fixed60 state is carried into the shadow series.
 - The broader strategy's previously established True Forward OOS start date remains a separate record and must not be retroactively attributed to Fixed60.
 - Forward observations must be logged without changing Fixed60 allocation or adding post-hoc filters because of early outcomes.
+
+## Forward shadow implementation
+
+Research-only implementation:
+
+- `scripts/fixed60-forward-shadow.ts`
+- `.github/workflows/fixed60-forward-shadow.yml`
+
+The workflow rebuilds the PIT universe through completed signal months and refreshes Yahoo market data inside the ephemeral runner before evaluating the frozen Fixed60 rule. It uploads a research artifact and does not commit refreshed data or modify Production/main.
+
+Before a post-freeze return exists, the result is labeled `TRUE_FORWARD_ELIGIBLE` with `hasObservations=false`; it must not be described as a True Forward OOS result. Once the first eligible next-open execution and subsequent market observation exist, only those post-freeze observations qualify as Fixed60-specific True Forward evidence.
 
 ## Forward evaluation
 
