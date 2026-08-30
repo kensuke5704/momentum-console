@@ -1,3 +1,4 @@
+// research rerun: trigger dedicated FINRA short-interest probe
 async function req(url:string){const r=await fetch(url,{headers:{Accept:'application/json','User-Agent':'momentum-console research'}});const txt=await r.text();return{status:r.status,headers:Object.fromEntries(r.headers.entries()),body:txt.slice(0,8000)};}
 async function main(){const base='https://api.finra.org';const meta=await req(base+'/metadata/group/otcMarket/name/consolidatedShortInterest');const recent=await req(base+'/data/group/otcMarket/name/consolidatedShortInterest?limit=3');const old=await req(base+'/data/group/otcMarket/name/consolidatedShortInterest?limit=5&settlementDate=2022-06-30');console.log(JSON.stringify({meta,recent,old},null,2));}
 main().catch(e=>{console.error(e);process.exit(1)});
