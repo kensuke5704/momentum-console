@@ -1,3 +1,4 @@
+// research rerun trigger: fixed rule, no parameter change
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { PRODUCTION_STRATEGY } from '../src/lib/config';
