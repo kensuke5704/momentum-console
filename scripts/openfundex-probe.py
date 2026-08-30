@@ -1,4 +1,4 @@
-import json, os, subprocess, sys, urllib.request
+import json, subprocess, sys, urllib.request
 from pathlib import Path
 
 BASE='https://huggingface.co/datasets/ttchopper/openfundex/resolve/main/'
@@ -26,14 +26,15 @@ where (upper(ticker) in ('NVDA','GOOG','GOOGL') or cik in (1045810,1652044))
 order by filing_date desc
 limit 40
 """
-rows=con.execute(q).fetchdf().to_dict('records')
-for r in rows:
+cur=con.execute(q); cols=[x[0] for x in cur.description]
+rows=[]
+for vals in cur.fetchall():
+    r=dict(zip(cols,vals))
     for k,v in list(r.items()):
         if hasattr(v,'isoformat'): r[k]=v.isoformat()
-        elif str(type(v)).startswith("<class 'numpy."): r[k]=v.item()
+    rows.append(r)
 print('SAMPLE_JSON')
 print(json.dumps(rows,indent=2,default=str))
-# Coverage using Top10 union generated with the existing TS script in the workflow.
 p=Path('data/research/sec-top10-union/result.json')
 if p.exists():
     union=json.loads(p.read_text())['symbols']
