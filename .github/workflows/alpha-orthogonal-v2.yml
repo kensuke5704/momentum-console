@@ -5,6 +5,7 @@ on:
     paths:
       - scripts/alpha-orthogonal-v2.ts
       - .github/workflows/alpha-orthogonal-v2.yml
+  workflow_dispatch:
 jobs:
   run:
     runs-on: ubuntu-latest
