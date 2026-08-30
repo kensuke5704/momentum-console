@@ -1,0 +1,29 @@
+name: SEC fundamental momentum diagnostic via OpenFundex
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - 'scripts/production-top10-monthly.ts'
+      - 'scripts/openfundex-fundamental-diagnostic.py'
+      - '.github/workflows/openfundex-fundamental-diagnostic.yml'
+  workflow_dispatch:
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npx tsx scripts/production-top10-monthly.ts
+      - run: python scripts/openfundex-fundamental-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openfundex-fundamental-diagnostic-result
+          path: data/research/openfundex-fundamental-diagnostic/
