@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-30T12:58:16.363Z",
+  "generatedAt": "2026-08-30T13:01:27.237Z",
   "method": "anchored yearly pseudo-OOS using current Production strategy; expanding train window and next-calendar-year test window",
   "sample": {
     "start": "2020-01-02",
