@@ -1,0 +1,22 @@
+name: SEC 424B5 dilution diagnostic
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/sec424b5-dilution-diagnostic.py
+      - .github/workflows/sec424b5-dilution-diagnostic.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install duckdb
+      - run: python scripts/sec424b5-dilution-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec424b5-dilution-diagnostic-result
+          path: data/research/sec424b5-dilution-diagnostic/result.json
