@@ -1,0 +1,23 @@
+name: FINRA short interest Top10 diagnostic
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/finra-short-interest-top10-diagnostic.ts
+      - .github/workflows/finra-short-interest-top10-diagnostic.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/finra-short-interest-top10-diagnostic.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: finra-short-interest-top10-diagnostic-result
+          path: data/research/finra-short-interest-top10-diagnostic/result.json
