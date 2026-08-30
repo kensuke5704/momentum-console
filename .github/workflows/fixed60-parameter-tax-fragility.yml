@@ -1,0 +1,26 @@
+name: Fixed60 parameter tax fragility
+
+on:
+  push:
+    branches:
+      - research/anchored-walkforward-20260830
+    paths:
+      - scripts/fixed60-parameter-tax-fragility.ts
+      - .github/workflows/fixed60-parameter-tax-fragility.yml
+  workflow_dispatch:
+
+jobs:
+  fragility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/fixed60-parameter-tax-fragility.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixed60-parameter-tax-fragility-result
+          path: data/research/fixed60-parameter-tax-fragility/result.json
