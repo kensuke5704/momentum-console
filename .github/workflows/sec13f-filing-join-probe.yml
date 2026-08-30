@@ -1,0 +1,18 @@
+name: SEC 13F filing join probe
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/sec13f-filing-join-probe.py
+      - .github/workflows/sec13f-filing-join-probe.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install duckdb
+      - run: python scripts/sec13f-filing-join-probe.py
