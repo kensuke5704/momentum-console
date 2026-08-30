@@ -1,0 +1,23 @@
+name: Recovery bridge holdings exact
+on:
+  push:
+    branches: [research/anchored-walkforward-20260830]
+    paths:
+      - scripts/recovery-bridge-holdings-exact.ts
+      - .github/workflows/recovery-bridge-holdings-exact.yml
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/recovery-bridge-holdings-exact.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovery-bridge-holdings-exact-result
+          path: data/research/recovery-bridge-holdings-exact/result.json
