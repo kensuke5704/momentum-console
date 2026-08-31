@@ -85,3 +85,19 @@ jobs:
         with:
           name: forward40-alpha-stage1-orthogonal-v2
           path: data/research/alpha-orthogonal-v2/result.json
+
+  riskoff-equity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/riskoff-equity-sleeve.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-alpha-stage1-riskoff-equity
+          path: data/research/riskoff-equity-sleeve/result.json
