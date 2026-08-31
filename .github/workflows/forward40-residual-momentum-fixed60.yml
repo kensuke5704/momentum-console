@@ -1,0 +1,23 @@
+name: Forward40 Residual Momentum Fixed60
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - scripts/forward40-residual-momentum-fixed60.ts
+      - .github/workflows/forward40-residual-momentum-fixed60.yml
+      - scripts/lib/fixed60-config.ts
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/forward40-residual-momentum-fixed60.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-residual-momentum-fixed60
+          path: data/research/forward40-residual-momentum-fixed60/result.json
