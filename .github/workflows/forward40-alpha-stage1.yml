@@ -4,6 +4,7 @@ on:
     branches: [research/forward40-alpha-stage1-20260831]
     paths:
       - .github/workflows/forward40-alpha-stage1.yml
+      - scripts/riskoff-macro-final-gate.ts
       - scripts/forward40-riskoff-equity-fixed60.ts
   workflow_dispatch:
 jobs:
