@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "node --import tsx --test --test-concurrency=1 tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run test && npm run typecheck && npm run lint && npm run build",
     "import:nport": "node --max-old-space-size=6144 --import tsx scripts/import-nport.ts",
     "sync:universe": "node --import tsx scripts/build-universe.ts",
