@@ -1,0 +1,24 @@
+name: Forward40 Fixed60 no-churn
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-nochurn-fixed60.yml
+      - scripts/forward40-nochurn-fixed60.ts
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/forward40-nochurn-fixed60.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-nochurn-fixed60
+          path: data/research/forward40-nochurn-fixed60/result.json
