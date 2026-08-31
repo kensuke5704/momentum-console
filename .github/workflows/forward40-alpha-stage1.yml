@@ -13,6 +13,7 @@ on:
       - scripts/consensus-robustness.ts
       - scripts/consensus75-edge-decay.ts
       - scripts/consensus75-tax.ts
+      - scripts/forward40-consensus75-fixed60.ts
   workflow_dispatch:
 jobs:
   macro-robustness:
@@ -158,3 +159,19 @@ jobs:
         with:
           name: forward40-consensus-tax
           path: data/research/consensus75-tax/result.json
+
+  consensus75-fixed60:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/forward40-consensus75-fixed60.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-consensus75-fixed60
+          path: data/research/forward40-consensus75-fixed60/result.json
