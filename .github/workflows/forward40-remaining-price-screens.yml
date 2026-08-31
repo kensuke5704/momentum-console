@@ -1,0 +1,40 @@
+name: Forward40 remaining price screens
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-remaining-price-screens.yml
+      - scripts/rank2-quality-screen.ts
+      - scripts/horizon-ensemble-screen.ts
+  workflow_dispatch:
+jobs:
+  rank2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/rank2-quality-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-rank2-quality
+          path: data/research/rank2-quality-screen/result.json
+  horizon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/horizon-ensemble-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-horizon-ensemble
+          path: data/research/horizon-ensemble-screen/result.json
