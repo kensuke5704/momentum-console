@@ -4,9 +4,10 @@ on:
     branches: [research/forward40-alpha-stage1-20260831]
     paths:
       - .github/workflows/forward40-alpha-stage1.yml
+      - scripts/forward40-riskoff-equity-fixed60.ts
   workflow_dispatch:
 jobs:
-  early-leader:
+  fixed60-riskoff-equity:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -16,88 +17,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx tsx scripts/early-leader-engine-screen.ts
+      - run: npx tsx scripts/forward40-riskoff-equity-fixed60.ts
       - uses: actions/upload-artifact@v4
         with:
-          name: forward40-alpha-stage1-early-leader
-          path: data/research/early-leader-engine-screen/result.json
-
-  residual-momentum:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx tsx scripts/residual-momentum-screen.ts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forward40-alpha-stage1-residual-momentum
-          path: data/research/residual-momentum-screen/result.json
-
-  defensive-sleeve:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx tsx scripts/defensive-gold-treasury-screen.ts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forward40-alpha-stage1-defensive-sleeve
-          path: data/research/defensive-gold-treasury-screen/result.json
-
-  signal-quality:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx tsx scripts/orthogonal-signal-quality.ts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forward40-alpha-stage1-signal-quality
-          path: data/research/orthogonal-signal-quality/result.json
-
-  orthogonal-v2:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx tsx scripts/alpha-orthogonal-v2.ts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forward40-alpha-stage1-orthogonal-v2
-          path: data/research/alpha-orthogonal-v2/result.json
-
-  riskoff-equity:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx tsx scripts/riskoff-equity-sleeve.ts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: forward40-alpha-stage1-riskoff-equity
-          path: data/research/riskoff-equity-sleeve/result.json
+          name: forward40-fixed60-riskoff-equity
+          path: data/research/forward40-riskoff-equity-fixed60/result.json
