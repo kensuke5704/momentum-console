@@ -1,0 +1,20 @@
+{
+  "strategyId": "independent-top5-breakout-v1",
+  "frozenAt": "2026-09-01",
+  "historicalDataEnd": "2026-08-25",
+  "forwardOosStartExclusive": "2026-08-25",
+  "status": "WAITING_FOR_NEW_DATA",
+  "rules": {
+    "appendOnly": true,
+    "parameterChangesAllowed": false,
+    "historicalReclassificationAllowed": false,
+    "separateFromFixed60Oos": true,
+    "signalChangingBugFixCreatesNewStrategyId": true
+  },
+  "observations": [],
+  "notes": [
+    "This ledger starts empty because repository market data used for freeze ends on 2026-08-25.",
+    "Only observations based on market data strictly after 2026-08-25 qualify as forward OOS.",
+    "Do not backfill pre-freeze trades into this ledger."
+  ]
+}
