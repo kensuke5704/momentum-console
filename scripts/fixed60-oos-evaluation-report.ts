@@ -1,10 +1,22 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { PRODUCTION_STRATEGY } from "../src/lib/config";
 import { evaluateOosActionGate } from "../src/lib/oos-action-gate";
+import { OOS_START_DATE } from "../src/lib/oos";
 import type { ForwardOosResult } from "../src/lib/types";
 
 const file = resolve(process.cwd(), process.argv[2] ?? "public/data/oos-performance.json");
-const oos = JSON.parse(readFileSync(file, "utf8")) as ForwardOosResult;
+const raw = JSON.parse(readFileSync(file, "utf8")) as ForwardOosResult | { dashboard?: { oos?: ForwardOosResult } };
+const oos = ("dashboard" in raw ? raw.dashboard?.oos : raw) as ForwardOosResult | undefined;
+
+if (!oos) throw new Error(`No Forward OOS payload found in ${file}`);
+if (oos.strategyId !== PRODUCTION_STRATEGY.strategyId) {
+  throw new Error(`Stale OOS strategyId: ${oos.strategyId}; expected ${PRODUCTION_STRATEGY.strategyId}`);
+}
+if (oos.startedAt !== OOS_START_DATE) {
+  throw new Error(`Unexpected OOS start: ${oos.startedAt}; expected ${OOS_START_DATE}`);
+}
+
 const gate = evaluateOosActionGate(oos);
 
 const report = {
