@@ -1,0 +1,24 @@
+name: Forward40 partial rebalance risk re-anchor
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-partial-risk-reanchor.yml
+      - scripts/forward40-partial-rebalance-risk-reanchor.ts
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/forward40-partial-rebalance-risk-reanchor.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-partial-risk-reanchor
+          path: data/research/forward40-partial-rebalance-risk-reanchor/result.json
