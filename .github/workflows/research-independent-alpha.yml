@@ -22,3 +22,5 @@ jobs:
         run: node --import tsx scripts/independent-alpha-tcsr.ts
       - name: Run Stage 2 candidates
         run: node --import tsx scripts/independent-alpha-stage2.ts
+      - name: Validate VCB robustness
+        run: node --import tsx scripts/independent-alpha-vcb-validation.ts
