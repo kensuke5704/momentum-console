@@ -53,3 +53,35 @@ jobs:
         with:
           name: forward40-alpha-stage1-defensive-sleeve
           path: data/research/defensive-gold-treasury-screen/result.json
+
+  signal-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/orthogonal-signal-quality.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-alpha-stage1-signal-quality
+          path: data/research/orthogonal-signal-quality/result.json
+
+  orthogonal-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/alpha-orthogonal-v2.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-alpha-stage1-orthogonal-v2
+          path: data/research/alpha-orthogonal-v2/result.json
