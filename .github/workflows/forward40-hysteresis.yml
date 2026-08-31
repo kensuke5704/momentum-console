@@ -1,0 +1,24 @@
+name: Forward40 tax-aware hysteresis
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-hysteresis.yml
+      - scripts/tax-aware-hysteresis-walkforward.ts
+  workflow_dispatch:
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/tax-aware-hysteresis-walkforward.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-hysteresis
+          path: data/research/tax-aware-hysteresis/result.json
