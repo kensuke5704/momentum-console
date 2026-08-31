@@ -32,6 +32,10 @@ function pctLabel(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function makeBin(label: string, from: number, to: number): MonthlyReturnHistogramBin {
+  return { label, from, to, probability: 0, count: 0 };
+}
+
 export function buildMonthlyReturnDistribution(curve: EquityPoint[]): MonthlyReturnDistribution {
   const monthEnds = monthEndEquity(curve);
   const returns = monthEnds.slice(1).flatMap((point, index) => {
@@ -53,26 +57,58 @@ export function buildMonthlyReturnDistribution(curve: EquityPoint[]): MonthlyRet
     };
   }
 
-  const min = Math.min(...returns);
-  const max = Math.max(...returns);
-  const start = Math.floor(min / BIN_WIDTH) * BIN_WIDTH;
-  const end = Math.max(start + BIN_WIDTH, Math.ceil((max + EPS) / BIN_WIDTH) * BIN_WIDTH);
-  const bins: MonthlyReturnHistogramBin[] = [];
-  for (let rawFrom = start; rawFrom < end - EPS; rawFrom += BIN_WIDTH) {
+  const negativeValues = returns.filter((value) => value < -EPS);
+  const positiveValues = returns.filter((value) => value > EPS);
+  const negativeStart = negativeValues.length
+    ? Math.floor(Math.min(...negativeValues) / BIN_WIDTH) * BIN_WIDTH
+    : 0;
+  const positiveEnd = positiveValues.length
+    ? Math.max(BIN_WIDTH, Math.ceil((Math.max(...positiveValues) + EPS) / BIN_WIDTH) * BIN_WIDTH)
+    : 0;
+
+  const negativeBins: MonthlyReturnHistogramBin[] = [];
+  for (let rawFrom = negativeStart; rawFrom < -EPS; rawFrom += BIN_WIDTH) {
     const from = Math.abs(rawFrom) < EPS ? 0 : rawFrom;
+    const to = Math.min(0, from + BIN_WIDTH);
+    const label = to === 0 ? `${pctLabel(from)}–<0%` : `${pctLabel(from)}–${pctLabel(to)}`;
+    negativeBins.push(makeBin(label, from, to));
+  }
+
+  const zeroBin = makeBin("0%", -EPS, EPS);
+
+  const positiveBins: MonthlyReturnHistogramBin[] = [];
+  for (let from = 0; from < positiveEnd - EPS; from += BIN_WIDTH) {
     const to = from + BIN_WIDTH;
-    bins.push({ label: `${pctLabel(from)}–${pctLabel(to)}`, from, to, probability: 0, count: 0 });
+    const label = from === 0 ? `>0%–${pctLabel(to)}` : `${pctLabel(from)}–${pctLabel(to)}`;
+    positiveBins.push(makeBin(label, from, to));
   }
 
   for (const value of returns) {
-    const index = Math.min(bins.length - 1, Math.max(0, Math.floor((value - start) / BIN_WIDTH + EPS)));
-    bins[index].count += 1;
+    if (Math.abs(value) <= EPS) {
+      zeroBin.count += 1;
+      continue;
+    }
+    if (value < 0) {
+      const index = Math.min(
+        negativeBins.length - 1,
+        Math.max(0, Math.floor((value - negativeStart) / BIN_WIDTH + EPS)),
+      );
+      negativeBins[index].count += 1;
+      continue;
+    }
+    const index = Math.min(
+      positiveBins.length - 1,
+      Math.max(0, Math.floor(value / BIN_WIDTH + EPS)),
+    );
+    positiveBins[index].count += 1;
   }
+
+  const bins = [...negativeBins, zeroBin, ...positiveBins];
   for (const bin of bins) bin.probability = bin.count / months;
 
-  const negative = returns.filter((value) => value < -EPS).length;
-  const zero = returns.filter((value) => Math.abs(value) <= EPS).length;
-  const positive = months - negative - zero;
+  const negative = negativeValues.length;
+  const zero = zeroBin.count;
+  const positive = positiveValues.length;
   return {
     sampleStart: monthEnds[0]?.date ?? null,
     sampleEnd: monthEnds.at(-1)?.date ?? null,
