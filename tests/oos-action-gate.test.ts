@@ -50,10 +50,10 @@ test("OOS gate turns red at 24 months if gross CAGR is already below the after-t
   assert.equal(gate.level, "RED");
 });
 
-test("OOS gate uses amber after 24 months while exact after-tax CAGR is unavailable", () => {
+test("OOS gate stays green after 24 months when gross CAGR clears the hurdle", () => {
   const gate = evaluateOosActionGate(sample({
     asOf: "2028-09-01",
     stats: { cagr: 0.35, maxDrawdown: -0.2, annualizedVolatility: 0.3, calmar: 1.75, finalEquity: 1.8 },
   }));
-  assert.equal(gate.level, "AMBER");
+  assert.equal(gate.level, "GREEN");
 });
