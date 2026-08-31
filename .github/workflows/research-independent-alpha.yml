@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  tcsr-stage1:
+  independent-alpha:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +20,5 @@ jobs:
       - run: npm ci
       - name: Run TCSR Stage 1
         run: node --import tsx scripts/independent-alpha-tcsr.ts
+      - name: Run Stage 2 candidates
+        run: node --import tsx scripts/independent-alpha-stage2.ts
