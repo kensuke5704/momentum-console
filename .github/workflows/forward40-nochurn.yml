@@ -1,0 +1,24 @@
+name: Forward40 no-churn screen
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-nochurn.yml
+      - scripts/no-churn-partial-rebalance.ts
+  workflow_dispatch:
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/no-churn-partial-rebalance.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-nochurn
+          path: data/research/no-churn-partial-rebalance/result.json
