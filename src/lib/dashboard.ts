@@ -14,7 +14,12 @@ export function buildDashboardPayload(histories: Record<string, PricePoint[]>, u
   const currentUniverse = universeHistory.at(-1) ?? null;
   const qqq = histories.QQQ ?? [];
   const signalIndex = currentUniverse ? qqq.findIndex((point) => point.date === currentUniverse.asOf) : -1;
-  const currentSignal = currentUniverse ? buildMonthlySignal({ universe: currentUniverse, histories, qqq, nextSessionDate: signalIndex >= 0 ? qqq[signalIndex + 1]?.date ?? nextUsTradingSession(currentUniverse.asOf) : null, config: PRODUCTION_STRATEGY }) : null;
+  // Keep the displayed signal in lock-step with the state-machine clock. A newly
+  // committed month-end Universe must not be evaluated against an earlier QQQ
+  // close while the actual signal-date daily row is still unavailable.
+  const currentSignal = currentUniverse && signalIndex >= 0
+    ? buildMonthlySignal({ universe: currentUniverse, histories, qqq, nextSessionDate: qqq[signalIndex + 1]?.date ?? nextUsTradingSession(currentUniverse.asOf), config: PRODUCTION_STRATEGY })
+    : null;
   const close = qqq.at(-1)?.close ?? null;
   const sma = qqq.length >= PRODUCTION_STRATEGY.recovery.qqqDailySmaDays ? mean(qqq.slice(-PRODUCTION_STRATEGY.recovery.qqqDailySmaDays).map((point) => point.close)) : null;
   const prior = qqq.at(-(PRODUCTION_STRATEGY.recovery.qqqMomentumDays + 1))?.close;
