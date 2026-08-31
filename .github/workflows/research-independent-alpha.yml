@@ -18,9 +18,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run TCSR Stage 1
-        run: node --import tsx scripts/independent-alpha-tcsr.ts
-      - name: Run Stage 2 candidates
-        run: node --import tsx scripts/independent-alpha-stage2.ts
-      - name: Validate VCB robustness
-        run: node --import tsx scripts/independent-alpha-vcb-validation.ts
+      - name: Run Stage 3 structural candidates
+        run: node --import tsx scripts/independent-alpha-stage3.ts
