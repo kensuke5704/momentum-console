@@ -21,3 +21,35 @@ jobs:
         with:
           name: forward40-alpha-stage1-early-leader
           path: data/research/early-leader-engine-screen/result.json
+
+  residual-momentum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/residual-momentum-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-alpha-stage1-residual-momentum
+          path: data/research/residual-momentum-screen/result.json
+
+  defensive-sleeve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/defensive-gold-treasury-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-alpha-stage1-defensive-sleeve
+          path: data/research/defensive-gold-treasury-screen/result.json
