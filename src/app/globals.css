@@ -3158,10 +3158,40 @@ main {
   padding: 0;
 }
 
-.equity-chart,
-.large-chart {
-  height: 270px;
+.equity-chart {
+  height: 280px;
   padding: 4px 18px 4px;
+}
+
+.large-chart {
+  height: 360px;
+  padding: 4px 18px 4px;
+}
+
+/* The historical chart includes bootstrap bands and needs more plotting room.
+   OOS is intentionally shorter, especially while it contains only a few points. */
+.equity-chart:has(.recharts-line-curve) {
+  height: 360px;
+}
+
+@media (max-width: 900px) {
+  .equity-chart {
+    height: 280px !important;
+  }
+
+  .equity-chart:has(.recharts-line-curve) {
+    height: 360px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .equity-chart {
+    height: 260px !important;
+  }
+
+  .equity-chart:has(.recharts-line-curve) {
+    height: 360px !important;
+  }
 }
 
 .stats-column {

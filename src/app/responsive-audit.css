@@ -5,6 +5,14 @@
 }
 
 @media (max-width: 520px) {
+  .sidebar nav button {
+    scroll-margin-inline: 12px;
+  }
+
+  .sidebar nav button span {
+    white-space: nowrap;
+  }
+
   .dynamic-card > header {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -22,24 +30,67 @@
   }
 
   .monthly-return-distribution {
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 10px;
+    overflow: hidden;
+    padding-bottom: 0;
   }
 
-  /* Recharts sets min-width: 0 inline on ResponsiveContainer. Override that
-     so the histogram actually renders wider than the phone viewport and the
-     full-width chart can be panned horizontally. */
+  /* Keep the histogram inside the phone viewport. Axis labels are already
+     thinned in the chart component, so horizontal panning is unnecessary. */
   .monthly-return-distribution > .recharts-responsive-container {
-    width: 1100px !important;
-    min-width: 1100px !important;
-    max-width: none !important;
-    flex: 0 0 1100px;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: 1 1 auto;
   }
 
   .monthly-return-summary {
     gap: 8px 14px;
+  }
+
+  .execution-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .rules-grid:not(.execution-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .rules-grid:not(.execution-grid) > div {
+    border-right: 1px solid var(--line);
+  }
+
+  .rules-grid:not(.execution-grid) > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .rules-grid:not(.execution-grid) > div:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  /* Inline desktop dimensions must yield to wrapped phone content. */
+  .next-action > div {
+    align-content: start;
+    grid-template-rows: 15px minmax(0, auto) !important;
+    min-height: 0 !important;
+    padding: 14px 12px !important;
+  }
+
+  .next-action-copy strong,
+  .next-action-copy p {
+    overflow-wrap: anywhere;
+  }
+
+  .table-scroll > .empty-state {
+    border-width: 0;
+    min-height: 120px;
+    padding: 20px !important;
+  }
+
+  .action-modal > header + div:not(.action-guide-list) {
+    grid-template-columns: 88px minmax(0, 1fr) !important;
+  }
+
+  .action-modal > header + div:not(.action-guide-list) > div {
+    padding: 14px !important;
   }
 }
