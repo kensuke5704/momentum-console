@@ -58,17 +58,14 @@ export function evaluateOosActionGate(oos: ForwardOosResult): OosActionGate {
     };
   }
 
-  // The preregistered 24M/36M gates are after-tax CAGR criteria. The live OOS
-  // payload currently contains gross performance only. Gross below the hurdle
-  // is sufficient to fail; otherwise keep AMBER until an exact after-tax OOS
-  // series is available rather than inventing a tax proxy.
+  // The preregistered 24M/36M gates use the live gross (pre-tax) OOS CAGR.
   if (monthsObserved >= 36 && cagr < 0.30) {
     return {
       level: "RED",
       phase,
       monthsObserved,
       instruction: "新規買付を停止。保有中なら次の米国寄付きで全売却し、Cashへ移行。",
-      reason: `36か月以上の税引前OOS CAGRが30%未満のため、税引後30%基準も満たせません。`,
+      reason: `36か月以上の税引前OOS CAGRが30%未満です。`,
       blocksNewEntries: true,
     };
   }
@@ -78,7 +75,7 @@ export function evaluateOosActionGate(oos: ForwardOosResult): OosActionGate {
       phase,
       monthsObserved,
       instruction: "新規買付を停止。保有中なら次の米国寄付きで全売却し、Cashへ移行。",
-      reason: `24か月以上の税引前OOS CAGRが20%未満のため、税引後20%基準も満たせません。`,
+      reason: `24か月以上の税引前OOS CAGRが20%未満です。`,
       blocksNewEntries: true,
     };
   }
@@ -90,17 +87,6 @@ export function evaluateOosActionGate(oos: ForwardOosResult): OosActionGate {
       monthsObserved,
       instruction: "取引ルールは変更せず継続。新規最適化はせず、OOSレビュー対象として扱う。",
       reason: `OOS MaxDD ${Math.abs(maxDrawdown * 100).toFixed(1)}% が30%のReview基準に到達しています。`,
-      blocksNewEntries: false,
-    };
-  }
-
-  if (monthsObserved >= 24) {
-    return {
-      level: "AMBER",
-      phase,
-      monthsObserved,
-      instruction: "現行ルールで継続。ただし税引後OOS CAGRの正式判定が完了するまで要レビュー。",
-      reason: "24か月以降のKill Criteriaは税引後CAGR基準です。現在のOOS表示値は税引前のため、税引後判定を保留しています。",
       blocksNewEntries: false,
     };
   }
