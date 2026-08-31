@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./responsive-audit.css";
+import "./next-action-layout.css";
 import { TickerProfileEnhancer } from "@/components/ticker-profile";
 
 export const metadata: Metadata = {
