@@ -52,6 +52,7 @@ test("OOS gate turns red at 24 months if gross CAGR is already below the after-t
 
 test("OOS gate uses amber after 24 months while exact after-tax CAGR is unavailable", () => {
   const gate = evaluateOosActionGate(sample({
+    startedAt: "2026-01-01",
     asOf: "2028-10-01",
     stats: { cagr: 0.35, maxDrawdown: -0.2, annualizedVolatility: 0.3, calmar: 1.75, finalEquity: 1.8 },
   }));
