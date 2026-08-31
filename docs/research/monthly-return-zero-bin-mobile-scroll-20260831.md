@@ -7,3 +7,4 @@ Scope: presentation/binning only. No strategy, backtest equity, or monthly-retur
 - Negative and positive bins otherwise remain 5 percentage points wide.
 - On <=520px viewports, the monthly-return chart gets a 760px minimum chart width and horizontal scrolling rather than compressing or hiding x-axis labels.
 - PC layout remains responsive at full card width.
+- Regression tests assert one and only one `0%` bin and conservation of monthly observations.
