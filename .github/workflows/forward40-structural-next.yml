@@ -1,0 +1,40 @@
+name: Forward40 structural next
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-structural-next.yml
+      - scripts/forward40-nochurn-fixed60.ts
+      - scripts/fixed60-semimonthly-refresh.ts
+  workflow_dispatch:
+jobs:
+  nochurn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/forward40-nochurn-fixed60.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-nochurn-fixed60
+          path: data/research/forward40-nochurn-fixed60/result.json
+  semimonthly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/fixed60-semimonthly-refresh.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-fixed60-semimonthly
+          path: data/research/fixed60-semimonthly-refresh/result.json
