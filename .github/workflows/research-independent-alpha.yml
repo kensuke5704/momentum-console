@@ -1,0 +1,22 @@
+name: Research Independent Alpha
+
+on:
+  push:
+    branches: ["research/independent-alpha-engine-20260901"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tcsr-stage1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run TCSR Stage 1
+        run: node --import tsx scripts/independent-alpha-tcsr.ts
