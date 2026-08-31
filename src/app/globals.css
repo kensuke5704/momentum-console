@@ -334,7 +334,7 @@
 .section-note { color: var(--text-muted); font-family: "Roboto Mono", monospace; font-size: 10px; white-space: nowrap; }
 .trigger-text { margin: 0; }
 .equity-chart { height: 430px; }
-.monthly-return-distribution { width: 100%; height: 340px; min-width: 0; }
+.monthly-return-distribution { width: 100%; height: 230px; min-width: 0; }
 .monthly-return-summary {
   border-top: 1px solid var(--line);
   display: flex;
@@ -3160,8 +3160,8 @@ main {
 
 .equity-chart,
 .large-chart {
-  height: 290px;
-  padding: 14px 18px 10px;
+  height: 230px;
+  padding: 4px 18px 4px;
 }
 
 .stats-column {
