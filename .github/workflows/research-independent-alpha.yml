@@ -18,5 +18,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run Stage 3 structural candidates
-        run: node --import tsx scripts/independent-alpha-stage3.ts
+      - name: Run Stage 4 diversified baskets
+        run: node --import tsx scripts/independent-alpha-stage4.ts
