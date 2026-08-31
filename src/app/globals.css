@@ -434,7 +434,7 @@
 
 .action-guide-list > div:nth-child(2n) { border-right: 0; }
 .action-guide-list > div:nth-last-child(-n + 2) { border-bottom: 0; }
-.action-guide-list > div.current { background: var(--accent-soft); }
+.action-modal .current { background: var(--accent-soft); }
 .action-guide-list strong { font-family: "Roboto Mono", monospace; font-size: 14px; }
 .action-guide-list p { color: var(--text-soft); margin: 9px 0 0; padding-right: 42px; }
 .action-guide-list span {
