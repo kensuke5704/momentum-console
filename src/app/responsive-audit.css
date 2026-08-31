@@ -21,8 +21,16 @@
     white-space: normal;
   }
 
-  .monthly-return-distribution .recharts-xAxis .recharts-cartesian-axis-tick:nth-child(even) {
-    display: none;
+  .monthly-return-distribution {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+  }
+
+  .monthly-return-distribution > .recharts-responsive-container {
+    min-width: 760px;
   }
 
   .monthly-return-summary {
