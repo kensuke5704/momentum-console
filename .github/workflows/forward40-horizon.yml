@@ -1,0 +1,24 @@
+name: Forward40 horizon ensemble
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-horizon.yml
+      - scripts/horizon-ensemble-screen.ts
+  workflow_dispatch:
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/horizon-ensemble-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-horizon-ensemble
+          path: data/research/horizon-ensemble-screen/result.json
