@@ -1,0 +1,31 @@
+name: Fixed60 Forward40 density
+on:
+  push:
+    branches: [research/fixed60-after-tax-density-20260831]
+    paths:
+      - scripts/fixed60-forward40-density.py
+      - .github/workflows/fixed60-forward40-density.yml
+  workflow_dispatch:
+jobs:
+  density:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/fixed60-density-export.ts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check numpy matplotlib scipy
+      - run: python scripts/fixed60-forward40-density.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fixed60-forward40-density-20260831
+          path: |
+            data/research/fixed60-forward40-density/fixed60-forward40-100-path-density-20260831.png
+            data/research/fixed60-forward40-density/metadata.json
