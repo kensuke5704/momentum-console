@@ -1,0 +1,23 @@
+name: Forward40 alpha stage1
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-alpha-stage1.yml
+  workflow_dispatch:
+jobs:
+  early-leader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/early-leader-engine-screen.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-alpha-stage1-early-leader
+          path: data/research/early-leader-engine-screen/result.json
