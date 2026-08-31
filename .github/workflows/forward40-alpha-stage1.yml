@@ -7,6 +7,7 @@ on:
       - scripts/riskoff-macro-final-gate.ts
       - scripts/forward40-riskoff-equity-fixed60.ts
       - scripts/forward40-riskoff-gold-fixed60.ts
+      - scripts/forward40-riskoff-gold-filtered.ts
   workflow_dispatch:
 jobs:
   macro-robustness:
@@ -56,3 +57,19 @@ jobs:
         with:
           name: forward40-riskoff-gold-fixed60
           path: data/research/forward40-riskoff-gold-fixed60/result.json
+
+  riskoff-gold-filtered:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/forward40-riskoff-gold-filtered.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-riskoff-gold-filtered
+          path: data/research/forward40-riskoff-gold-filtered/result.json
