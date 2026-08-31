@@ -1,0 +1,49 @@
+{
+  "strategyId": "independent-top5-breakout-v1",
+  "status": "FROZEN_RESEARCH_CANDIDATE",
+  "freezeDate": "2026-09-01",
+  "historicalDataEnd": "2026-08-25",
+  "forwardOosStartExclusive": "2026-08-25",
+  "spec": {
+    "universe": "PIT dynamic universe from data/universe-history.json; latest asOf <= signal date",
+    "marketGate": "QQQ close > QQQ 200-session SMA",
+    "stockGate": "stock close > stock 100-session SMA",
+    "signal": "stock close > maximum close of prior 20 sessions",
+    "ranking": "breakout strength = close / prior20CloseHigh - 1, descending",
+    "topN": 5,
+    "allocation": "equal weight",
+    "entry": "next US trading-session open after signal close",
+    "holdSessions": 20,
+    "individualStop": 0.12,
+    "portfolioCircuit": 0.15,
+    "exitExecution": "next US trading-session open after close-based stop/circuit/hold trigger",
+    "costPerSide": 0.001
+  },
+  "historicalValidation": {
+    "baselineCagr": 0.23394902872181955,
+    "baselineMaxDrawdown": -0.27558362349021714,
+    "monthlyCorrelationWithFixed60": 0.34161786054452575,
+    "fixed60NegativeMonthPositiveShare": 0.5,
+    "stressMedianCagr": 0.2002920870705891,
+    "stressP10Cagr": 0.14993142732212528,
+    "stressWorstCagr": 0.12962082031191224,
+    "looWorstCagr": 0.1242247488815802,
+    "looWorstRetention": 0.5309906587784616,
+    "rolling36mMedian": 0.1299626295667068,
+    "rolling36mP10": 0.01764453733829557,
+    "rolling36mPositiveShare": 0.9573304157549234
+  },
+  "forwardOosRules": [
+    "Do not change any parameter based on observations after freeze.",
+    "Do not redefine the universe, ranking, entry, exit, costs, or gates without assigning a new strategyId.",
+    "Do not merge this candidate into Production/main solely from historical validation.",
+    "Record every forward signal and realized execution without cherry-picking.",
+    "Any bug fix that changes historical or forward signals invalidates this strategyId and requires a new frozen version.",
+    "Evaluate forward results separately from all pre-freeze historical metrics."
+  ],
+  "knownLimitations": [
+    "Corporate-action and price-history integrity inherit the repository market-data pipeline.",
+    "PIT validity inherits the construction quality of data/universe-history.json.",
+    "Stop and circuit triggers are close-based and do not model intraday stop execution."
+  ]
+}
