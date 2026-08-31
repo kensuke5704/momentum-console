@@ -1,0 +1,22 @@
+name: Forward40 Risk-Off Macro Long History
+on:
+  push:
+    branches: [research/forward40-alpha-stage1-20260831]
+    paths:
+      - .github/workflows/forward40-riskoff-macro-long-history.yml
+      - scripts/riskoff-macro-final-gate.ts
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/riskoff-macro-final-gate.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-riskoff-macro-long-history
+          path: data/research/riskoff-macro-final-gate/result.json
