@@ -10,6 +10,9 @@ on:
       - scripts/forward40-riskoff-gold-filtered.ts
       - scripts/vix-term-structure-diagnostic.ts
       - scripts/crossasset-defensive-diagnostic.ts
+      - scripts/consensus-robustness.ts
+      - scripts/consensus75-edge-decay.ts
+      - scripts/consensus75-tax.ts
   workflow_dispatch:
 jobs:
   macro-robustness:
@@ -107,3 +110,51 @@ jobs:
         with:
           name: forward40-crossasset-defensive
           path: data/research/crossasset-defensive-diagnostic/result.json
+
+  consensus-robustness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/consensus-robustness.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-consensus-robustness
+          path: data/research/consensus-robustness/result.json
+
+  consensus-edge-decay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/consensus75-edge-decay.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-consensus-edge-decay
+          path: data/research/consensus75-edge-decay/result.json
+
+  consensus-tax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/consensus75-tax.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-consensus-tax
+          path: data/research/consensus75-tax/result.json
