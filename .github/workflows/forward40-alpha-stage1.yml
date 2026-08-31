@@ -9,6 +9,7 @@ on:
       - scripts/forward40-riskoff-gold-fixed60.ts
       - scripts/forward40-riskoff-gold-filtered.ts
       - scripts/vix-term-structure-diagnostic.ts
+      - scripts/crossasset-defensive-diagnostic.ts
   workflow_dispatch:
 jobs:
   macro-robustness:
@@ -90,3 +91,19 @@ jobs:
         with:
           name: forward40-vix-term-structure
           path: data/research/vix-term-structure-diagnostic/result.json
+
+  crossasset-defensive-long-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/crossasset-defensive-diagnostic.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forward40-crossasset-defensive
+          path: data/research/crossasset-defensive-diagnostic/result.json
