@@ -3160,8 +3160,20 @@ main {
 
 .equity-chart,
 .large-chart {
-  height: 270px;
+  height: 360px;
   padding: 4px 18px 4px;
+}
+
+@media (max-width: 900px) {
+  .equity-chart {
+    height: 360px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .equity-chart {
+    height: 320px !important;
+  }
 }
 
 .stats-column {
