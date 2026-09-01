@@ -39,9 +39,9 @@ export function nextNportImportDeadline(activeQuarter: string | null, now = new 
   const previousDay = new Date(`${firstOfMonth}T00:00:00Z`);
   previousDay.setUTCDate(previousDay.getUTCDate() - 1);
   const firstTradingDay = nextUsTradingSession(previousDay.toISOString().slice(0, 10));
-  // 07:00 UTC / 16:00 JST is the existing Universe-selection cutoff and is
-  // safely before 09:30 ET during both EST and EDT.
-  return `${firstTradingDay}T16:00:00+09:00`;
+  // 00:30 UTC / 09:30 JST starts the audited month-start rebuild. Require
+  // the ZIP before 09:00 JST, leaving a validation buffer before the job.
+  return `${firstTradingDay}T09:00:00+09:00`;
 }
 
 const sameWeights = (left: number[], right: number[]) => left.length === right.length && left.every((value, index) => Math.abs(value - right[index]) < 1e-12);

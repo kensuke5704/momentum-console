@@ -22,14 +22,14 @@ test("an imported quarterly Universe is used before the month-open signal", () =
 });
 
 test("N-PORT deadline targets the first US trading day of the next required quarter update month", () => {
-  assert.equal(nextNportImportDeadline("2026q1"), "2026-07-01T16:00:00+09:00");
-  assert.equal(nextNportImportDeadline("2026q2"), "2026-10-01T16:00:00+09:00");
-  assert.equal(nextNportImportDeadline("2026q3"), "2027-01-04T16:00:00+09:00");
-  assert.equal(nextNportImportDeadline("2026q4"), "2027-04-01T16:00:00+09:00");
+  assert.equal(nextNportImportDeadline("2026q1"), "2026-07-01T09:00:00+09:00");
+  assert.equal(nextNportImportDeadline("2026q2"), "2026-10-01T09:00:00+09:00");
+  assert.equal(nextNportImportDeadline("2026q3"), "2027-01-04T09:00:00+09:00");
+  assert.equal(nextNportImportDeadline("2026q4"), "2027-04-01T09:00:00+09:00");
 });
 
 test("N-PORT deadline skips a weekend at the start of the update month", () => {
-  assert.equal(nextNportImportDeadline("2022q2"), "2022-10-03T16:00:00+09:00");
+  assert.equal(nextNportImportDeadline("2022q2"), "2022-10-03T09:00:00+09:00");
 });
 
 test("missing quarterly ZIP retains the previous valid Universe as fallback", () => {

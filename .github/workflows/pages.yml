@@ -7,6 +7,10 @@ on:
   schedule:
     # 22:20 UTC is after the US close in both EST (17:20) and EDT (18:20).
     - cron: "20 22 * * 1-5"
+    # First post-close retry, including Friday's close on Saturday UTC.
+    - cron: "30 0 * * 2-6"
+    # Rebuild the static site after the month-start Universe audit commit.
+    - cron: "30 1 1-4 * *"
     # Pre-open refresh publishes a month-start fallback or delayed N-PORT plan.
     - cron: "30 8 * * 1-5"
     # Retry completed daily bars before the next US open. 12:30 UTC remains
@@ -41,9 +45,10 @@ jobs:
 
       - name: Fetch market data
         env:
-          # The final pre-open attempt fails visibly instead of deploying a
-          # partial/stale risk transition when validated close data is absent.
-          REQUIRE_LATEST_DAILY_CLOSE: ${{ github.event.schedule == '30 12 * * 1-5' }}
+          # Every scheduled/manual data refresh fails visibly instead of
+          # publishing a partial or stale daily risk transition. A code-only
+          # push can still deploy the last fully confirmed data snapshot.
+          REQUIRE_LATEST_DAILY_CLOSE: ${{ github.event_name != 'push' }}
         run: npm run sync:data
 
       - name: Update Forward OOS with actual daily prices

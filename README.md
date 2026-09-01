@@ -54,9 +54,9 @@ npm run sync:oos
 
 `import:nport`はZIP構造と必須headerを検証して正規化済みfiling cacheを更新し、Universe、atlas、market data、OOS、tests/typecheck/lint/buildまで一括実行します。詳細は[`docs/runbooks/manual-nport-update.md`](docs/runbooks/manual-nport-update.md)を参照してください。`sync:universe`はQQQのofficial trading close dateをsignal dateとしてPIT Universe historyを再生成します。`sync:data`はYahoo Financeのadjusted closeと同一adjustment factorをOpen/High/Lowへ適用し、splitによる偽stopを防ぎます。Yahooの日足`close`/`adjclose`がClose後も未生成の場合は、16:00 ET（短縮日は13:00 ET）のregular-market時刻、`regularMarketPrice`、30分足の始値・全session coverage・closing markerが一致した場合だけ、検証済み暫定日足を使用します。不一致時はQQQをstrategy clockとして当日stateをatomicに進めず、部分更新を残しません。暫定OOS点は正式なadjusted日足到着時に自動置換します。
 
-GitHub ActionsはClose後の22:20 UTCに加え、次回Open前の08:30 / 10:30 / 12:30 UTCにも再取得します。最終12:30 UTCはEDTで08:30、ESTで07:30です。この最終試行でも必要な日足または検証済みfallbackが揃わなければworkflowを失敗させ、古い価格を混ぜたstateを公開しません。画面の「最新データを読込」はActionsが公開した`market-data.json`をcache無効で再取得します。ブラウザ内に別のsignalロジックはありません。
+GitHub ActionsはClose後の22:20 UTCに加え、00:30 UTC（Close後retry）と次回Open前の08:30 / 10:30 / 12:30 UTCにも再取得します。定期・手動のデータ更新では、必要な日足または検証済みfallbackが揃わなければworkflowを失敗させ、直前の正常な公開版を維持します。古い価格を混ぜたstateや部分更新は公開しません。画面の「最新データを読込」はActionsが公開した`market-data.json`をcache無効で再取得します。ブラウザ内に別のsignalロジックはありません。
 
-月初のUniverse workflowは最後に手動取込・検証されたN-PORT sourceからUniverse historyを再構築し、日次workflowはstop/circuit/recoveryとNext Actionを更新します。
+月初のUniverse workflowは00:30 UTC（09:30 JST）に、最後に手動取込・検証されたN-PORT sourceからUniverse historyを再構築します。日次workflowは確定日足を検証できた時点でstop/circuit/recovery、OOS、Next Actionを更新します。
 
 ## State machine
 
