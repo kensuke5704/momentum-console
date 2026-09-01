@@ -92,12 +92,42 @@ Research gate:
 - historical MaxDD >= -17%: **PASS**
 - combined gate: **PASS**
 
+## Plateau / neighborhood robustness check
+After the first PASS, no fine grid search was performed. Instead, a coarse preregistered neighborhood was tested to determine whether Stage21 sits on a broad plateau rather than at a single lucky allocation point.
+
+Rounded center used for the neighborhood check:
+- NORMAL: Fixed60 85.0%, GLDM 15.0%.
+- YELLOW: Fixed60 55.5%, GLDM 22.5%, Cash 22.0%.
+- DEEP: Fixed60 25.5%, GLDM 30.0%, Cash 44.5%.
+
+Seven coarse perturbations were tested. The purpose was robustness diagnosis, not selecting the best performer.
+
+| Pattern | Structural perturbation | Historical CAGR | Planning proxy | MaxDD | Gate |
+|---|---|---:|---:|---:|---|
+| P0 | rounded center | 49.34% | 43.66% | -16.89% | PASS |
+| P1 | NORMAL Fixed60 80% / GLDM 20% | 47.29% | 41.56% | -16.25% | PASS |
+| P2 | NORMAL Fixed60 90% / GLDM 10% | 51.40% | 45.83% | -17.52% | FAIL DD |
+| P3 | YELLOW/DEEP Fixed60 -1pt, Cash +1pt | 49.13% | 43.64% | -16.78% | PASS |
+| P4 | YELLOW/DEEP Fixed60 +1pt, Cash -1pt | 49.56% | 43.74% | -16.99% | PASS |
+| P5 | YELLOW/DEEP GLDM -1pt, Cash +1pt | 49.15% | 43.53% | -16.85% | PASS |
+| P6 | YELLOW/DEEP GLDM +1pt, Cash -1pt | 49.54% | 43.85% | -16.92% | PASS |
+
+Interpretation:
+- **6 of 7** coarse neighboring structures pass both gates.
+- All YELLOW/DEEP +/-1 percentage-point perturbations remain within a narrow performance band and pass.
+- NORMAL 80/20 also passes comfortably.
+- NORMAL 90/10 raises return but crosses the DD gate to -17.52%.
+- Therefore the PASS is not dependent on the original four-decimal weights such as 22.4375%.
+- The evidence supports a broad plateau approximately on the 80-85% Fixed60 side of NORMAL and around the rounded YELLOW/DEEP allocations, with a risk boundary appearing as NORMAL exposure approaches 90% Fixed60.
+
+The rounded center is operationally simpler and produces effectively the same result as the exact Stage21 weights. This robustness check is evidence for simplification, not a license to optimize further within the plateau.
+
 ## Governance / freeze
-This is the first tested SBI-executable architecture to clear both research gates simultaneously. Therefore same-sample search must stop here.
+This is the first tested SBI-executable architecture to clear both research gates simultaneously, and the subsequent coarse neighborhood check shows that the result is not a single-point allocation artifact. Same-sample search stops here.
 
 Do NOT now optimize:
 - GLDM weight around 15%,
-- Fixed60 weight around 85%,
+- Fixed60 weight within the observed 80-90% neighborhood,
 - Yellow/Deep weights,
 - cash levels,
 - CFTC 4-week lookback or participant class,
@@ -107,9 +137,9 @@ Do NOT now optimize:
 - gold/silver mixtures,
 - execution-delay definitions.
 
-Any such tuning after observing this PASS would increase same-sample overfitting risk.
+Any such tuning after observing this plateau would increase same-sample overfitting risk.
 
 ## What this result does and does not mean
-It establishes a same-sample historical/robustness candidate that satisfies the research targets and uses SBI-buyable funded instruments (Fixed60 underlying US securities and GLDM; cash) plus public CFTC data for risk state. It does not establish a 43.64% true expected CAGR. True Forward OOS evidence is still required before Production replacement or confidence in future return can be justified.
+It establishes a same-sample historical/robustness candidate that satisfies the research targets and uses SBI-buyable funded instruments (Fixed60 underlying US securities and GLDM; cash) plus public CFTC data for risk state. The plateau check strengthens the case that the allocation is not dependent on four-decimal precision. It does not establish a 43-44% true expected CAGR. True Forward OOS evidence is still required before Production replacement or confidence in future return can be justified.
 
 Production Fixed60 remains unchanged unless the user explicitly approves a Production change.
