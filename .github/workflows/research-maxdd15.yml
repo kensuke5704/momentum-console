@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen return-stacked risk budgets
-        run: node --import tsx scripts/maxdd15-stage7-return-stack.ts
+      - name: Screen TQQQ forward planning CAGR
+        run: node --import tsx scripts/maxdd15-stage8-tqqq-planning.ts
