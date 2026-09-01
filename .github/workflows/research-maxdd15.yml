@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen directional switch Stage 4
-        run: node --import tsx scripts/cagr40-directional-switch-stage4.ts
+      - name: Screen N-PORT flow alpha Stage 5
+        run: node --import tsx scripts/cagr40-nport-flow-stage5.ts
