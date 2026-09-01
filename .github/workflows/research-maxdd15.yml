@@ -19,33 +19,29 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Ablate rounded Stage21 components
+      - name: Test rounded Stage21 later-start period stats
         run: |
           make_base () {
             cp scripts/cagr40-sbi-stage18.ts "$1"
             sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' "$1"
           }
 
-          make_base scripts/_a0-base.ts
-          echo '=== A0 BASE ==='
-          node --import tsx scripts/_a0-base.ts
+          make_base scripts/_t0-2021.ts
+          sed -i 's/st=performanceStats(base)/st=performanceStats(trim(base,"2021-01-01"))/' scripts/_t0-2021.ts
+          echo '=== T0 PERIOD 2021+ ==='
+          node --import tsx scripts/_t0-2021.ts
 
-          make_base scripts/_a1-no-cftc.ts
-          sed -i 's/desired:State=m3?"DEEP":cs?"YELLOW":"NORMAL"/desired:State=m3?"DEEP":"NORMAL"/' scripts/_a1-no-cftc.ts
-          echo '=== A1 NO CFTC YELLOW ==='
-          node --import tsx scripts/_a1-no-cftc.ts
+          make_base scripts/_t1-2022.ts
+          sed -i 's/st=performanceStats(base)/st=performanceStats(trim(base,"2022-01-01"))/' scripts/_t1-2022.ts
+          echo '=== T1 PERIOD 2022+ ==='
+          node --import tsx scripts/_t1-2022.ts
 
-          make_base scripts/_a2-no-m3.ts
-          sed -i 's/desired:State=m3?"DEEP":cs?"YELLOW":"NORMAL"/desired:State=cs?"YELLOW":"NORMAL"/' scripts/_a2-no-m3.ts
-          echo '=== A2 NO M3 DEEP ==='
-          node --import tsx scripts/_a2-no-m3.ts
+          make_base scripts/_t2-2023.ts
+          sed -i 's/st=performanceStats(base)/st=performanceStats(trim(base,"2023-01-01"))/' scripts/_t2-2023.ts
+          echo '=== T2 PERIOD 2023+ ==='
+          node --import tsx scripts/_t2-2023.ts
 
-          make_base scripts/_a3-no-gldm.ts
-          sed -i 's/f:.85,g:0,gold:.075,bond:.075,sh:0,c:0/f:.85,g:0,gold:0,bond:0,sh:0,c:.15/; s/f:.555,g:0,gold:.1125,bond:.1125,sh:0,c:.22/f:.555,g:0,gold:0,bond:0,sh:0,c:.445/; s/f:.255,g:0,gold:.15,bond:.15,sh:0,c:.445/f:.255,g:0,gold:0,bond:0,sh:0,c:.745/' scripts/_a3-no-gldm.ts
-          echo '=== A3 NO GLDM, CASH SUBSTITUTE ==='
-          node --import tsx scripts/_a3-no-gldm.ts
-
-          make_base scripts/_a4-no-signals.ts
-          sed -i 's/desired:State=m3?"DEEP":cs?"YELLOW":"NORMAL"/desired:State="NORMAL"/' scripts/_a4-no-signals.ts
-          echo '=== A4 NO CFTC OR M3 ==='
-          node --import tsx scripts/_a4-no-signals.ts
+          make_base scripts/_t3-2024.ts
+          sed -i 's/st=performanceStats(base)/st=performanceStats(trim(base,"2024-01-01"))/' scripts/_t3-2024.ts
+          echo '=== T3 PERIOD 2024+ ==='
+          node --import tsx scripts/_t3-2024.ts
