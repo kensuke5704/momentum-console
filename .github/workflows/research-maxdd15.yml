@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen dual-speed core stress Stage 11
-        run: node --import tsx scripts/cagr40-dual-speed-stage11.ts
+      - name: Screen two-tier hard circuit Stage 14
+        run: node --import tsx scripts/cagr40-two-tier-stage14.ts
