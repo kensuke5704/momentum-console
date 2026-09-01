@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen shock quarantine Stage 13
-        run: node --import tsx scripts/cagr40-shock-quarantine-stage13.ts
+      - name: Screen asymmetric TQQQ BTAL
+        run: node --import tsx scripts/cagr40-asymmetric-tqqq-btal-stage8.ts
