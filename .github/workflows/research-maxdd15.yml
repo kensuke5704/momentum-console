@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen N-PORT flow alpha Stage 5
-        run: node --import tsx scripts/cagr40-nport-flow-stage5.ts
+      - name: Screen SEC fundamental alpha Stage 6
+        run: node --import tsx scripts/cagr40-sec-fundamental-stage6.ts
