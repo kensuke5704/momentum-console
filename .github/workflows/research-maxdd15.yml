@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen MaxDD 15 designs
-        run: node --import tsx scripts/maxdd15-portfolio-screen.ts
+      - name: Screen MaxDD 15 governors
+        run: node --import tsx scripts/maxdd15-stage2-governors.ts
