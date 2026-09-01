@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen defensive cash replacements
-        run: node --import tsx scripts/maxdd15-stage4-defensive.ts
+      - name: Screen orthogonal hedges
+        run: node --import tsx scripts/maxdd15-stage5-hedges.ts
