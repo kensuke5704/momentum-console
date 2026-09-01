@@ -19,15 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen SBI IEF baseline
-        run: node --import tsx scripts/cagr40-sbi-stage18.ts
-      - name: Screen SBI SHY substitute
-        run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-shy.ts
-          sed -i 's/IEF/SHY/g' scripts/_sbi-shy.ts
-          node --import tsx scripts/_sbi-shy.ts
-      - name: Screen SBI TLT substitute
-        run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-tlt.ts
-          sed -i 's/IEF/TLT/g' scripts/_sbi-tlt.ts
-          node --import tsx scripts/_sbi-tlt.ts
+      - name: Screen SBI trend-gated Stage 20
+        run: node --import tsx scripts/cagr40-sbi-trend-stage20.ts
