@@ -34,7 +34,59 @@ Conclusion: leveraged ETF decay plus slow monthly direction changes produced una
 
 Conclusion: inverse ETF participation did not solve whipsaw or leveraged-decay risk.
 
-## Research decision
-Stop additional same-sample mining of price-only leveraged/inverse ETF architectures. Four structurally distinct families failed. The next useful research step must add genuinely new information rather than another OHLC-derived rule. Candidates should come from event/fundamental/positioning/flow data with point-in-time availability and an implementable daily signal path.
+## Stage 5 — PIT N-PORT flow acceleration
+Monthly signal, Top5 equal weight, next-open, 10bp/side, no price ranking.
 
-Do not modify Fixed60 Production mechanics based on this work.
+- AL Ownership Breadth Acceleration: CAGR 18.15%, MaxDD -44.50%, stress median 17.18%, rolling36 median 16.21%, planning 16.21%, Fixed60 corr 0.390. Reject.
+- AM Aggregate Weight Acceleration: CAGR 23.16%, MaxDD -39.42%, stress median 19.83%, rolling36 median 16.30%, rolling36 worst +2.64%, planning 16.30%, Fixed60 corr 0.496. Reject.
+- AN New Sponsorship: same realized ranking/result as AL in this dataset; planning 16.21%, corr 0.390. Reject.
+
+Conclusion: N-PORT holding-flow changes provide some positive return but insufficient planning return and insufficient independence for the portfolio objective. Stop further N-PORT derivative mining on the same sample.
+
+## Stage 6 — SEC XBRL fundamental acceleration
+Preregistered, not evaluated:
+- AO annual FCF acceleration
+- AP diluted-share-count contraction
+- AQ CFO/net-income quality improvement
+
+All use only annual 10-K facts filed by the signal date, PIT N-PORT universe, Top5, next-open, and no price ranking.
+
+Infrastructure result: GitHub Actions could not access SEC companyfacts. Official ticker mapping initially returned 403; after replacing only the ticker map with a pinned public GitHub mirror, `data.sec.gov` companyfacts still returned zero usable downloads (0/247 requested symbols, 230 attempted and failed). Therefore AO/AP/AQ are **data-blocked / untested**, not rejected. No strategy rule was changed in response to this access failure.
+
+## Stage 7 — High-Yield credit-spread guard on frozen M3 core
+Purpose: add a genuinely different credit-market state variable to the high-return M3 architecture rather than tuning its price thresholds.
+
+Data:
+- ICE BofA US High Yield OAS history, one-session lagged before use.
+- FRED now exposes only about three recent years for this ICE series, so a public long-history representation was used only to restore 2020-2026 coverage. The strategy rules were fixed before results.
+
+Frozen M3 allocation retained:
+- normal: Fixed60 85%, G 15%
+- defensive: Fixed60 30%, G 15%, BTAL 35%, cash 20%
+
+Preregistered macro additions:
+- AR: defensive when OAS >= 5%
+- AS: defensive when 20-observation OAS increase >= 1 percentage point
+- AT: AR OR AS
+- return to normal only after both M3 and macro condition are clear for 5 sessions
+
+Results:
+- AR: CAGR 44.72%, MaxDD -22.77%, stress median 44.42%, rolling36 median 42.04%, rolling36 worst 22.32%, planning 42.04%. Reject on DD.
+- AS: CAGR 51.71%, MaxDD -23.30%, stress median 49.82%, rolling36 median 46.38%, rolling36 worst 24.78%, planning 46.38%. Reject on DD.
+- AT: CAGR 44.30%, MaxDD -22.77%, stress median 43.55%, rolling36 median 41.38%, rolling36 worst 22.14%, planning 41.38%. Reject on DD.
+
+Conclusion: credit-market information can preserve a >40% planning-return proxy, but it does not solve the approximately 22-23% drawdown regime. Do not tune OAS thresholds further on this sample.
+
+## Current research conclusion
+Two constraints are now empirically distinct:
+1. Historical architectures with a planning-return proxy above 40% are available.
+2. The same architectures retain roughly 22-24% MaxDD.
+3. Risk targeting can push MaxDD to about 17%, but the planning proxy falls toward 30%.
+
+Price-only ETF architectures, N-PORT flow, and a simple credit-spread overlay have not bridged that gap. SEC annual fundamentals remain untested only because the current GitHub Actions environment cannot retrieve SEC companyfacts reliably.
+
+The next useful work should emphasize either:
+- an independent return stream with materially better return density than G/N-PORT flow, or
+- a genuinely anticipatory risk variable that is demonstrably active before the existing 2020-style drawdown rather than after it begins.
+
+Do not grid-search existing price, BTAL, TQQQ, OAS, or N-PORT thresholds on the 2020-2026 sample. Do not modify Fixed60 Production mechanics based on this work.
