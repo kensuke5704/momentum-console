@@ -7,7 +7,8 @@ import type { DashboardPayload } from "@/lib/types";
 function initialDashboard(): DashboardPayload {
   try {
     const data = JSON.parse(readFileSync(join(process.cwd(), "public/data/dashboard.json"), "utf8")) as { dashboard?: DashboardPayload };
-    return data.dashboard?.config?.strategyId ? data.dashboard : SNAPSHOT_DASHBOARD;
+    const dashboard = data.dashboard;
+    return dashboard?.portfolioConfig?.strategyId && dashboard?.portfolioState?.strategyId ? dashboard : SNAPSHOT_DASHBOARD;
   } catch { return SNAPSHOT_DASHBOARD; }
 }
 export default function Home() { return <MomentumApp initialDashboard={initialDashboard()} />; }
