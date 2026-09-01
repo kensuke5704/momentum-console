@@ -19,8 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen CFTC OI-normalized Stage 16
-        run: |
-          cp scripts/cagr40-cftc-yellow-stage15.ts scripts/_stage16-runtime.ts
-          sed -i 's/asset_mgr_positions_long/pct_of_oi_asset_mgr_long/g; s/asset_mgr_positions_short/pct_of_oi_asset_mgr_short/g' scripts/_stage16-runtime.ts
-          node --import tsx scripts/_stage16-runtime.ts
+      - name: Probe Cboe put-call access
+        run: node --import tsx scripts/cboe-putcall-probe.ts
