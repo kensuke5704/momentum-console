@@ -19,5 +19,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Inspect CFTC API schema
-        run: node --import tsx scripts/cftc-debug.ts
+      - name: Screen CFTC positioning guard Stage 14
+        run: |
+          sed -i 's/asset_mgr_positions_long_all/asset_mgr_positions_long/g; s/asset_mgr_positions_short_all/asset_mgr_positions_short/g' scripts/cagr40-cftc-positioning-stage14.ts
+          node --import tsx scripts/cagr40-cftc-positioning-stage14.ts
