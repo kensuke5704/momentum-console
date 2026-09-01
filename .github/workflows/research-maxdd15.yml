@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen non-equity macro alpha Stage 1
-        run: node --import tsx scripts/cagr40-new-alpha-stage1.ts
+      - name: Screen relative-value ETF Stage 2
+        run: node --import tsx scripts/cagr40-relative-value-stage2.ts
