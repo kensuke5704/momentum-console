@@ -1,8 +1,8 @@
-name: Research CAGR40 Orthogonal Engines
+name: Research CAGR40 New Alpha
 
 on:
   push:
-    branches: ["research/cagr40-orthogonal-20260901"]
+    branches: ["research/cagr40-new-alpha-20260901"]
   workflow_dispatch:
 
 permissions:
@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen volatility target Stage 17
-        run: node --import tsx scripts/cagr40-vol-target-stage17.ts
+      - name: Screen non-equity macro alpha Stage 1
+        run: node --import tsx scripts/cagr40-new-alpha-stage1.ts
