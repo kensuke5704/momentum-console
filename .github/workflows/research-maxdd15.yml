@@ -19,27 +19,25 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Audit rounded Stage21 with actual 2025 CFTC release availability
+      - name: Test contiguous rolling windows for rounded Stage21 PIT
         run: |
-          make_base () {
-            cp scripts/cagr40-sbi-stage18.ts "$1"
-            sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' "$1"
-          }
-
-          make_base scripts/_pit-naive.ts
-          echo '=== NAIVE 7-DAY REPORT-DATE LAG ==='
-          node --import tsx scripts/_pit-naive.ts
-
-          make_base scripts/_pit-release-aware.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_rolling-joint.ts
+          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' scripts/_rolling-joint.ts
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('scripts/_pit-release-aware.ts')
+          p=Path('scripts/_rolling-joint.ts')
           s=p.read_text()
           old='function cotStress(rows:Cot[],date:string){const cut=new Date(date+"T00:00:00Z");cut.setUTCDate(cut.getUTCDate()-7);const ds=rows.filter(x=>x.date<=cut.toISOString().slice(0,10));if(ds.length<5)return false;return ds[ds.length-1].net<ds[ds.length-5].net}'
           new='''const COT_RELEASE_OVERRIDES:Record<string,string>={"2025-09-30":"2025-11-19","2025-10-07":"2025-11-21","2025-10-14":"2025-11-25","2025-10-21":"2025-12-02","2025-10-28":"2025-12-05","2025-11-04":"2025-12-09","2025-11-10":"2025-12-10","2025-11-18":"2025-12-12","2025-11-25":"2025-12-15","2025-12-02":"2025-12-17","2025-12-09":"2025-12-19","2025-12-16":"2025-12-23","2025-12-23":"2025-12-29"};function cotStress(rows:Cot[],date:string){const cut=new Date(date+"T00:00:00Z");cut.setUTCDate(cut.getUTCDate()-7);const cutoff=cut.toISOString().slice(0,10);const ds=rows.filter(x=>x.date<=cutoff&&(!COT_RELEASE_OVERRIDES[x.date]||COT_RELEASE_OVERRIDES[x.date]<=date));if(ds.length<5)return false;return ds[ds.length-1].net<ds[ds.length-5].net}'''
-          if old not in s: raise SystemExit('cotStress pattern not found')
+          if old not in s: raise SystemExit('cot pattern not found')
           s=s.replace(old,new)
+          marker='console.log(JSON.stringify({architecture:"SBI Stage18: exact Stage15 role substitution"'
+          i=s.find(marker)
+          if i<0: raise SystemExit('output marker not found')
+          j=s.find('}\nmain().catch',i)
+          if j<0: raise SystemExit('main end marker not found')
+          diag='''function rollJoint(c:EquityPoint[],months:number){const out:any[]=[];for(let i=0;i<c.length;i++){const sd=new Date(c[i].date+"T00:00:00Z"),ed=new Date(sd);ed.setUTCMonth(ed.getUTCMonth()+months);let j=i;while(j+1<c.length&&new Date(c[j+1].date+"T00:00:00Z")<=ed)j++;const yrs=(new Date(c[j].date+"T00:00:00Z").getTime()-sd.getTime())/86400000/365.25;if(yrs<months/12*.95)continue;const seg=trim(c,c[i].date).filter(x=>x.date<=c[j].date),st=performanceStats(seg);out.push({start:c[i].date,end:c[j].date,cagr:st.cagr,maxDD:st.maxDrawdown,passReturn:st.cagr>=.40,passDD:st.maxDrawdown>=-.17,pass:st.cagr>=.40&&st.maxDrawdown>=-.17})}return out}\nconst summary:any={};for(const m of [24,30,36,48]){const a=rollJoint(base,m),cagrs=a.map(x=>x.cagr).sort((x,y)=>x-y),dds=a.map(x=>x.maxDD).sort((x,y)=>x-y);summary[m]={n:a.length,passBoth:a.filter(x=>x.pass).length,passBothShare:a.length?a.filter(x=>x.pass).length/a.length:null,passReturnShare:a.length?a.filter(x=>x.passReturn).length/a.length:null,passDDShare:a.length?a.filter(x=>x.passDD).length/a.length:null,cagrMedian:median(cagrs),cagrP10:cagrs[Math.floor((cagrs.length-1)*.10)],cagrWorst:cagrs[0],ddMedian:median(dds),ddP10:dds[Math.floor((dds.length-1)*.10)],ddWorst:dds[0],worstReturnWindows:a.sort((x,y)=>x.cagr-y.cagr).slice(0,3),worstDDWindows:a.sort((x,y)=>x.maxDD-y.maxDD).slice(0,3)}}console.log(JSON.stringify({stats:st,planningProxy:proxy,rollingJoint:summary},null,2))'''
+          s=s[:i]+diag+s[j:]
           p.write_text(s)
           PY
-          echo '=== RELEASE-AWARE PIT ==='
-          node --import tsx scripts/_pit-release-aware.ts
+          node --import tsx scripts/_rolling-joint.ts
