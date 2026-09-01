@@ -1,0 +1,23 @@
+name: Research MaxDD 15 Portfolio
+
+on:
+  push:
+    branches: ["research/maxdd15-portfolio-20260901"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  maxdd15:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Screen MaxDD 15 designs
+        run: node --import tsx scripts/maxdd15-portfolio-screen.ts
