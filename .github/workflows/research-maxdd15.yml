@@ -19,34 +19,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Decompose rounded Stage21 drawdowns and states
+      - name: Audit rounded Stage21 with actual 2025 CFTC release availability
         run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_stage21-diagnostic.ts
+          make_base () {
+            cp scripts/cagr40-sbi-stage18.ts "$1"
+            sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' "$1"
+          }
+
+          make_base scripts/_pit-naive.ts
+          echo '=== NAIVE 7-DAY REPORT-DATE LAG ==='
+          node --import tsx scripts/_pit-naive.ts
+
+          make_base scripts/_pit-release-aware.ts
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('scripts/_stage21-diagnostic.ts')
+          p=Path('scripts/_pit-release-aware.ts')
           s=p.read_text()
-          # Rounded SBI Stage21 v1.
-          s=s.replace('IEF','GLDM')
-          s=s.replace('sh:.074375,c:.14875','sh:0,c:.22').replace('sh:.14875,c:.2975','sh:0,c:.445')
-          s=s.replace('f:.7225,g:.1275','f:.85,g:0').replace('f:.425,g:.1275','f:.555,g:0').replace('f:.1275,g:.1275','f:.255,g:0')
-          s=s.replace('gold:.1121875,bond:.1121875','gold:.1125,bond:.1125').replace('gold:.149375,bond:.149375','gold:.15,bond:.15')
-          # Instrument apply(): daily state, turnover, transaction-cost drag, and sleeve return contribution.
-          s=s.replace('const out:EquityPoint[]=[{date:f[0].date,equity:1,drawdown:0}];for(const d of dates){',
-          'const out:any[]=[{date:f[0].date,equity:1,drawdown:0,state:"NORMAL",turnover:0,costDrag:0,cf:0,cgold:0,ccash:0,m3:false,cftc:false}];for(const d of dates){')
-          old='const cs=cotStress(cotRows,shadow[si]?.date??d),desired:State=m3?"DEEP":cs?"YELLOW":"NORMAL";bal.f*=1+(fm.get(d)??0);bal.g*=1+(gm.get(d)??0);bal.gold*=1+(am.get(d)??0);bal.bond*=1+(bm.get(d)??0);bal.sh*=1+(smkt.get(d)??0);const month=d.slice(0,7),rebalance=month!==lastMonth||desired!==state;if(rebalance){let total=bal.f+bal.g+bal.gold+bal.bond+bal.sh+bal.c;const t=targets(desired),cur={f:bal.f/total,g:bal.g/total,gold:bal.gold/total,bond:bal.bond/total,sh:bal.sh/total,c:bal.c/total},turn=(Math.abs(cur.f-t.f)+Math.abs(cur.g-t.g)+Math.abs(cur.gold-t.gold)+Math.abs(cur.bond-t.bond)+Math.abs(cur.sh-t.sh)+Math.abs(cur.c-t.c))/2;total*=1-cost*turn;bal={f:total*t.f,g:total*t.g,gold:total*t.gold,bond:total*t.bond,sh:total*t.sh,c:total*t.c};lastMonth=month;state=desired}const e=bal.f+bal.g+bal.gold+bal.bond+bal.sh+bal.c;peak=Math.max(peak,e);out.push({date:d,equity:e,drawdown:e/peak-1})'
-          new='const cs=cotStress(cotRows,shadow[si]?.date??d),desired:State=m3?"DEEP":cs?"YELLOW":"NORMAL";const pre=bal.f+bal.g+bal.gold+bal.bond+bal.sh+bal.c,rf=fm.get(d)??0,rg=gm.get(d)??0,ra=am.get(d)??0,rb=bm.get(d)??0,rs=smkt.get(d)??0,cf=pre?bal.f*rf/pre:0,cgold=pre?(bal.gold*ra+bal.bond*rb)/pre:0;bal.f*=1+rf;bal.g*=1+rg;bal.gold*=1+ra;bal.bond*=1+rb;bal.sh*=1+rs;const month=d.slice(0,7),rebalance=month!==lastMonth||desired!==state;let turn=0,costDrag=0;if(rebalance){let total=bal.f+bal.g+bal.gold+bal.bond+bal.sh+bal.c;const beforeCost=total,t=targets(desired),cur={f:bal.f/total,g:bal.g/total,gold:bal.gold/total,bond:bal.bond/total,sh:bal.sh/total,c:bal.c/total};turn=(Math.abs(cur.f-t.f)+Math.abs(cur.g-t.g)+Math.abs(cur.gold-t.gold)+Math.abs(cur.bond-t.bond)+Math.abs(cur.sh-t.sh)+Math.abs(cur.c-t.c))/2;total*=1-cost*turn;costDrag=pre?(beforeCost-total)/pre:0;bal={f:total*t.f,g:total*t.g,gold:total*t.gold,bond:total*t.bond,sh:total*t.sh,c:total*t.c};lastMonth=month;state=desired}const e=bal.f+bal.g+bal.gold+bal.bond+bal.sh+bal.c;peak=Math.max(peak,e);out.push({date:d,equity:e,drawdown:e/peak-1,state:desired,turnover:turn,costDrag,cf,cgold,ccash:0,m3,cftc:cs})'
-          if old not in s:
-              raise SystemExit('apply pattern not found')
+          old='function cotStress(rows:Cot[],date:string){const cut=new Date(date+"T00:00:00Z");cut.setUTCDate(cut.getUTCDate()-7);const ds=rows.filter(x=>x.date<=cut.toISOString().slice(0,10));if(ds.length<5)return false;return ds[ds.length-1].net<ds[ds.length-5].net}'
+          new='''const COT_RELEASE_OVERRIDES:Record<string,string>={"2025-09-30":"2025-11-19","2025-10-07":"2025-11-21","2025-10-14":"2025-11-25","2025-10-21":"2025-12-02","2025-10-28":"2025-12-05","2025-11-04":"2025-12-09","2025-11-10":"2025-12-10","2025-11-18":"2025-12-12","2025-11-25":"2025-12-15","2025-12-02":"2025-12-17","2025-12-09":"2025-12-19","2025-12-16":"2025-12-23","2025-12-23":"2025-12-29"};function cotStress(rows:Cot[],date:string){const cut=new Date(date+"T00:00:00Z");cut.setUTCDate(cut.getUTCDate()-7);const cutoff=cut.toISOString().slice(0,10);const ds=rows.filter(x=>x.date<=cutoff&&(!COT_RELEASE_OVERRIDES[x.date]||COT_RELEASE_OVERRIDES[x.date]<=date));if(ds.length<5)return false;return ds[ds.length-1].net<ds[ds.length-5].net}'''
+          if old not in s: raise SystemExit('cotStress pattern not found')
           s=s.replace(old,new)
-          # Replace main output with diagnostics.
-          marker='console.log(JSON.stringify({architecture:"SBI Stage18: exact Stage15 role substitution"'
-          i=s.find(marker)
-          if i<0: raise SystemExit('main output marker not found')
-          j=s.find('}\nmain().catch', i)
-          if j<0: raise SystemExit('main end marker not found')
-          diag='''const rows:any[]=base as any[];\nfunction episodes(a:any[]){const out:any[]=[];let peakIdx=0,troughIdx=0,inDD=false;for(let i=1;i<a.length;i++){if(a[i].equity>=a[peakIdx].equity){if(inDD){const seg=a.slice(peakIdx,i+1),tr=a[troughIdx];out.push({peak:a[peakIdx].date,trough:tr.date,recovery:a[i].date,dd:tr.drawdown,days:seg.length-1,states:Object.fromEntries(["NORMAL","YELLOW","DEEP"].map(x=>[x,seg.filter((r:any)=>r.state===x).length])),turnover:seg.reduce((z:number,r:any)=>z+(r.turnover||0),0),fixedContribution:seg.reduce((z:number,r:any)=>z+(r.cf||0),0),goldContribution:seg.reduce((z:number,r:any)=>z+(r.cgold||0),0),costDrag:seg.reduce((z:number,r:any)=>z-(r.costDrag||0),0),firstYellow:seg.find((r:any)=>r.state==="YELLOW")?.date??null,firstDeep:seg.find((r:any)=>r.state==="DEEP")?.date??null});}peakIdx=i;troughIdx=i;inDD=false}else{inDD=true;if(a[i].drawdown<a[troughIdx].drawdown)troughIdx=i}}if(inDD){const seg=a.slice(peakIdx),tr=a[troughIdx];out.push({peak:a[peakIdx].date,trough:tr.date,recovery:null,dd:tr.drawdown,days:seg.length-1,states:Object.fromEntries(["NORMAL","YELLOW","DEEP"].map(x=>[x,seg.filter((r:any)=>r.state===x).length])),turnover:seg.reduce((z:number,r:any)=>z+(r.turnover||0),0),fixedContribution:seg.reduce((z:number,r:any)=>z+(r.cf||0),0),goldContribution:seg.reduce((z:number,r:any)=>z+(r.cgold||0),0),costDrag:seg.reduce((z:number,r:any)=>z-(r.costDrag||0),0),firstYellow:seg.find((r:any)=>r.state==="YELLOW")?.date??null,firstDeep:seg.find((r:any)=>r.state==="DEEP")?.date??null});}return out.sort((x,y)=>x.dd-y.dd)}\nconst eps=episodes(rows).slice(0,8);const stateDays=Object.fromEntries(["NORMAL","YELLOW","DEEP"].map(x=>[x,rows.filter(r=>r.state===x).length]));const transitions=rows.slice(1).filter((r,i)=>r.state!==rows[i].state).map((r,i)=>({date:r.date,to:r.state}));const totalTurnover=rows.reduce((z,r)=>z+(r.turnover||0),0);const rebalanceDays=rows.filter(r=>(r.turnover||0)>0).length;console.log(JSON.stringify({stats:st,planningProxy:proxy,stateDays,stateShare:Object.fromEntries(Object.entries(stateDays).map(([k,v])=>[k,(v as number)/rows.length])),transitionCount:transitions.length,transitions:transitions.slice(0,80),totalTurnover,annualizedTurnover:totalTurnover/((new Date(rows.at(-1).date).getTime()-new Date(rows[0].date).getTime())/86400000/365.25),rebalanceDays,episodes:eps},null,2))'''
-          s=s[:i]+diag+s[j:]
           p.write_text(s)
           PY
-          node --import tsx scripts/_stage21-diagnostic.ts
+          echo '=== RELEASE-AWARE PIT ==='
+          node --import tsx scripts/_pit-release-aware.ts
