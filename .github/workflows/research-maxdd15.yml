@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Diagnose Stage 5 drawdown window
-        run: node --import tsx scripts/cagr40-stage5-drawdown-diagnostic.ts
+      - name: Screen core drawdown BTAL Stage 6
+        run: node --import tsx scripts/cagr40-coredd-btal-stage6.ts
