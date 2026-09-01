@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen dynamic BTAL Stage 4
-        run: node --import tsx scripts/cagr40-dynamic-btal-stage4.ts
+      - name: Diagnose Stage 5 drawdown window
+        run: node --import tsx scripts/cagr40-stage5-drawdown-diagnostic.ts
