@@ -18,5 +18,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run frozen G stage 5 validation
-        run: node --import tsx scripts/independent-alpha-g-stage5.ts
+      - name: Run corrected Fixed60 comparison
+        run: node --import tsx scripts/independent-alpha-g-fixed60-corrected.ts
