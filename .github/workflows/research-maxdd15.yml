@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen asymmetric TQQQ BTAL
-        run: node --import tsx scripts/cagr40-asymmetric-tqqq-btal-stage8.ts
+      - name: Screen static hedge Stage 15
+        run: node --import tsx scripts/cagr40-static-hedge-stage15.ts
