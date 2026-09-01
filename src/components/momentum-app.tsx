@@ -61,16 +61,17 @@ const usMarketOpenAt = (value: string | null | undefined) => {
   }
   return updatedAt(instant.toISOString()).slice(0, 16);
 };
-const NEXT_ACTIONS: Array<{ type: NextActionType; meaning: string }> = [
-  { type: "BUY_NEXT_OPEN", meaning: "次の米国営業日の寄付きでTop2を新規購入します。" },
-  { type: "SELL_ALL_NEXT_OPEN", meaning: "次の米国営業日の寄付きで全保有銘柄を売却します。" },
-  { type: "HOLD", meaning: "現在のポートフォリオをそのまま維持します。" },
-  { type: "CASH_RECOVERY", meaning: "現金のまま、設定されたRecovery連続日数を満たすまで待機します。" },
-  { type: "MONTH_END_REBALANCE_NEXT_OPEN", meaning: "Month-end" },
-  { type: "CASH", meaning: "保留中の注文はなく、現金で待機します。" },
+const NEXT_ACTIONS: Array<{ type: NextActionType; label: string; meaning: string }> = [
+  { type: "BUY_NEXT_OPEN", label: "BUY", meaning: "Next open" },
+  { type: "SELL_ALL_NEXT_OPEN", label: "EXIT", meaning: "Next open" },
+  { type: "HOLD", label: "HOLD", meaning: "Keep" },
+  { type: "CASH_RECOVERY", label: "LOCK", meaning: "Recovery" },
+  { type: "MONTH_END_REBALANCE_NEXT_OPEN", label: "REBAL", meaning: "Month-end" },
+  { type: "CASH", label: "CASH", meaning: "No order" },
 ];
-const nextActionLabel = (type: NextActionType) => type === "MONTH_END_REBALANCE_NEXT_OPEN" ? "REBAL" : type.replaceAll("_", " ");
-const nextActionReason = (type: NextActionType, reason: string) => type === "MONTH_END_REBALANCE_NEXT_OPEN" ? "Month-end" : reason;
+const actionCopy = (type: NextActionType) => NEXT_ACTIONS.find((item) => item.type === type);
+const nextActionLabel = (type: NextActionType) => actionCopy(type)?.label ?? type.replaceAll("_", " ");
+const nextActionReason = (type: NextActionType, reason: string) => actionCopy(type)?.meaning ?? reason;
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   return <div className="dynamic-metric"><span>{label}</span><strong className={tone ? `tone-${tone}` : ""}>{value}</strong></div>;
