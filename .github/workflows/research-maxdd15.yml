@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen Cboe put-call Stage 17
-        run: node --import tsx scripts/cagr40-putcall-stage17.ts
+      - name: Screen SBI-only Stage 18
+        run: node --import tsx scripts/cagr40-sbi-stage18.ts
