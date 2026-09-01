@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Validate Candidate U robustness
-        run: node --import tsx scripts/independent-alpha-engine2-stage8-u-validation.ts
+      - name: Compare Fixed60 G U portfolios
+        run: node --import tsx scripts/fixed60-g-u-portfolio-comparison.ts
