@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen MaxDD 15 governors
-        run: node --import tsx scripts/maxdd15-stage2-governors.ts
+      - name: Compare Fixed60 and G target-DD portfolios
+        run: node --import tsx scripts/maxdd15-stage3-fixed-g.ts
