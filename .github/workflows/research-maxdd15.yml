@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen volatility guard Stage 12
-        run: node --import tsx scripts/cagr40-volatility-guard-stage12.ts
+      - name: Screen financial stress guard Stage 13
+        run: node --import tsx scripts/cagr40-financial-stress-stage13.ts
