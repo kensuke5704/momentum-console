@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen inverse ETF hedge Stage 12
-        run: node --import tsx scripts/cagr40-inverse-hedge-stage12.ts
+      - name: Screen dual-speed core stress Stage 11
+        run: node --import tsx scripts/cagr40-dual-speed-stage11.ts
