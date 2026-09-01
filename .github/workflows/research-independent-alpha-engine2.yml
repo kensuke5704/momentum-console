@@ -1,0 +1,22 @@
+name: Research Independent Alpha Engine 2
+
+on:
+  push:
+    branches: ["research/independent-alpha-engine2-20260901"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alpha-engine2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run preregistered candidates I J K
+        run: node --import tsx scripts/independent-alpha-engine2-stage1.ts
