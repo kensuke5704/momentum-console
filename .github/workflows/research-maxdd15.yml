@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen financial stress guard Stage 13
-        run: node --import tsx scripts/cagr40-financial-stress-stage13.ts
+      - name: Screen CFTC positioning guard Stage 14
+        run: node --import tsx scripts/cagr40-cftc-positioning-stage14.ts
