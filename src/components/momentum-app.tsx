@@ -69,8 +69,8 @@ const NEXT_ACTIONS: Array<{ type: NextActionType; meaning: string }> = [
   { type: "MONTH_END_REBALANCE_NEXT_OPEN", meaning: "月末シグナル確定後、次の米国営業日の寄付きでTop2へリバランスします。" },
   { type: "CASH", meaning: "保留中の注文はなく、現金で待機します。" },
 ];
-const nextActionLabel = (type: NextActionType) => type === "MONTH_END_REBALANCE_NEXT_OPEN" ? "REBALANCE" : type.replaceAll("_", " ");
-const nextActionReason = (type: NextActionType, reason: string) => type === "MONTH_END_REBALANCE_NEXT_OPEN" ? "Month-end confirmed" : reason;
+const nextActionLabel = (type: NextActionType) => type === "MONTH_END_REBALANCE_NEXT_OPEN" ? "REBAL" : type.replaceAll("_", " ");
+const nextActionReason = (type: NextActionType, reason: string) => type === "MONTH_END_REBALANCE_NEXT_OPEN" ? "Month-end" : reason;
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   return <div className="dynamic-metric"><span>{label}</span><strong className={tone ? `tone-${tone}` : ""}>{value}</strong></div>;
