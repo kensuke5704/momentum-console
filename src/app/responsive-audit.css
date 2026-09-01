@@ -1,15 +1,108 @@
-/* Responsive hardening for the Fixed60 console. Keep this file after globals.css. */
+/* Responsive hardening for the production console. Keep this file after globals.css. */
 .sidebar-foot > strong {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+/* Stage21 operational rows use flex rather than minmax track lists so CSS
+   minification cannot collapse adjacent grid functions. */
+.allocation-list {
+  display: block !important;
+  padding: 0 !important;
+}
+
+.allocation-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex !important;
+  gap: 16px;
+  min-width: 0;
+  padding: 15px 20px;
+}
+
+.allocation-row:last-child { border-bottom: 0; }
+.allocation-row > strong { flex: 1 1 90px; min-width: 0; }
+.allocation-row > span { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
+.allocation-row > b { flex: 0 0 auto; margin-left: auto; text-align: right; white-space: nowrap; }
+
+.simple-table { display: block !important; padding: 0 !important; }
+.simple-table > div {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  min-width: 0;
+  padding: 14px 18px;
+}
+.simple-table > div:last-child { border-bottom: 0; }
+.simple-table > div > * { min-width: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 901px) {
+  .next-action.next-action-stage21 {
+    grid-template-columns: 1fr 1fr 2fr !important;
+  }
+  .next-action.next-action-stage21 > div,
+  .next-action.next-action-stage21 > div:nth-child(-n + 3),
+  .next-action.next-action-stage21 > div:nth-child(4),
+  .next-action.next-action-stage21 > div:nth-child(5) {
+    border-bottom: 0 !important;
+    grid-column: auto !important;
+  }
+  .next-action.next-action-stage21 > div:last-child { border-right: 0 !important; }
+}
+
+@media (max-width: 900px) {
+  .dynamic-shell { max-width: 100vw; min-width: 0; overflow-x: hidden; }
+  .dynamic-shell main { margin-left: 0 !important; max-width: 100vw; min-width: 0; width: 100%; }
+  .dynamic-shell .sidebar {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    box-sizing: border-box;
+    display: block !important;
+    height: auto !important;
+    left: auto !important;
+    max-width: 100vw;
+    overflow-x: auto;
+    padding: 9px 10px;
+    position: sticky !important;
+    top: 0;
+    transform: none !important;
+    width: 100% !important;
+    z-index: 30;
+  }
+  .dynamic-shell .sidebar .brand,
+  .dynamic-shell .sidebar .sidebar-foot { display: none !important; }
+  .dynamic-shell .sidebar nav { display: flex !important; min-width: max-content; }
+  .dynamic-shell .topbar { top: 58px !important; }
+  .dynamic-content { max-width: 100vw; min-width: 0; padding: 16px 13px 36px; width: 100%; }
+
+  .next-action.next-action-stage21 { grid-template-columns: 1fr !important; }
+  .next-action.next-action-stage21 .target-cell { grid-column: auto !important; }
+  .next-action.next-action-stage21 > div,
+  .next-action.next-action-stage21 > div:nth-child(-n + 3) {
+    border-bottom: 1px solid var(--line) !important;
+    border-right: 0 !important;
+    grid-column: auto !important;
+    min-height: 90px !important;
+    padding: 16px !important;
+  }
+  .next-action.next-action-stage21 > div:last-child { border-bottom: 0 !important; }
+
+  .allocation-row { gap: 10px; padding: 13px 14px; }
+  .allocation-row > strong { flex-basis: 64px; }
+  .allocation-row > span { flex-basis: 88px; }
+}
+
 @media (max-width: 520px) {
   .sidebar nav button {
     scroll-margin-inline: 12px;
+    padding-left: 9px !important;
+    padding-right: 9px !important;
   }
 
   .sidebar nav button span {
+    font-size: 10px !important;
     white-space: nowrap;
   }
 
@@ -34,8 +127,6 @@
     padding-bottom: 0;
   }
 
-  /* Keep the histogram inside the phone viewport. Axis labels are already
-     thinned in the chart component, so horizontal panning is unnecessary. */
   .monthly-return-distribution > .recharts-responsive-container {
     width: 100% !important;
     min-width: 0 !important;
@@ -43,9 +134,7 @@
     flex: 1 1 auto;
   }
 
-  .monthly-return-summary {
-    gap: 8px 14px;
-  }
+  .monthly-return-summary { gap: 8px 14px; }
 
   .execution-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -55,19 +144,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
-  .rules-grid:not(.execution-grid) > div {
-    border-right: 1px solid var(--line);
-  }
+  .rules-grid:not(.execution-grid) > div { border-right: 1px solid var(--line); }
+  .rules-grid:not(.execution-grid) > div:nth-child(2n) { border-right: 0; }
+  .rules-grid:not(.execution-grid) > div:nth-last-child(-n + 2) { border-bottom: 0; }
 
-  .rules-grid:not(.execution-grid) > div:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .rules-grid:not(.execution-grid) > div:nth-last-child(-n + 2) {
-    border-bottom: 0;
-  }
-
-  /* Inline desktop dimensions must yield to wrapped phone content. */
   .next-action > div {
     align-content: start;
     grid-template-rows: 15px minmax(0, auto) !important;
@@ -76,9 +156,16 @@
   }
 
   .next-action-copy strong,
-  .next-action-copy p {
-    overflow-wrap: anywhere;
-  }
+  .next-action-copy p { overflow-wrap: anywhere; }
+  .next-action.next-action-stage21 strong { font-size: 19px !important; line-height: 1.35 !important; }
+
+  .allocation-row { font-size: 12px; gap: 8px; }
+  .allocation-row > span { font-size: 8px; }
+
+  .dynamic-metric-grid,
+  .dynamic-metric-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .dynamic-metric { min-width: 0; padding: 14px 12px !important; }
+  .dynamic-metric strong { font-size: 16px !important; overflow-wrap: anywhere; }
 
   .table-scroll > .empty-state {
     border-width: 0;
@@ -90,7 +177,5 @@
     grid-template-columns: 88px minmax(0, 1fr) !important;
   }
 
-  .action-modal > header + div:not(.action-guide-list) > div {
-    padding: 14px !important;
-  }
+  .action-modal > header + div:not(.action-guide-list) > div { padding: 14px !important; }
 }
