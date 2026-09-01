@@ -1,103 +1,160 @@
-# Momentum Console — Dynamic Production Strategy
+# Momentum Console — Stage21 Production
 
-`momentum-dynamic-2026-08-v1` を唯一のProduction Strategyとして表示・検証するNext.jsアプリです。固定TickerリストやWatchlistを採用Universeへ混ぜず、各signal monthで公開済みだったSEC Form N-PORT holdingsからPoint-in-Time Universeを再構築します。
+このNext.jsアプリは、SBI証券で実行可能なProduction portfolio **`momentum-stage21-sbi-2026-09-v1`** のsignal・target allocation・backtest・True Forward OOSを一元管理します。
 
-## Strategy
+旧Production `momentum-fixed60-2026-08-v1` は削除していません。現在はStage21の**内側のalpha/risk engine**としてTop2選定、stop/circuit/recovery、M3 shadow計算に利用します。旧Production仕様は [`docs/legacy/momentum-fixed60-2026-08-v1.md`](docs/legacy/momentum-fixed60-2026-08-v1.md) に保存しています。
 
-- Universe: SEC N-PORT breadth score Top 80
-- Point-in-Time: `filingDate <= signal close date`、各`seriesId`の公開済み最新filingだけを使用
-- Momentum: `0 × 1M + 0.20 × 3M + 0.80 × 6M`
-- Exclusions: 1M returnが+80%以上、またはMomentum scoreがQQQ以下
-- Selection: Top2。2銘柄未満なら新規Risk-On portfolioを組まない
-- Allocation: 通常50/50、raw Momentumのcross-sectional `zGap >= 0.25`なら70/30。Top1上限70%
-- Market gate: QQQ close > QQQ 10-month moving average
-- Individual stop: entryから-17.5%をdaily Closeで確認し、翌session Openで全売却
-- Portfolio circuit: equity peakから-15%をdaily Closeで確認し、翌session Openで全売却
-- Persistent recovery: monthly gate RiskOn、QQQ > 100DMA、20 trading-day momentum > 0を10 closes連続確認し、翌session Openで再投入
-- Execution: month-end signal、stop、circuit、recoveryのすべてが`confirmation close → next US session open`
-- Cost: entry/exit双方へ片道10bp
+## Production portfolio
 
-Production parameterは[`src/lib/config.ts`](src/lib/config.ts)だけで定義します。UI、同期script、signal、backtest、OOSは同じ定義をimportし、別parameterを持ちません。
+| State | Fixed60 sleeve | GLDM | Cash |
+|---|---:|---:|---:|
+| NORMAL | 85.0% | 15.0% | 0.0% |
+| YELLOW | 55.5% | 22.5% | 22.0% |
+| DEEP | 25.5% | 30.0% | 44.5% |
+
+借入・marginは使わず、gross exposureは100%以下です。SBIでは整数株で執行し、端数はCashとして残します。
+
+Production portfolio parameterは [`src/lib/portfolio-config.ts`](src/lib/portfolio-config.ts)、Fixed60 inner parameterは [`src/lib/config.ts`](src/lib/config.ts) がsingle source of truthです。
+
+詳細な凍結仕様は [`docs/production/stage21-sbi-2026-09-v1.md`](docs/production/stage21-sbi-2026-09-v1.md) を参照してください。
+
+## Regime logic
+
+### CFTC Yellow
+- CFTC Traders in Financial Futures
+- NASDAQ MINI contract 209742
+- Asset Manager net = long - short
+- 1週間のpublication lag
+- 最新eligible net < 4 report前のnet ならYELLOW
+- magnitude thresholdなし
+- 公開遅延がある場合は実際のrelease dateを優先（2025 shutdown backlogをPIT補正済み）
+
+### M3 Deep
+M3は資金を投入しないshadow coreを使います。
+
+```text
+shadow core = 85% Fixed60 + 15% frozen Candidate G
+```
+
+- 20D shadow return < 0
+- かつ20D QQQ比 underperformance <= -10pp
+- 上記でDEEP
+- gap > -3ppを5 sessions確認して解除
+
+Candidate Gは**funded sleeveではありません**。
+
+## Fixed60 inner engine
+
+- SEC N-PORT breadth Universe Top80
+- Point-in-Time: filingDate <= signal close date
+- Momentum: 0×1M + 0.20×3M + 0.80×6M
+- 1M +80%以上を除外
+- stock score <= QQQ scoreを除外
+- Top2、60/40
+- QQQ 10-month MA gate
+- individual stop -17.5%
+- portfolio circuit -15%
+- recovery: QQQ >100DMA、20D momentum >0、10 closes
+- close confirmation -> next US open
+
+## Rebalancing / execution
+
+Stage21は以下で次の米国寄付きにfunded portfolioをrebuildします。
+
+- 月次rebalance
+- NORMAL/YELLOW/DEEPの変更
+- Fixed60 funded targetの変更
+- delayed N-PORT activationによるTop2変更
+
+Outer portfolio transaction-cost modelは片道10bpのtraded notionalです。
 
 ## Dynamic Universe
 
-ETF sourceはleveraged/inverse、option income、buffer、fixed income、allocation/income、broad benchmark型を除外します。holdings数10〜120、positive weight合計50以上、Top10 weight合計25以上を満たすETFだけを使います。
-
-各stockについて`etfCount`、`aggregateWeight`、`maxWeight`、`recencyWeight`を計算します。
-
-```text
-recencyFactor = exp(-ageDays / 120)
-
-Universe score =
-3.0 × log1p(etfCount)
-+ 0.5 × log1p(aggregateWeight)
-+ 0.5 × log1p(recencyWeight)
-```
-
-`etfCount >= 2 OR maxWeight >= 4`だけをscore順に並べ、Top80をfreezeします。株価returnはUniverse admissionに使用しません。出力にはsource filings、rank、各score component、added/removedを保存します。
-
-## Data workflow
-
-新しいSEC quarterは、SEC公式サイトから人が取得したquarterly ZIPだけを手動で取り込みます。アプリやGitHub ActionsからSECへ直接ダウンロードしません。
+SEC N-PORT quarterly ZIPは公式ファイルを手動取込します。
 
 ```bash
 npm ci
 npm run import:nport -- /absolute/path/YYYYqN_nport.zip
 ```
 
-日次価格・state・backtest・Forward OOS:
+`sync:universe`は公開済みfilingだけからPIT Universe historyを再生成します。新しいquarterly ZIPが未取込の場合は直前のvalid Universeをfallbackとして維持し、遅延取込後に元のofficial month-end closeを使ってTop2を再評価します。
+
+## Daily data pipeline
 
 ```bash
 npm run sync:data
 npm run sync:oos
 ```
 
-`import:nport`はZIP構造と必須headerを検証して正規化済みfiling cacheを更新し、Universe、atlas、market data、OOS、tests/typecheck/lint/buildまで一括実行します。詳細は[`docs/runbooks/manual-nport-update.md`](docs/runbooks/manual-nport-update.md)を参照してください。`sync:universe`はQQQのofficial trading close dateをsignal dateとしてPIT Universe historyを再生成します。`sync:data`はYahoo Financeのadjusted closeと同一adjustment factorをOpen/High/Lowへ適用し、splitによる偽stopを防ぎます。Yahooの日足`close`/`adjclose`がClose後も未生成の場合は、16:00 ET（短縮日は13:00 ET）のregular-market時刻、`regularMarketPrice`、30分足の始値・全session coverage・closing markerが一致した場合だけ、検証済み暫定日足を使用します。不一致時はQQQをstrategy clockとして当日stateをatomicに進めず、部分更新を残しません。暫定OOS点は正式なadjusted日足到着時に自動置換します。
+`sync:data`は以下をatomicに更新します。
 
-GitHub ActionsはClose後の22:20 UTCに加え、00:30 UTC（Close後retry）と次回Open前の08:30 / 10:30 / 12:30 UTCにも再取得します。定期・手動のデータ更新では、必要な日足または検証済みfallbackが揃わなければworkflowを失敗させ、直前の正常な公開版を維持します。古い価格を混ぜたstateや部分更新は公開しません。画面の「最新データを読込」はActionsが公開した`market-data.json`をcache無効で再取得します。ブラウザ内に別のsignalロジックはありません。
+- Fixed60/Universe銘柄のYahoo adjusted OHLC
+- GLDM
+- CFTC Asset Manager positioning
+- Fixed60 inner state
+- Stage21 regime / target portfolio
+- Stage21 historical backtest
 
-月初のUniverse workflowは00:30 UTC（09:30 JST）に、最後に手動取込・検証されたN-PORT sourceからUniverse historyを再構築します。日次workflowは確定日足を検証できた時点でstop/circuit/recovery、OOS、Next Actionを更新します。
+必要な日足またはCFTCが揃わない場合はfail closedとし、古い/部分的なstateを公開しません。
 
-## State machine
+## Console
 
-```text
-CASH / INVESTED
-  ├─ monthly RiskOff close ──────> LOCKED_MARKET ─┐
-  ├─ individual stop close ──────> LOCKED_STOP ───┤
-  └─ portfolio circuit close ────> LOCKED_CIRCUIT ┤
-                                                  ↓ next OPEN exit
-                                         WAITING_RECOVERY
-                                                  ↓ 10th confirming CLOSE
-                                          READY_NEXT_OPEN
-                                                  ↓ next OPEN entry
-                                              INVESTED
-```
+UIの最上位Next ActionはFixed60単体ではなく**Stage21 funded portfolio**です。
 
-Production signalとhistorical backtestは[`src/lib/strategy/state-machine.ts`](src/lib/strategy/state-machine.ts)の同じtransitionを使用します。Closeで成立した条件をsame Close/Openへ遡って約定させません。overnight gapは実際の翌Open価格で損益に反映します。
+表示対象:
+- current NORMAL/YELLOW/DEEP
+- CFTC eligible report / net / Yellow status
+- M3 core/QQQ gap / Deep status
+- 最終funded target（Top2 + GLDM + Cash）
+- 次のUS Openでのrebalance指示
+- inner Fixed60 Top2とrisk state
+- Stage21 backtest
+- Stage21 True Forward OOS
 
-## Forward OOS and benchmark
+## Historical research reference
 
-Backtest表示は`2026-08-25`に凍結した[`public/data/backtest-frozen.json`](public/data/backtest-frozen.json)だけを参照し、日次価格同期では変更しません。
+Release-aware same-sample Stage21 research through 2026-08-25:
+- CAGR: 約48.61%
+- MaxDD: 約-16.89%
+- planning CAGR proxy: 約43.66%
+- rolling36 median: 約43.66%
+- rolling36 P10: 約35.19%
+- rolling36 worst: 約23.42%
 
-Forward OOSは`2026-08-25`から新Strategy IDで独立して開始し、旧戦略や凍結Backtestのequityへ接続しません。平日の米国市場Close後にGitHub ActionsがYahoo Financeの実OHLCを取得し、Productionと同じstate machine・next-open約定・取引コストで日次OOS equityを更新します。確定済みのOOS日次点は上書きせず、新しい取引日だけを追加します。検証済みregular-close fallbackを使った日だけは暫定として記録し、Yahooの正式なadjusted日足到着時に置換します。signal、Universe、ranking、target weights、market/risk state、execution、trigger historyも保存します。
+これはhistorical robustness referenceであり、将来CAGR 43.66%を保証・推定する統計的expected valueではありません。24–36か月windowではCAGR 40%を下回る期間も確認されています。
 
-Benchmarkは利用可能な期間のactual `TQQQ Buy & Hold`です。将来synthetic proxyを追加する場合は`Synthetic 3x QQQ proxy`と明示し、actual TQQQと混同しません。
+## SBI account-realism audit
+
+next-open execution + 10bp + whole sharesで$10k / $25k / $50k / $100k / $250kを検証しました。全ケースでhistorical MaxDD 17%以内、$10kでもfractional simulationとのCAGR差は約-0.36ptでした。
+
+## True Forward OOS
+
+Stage21 OOSは **2026-09-02** 開始です。旧Fixed60 OOS（2026-08-31開始）はstrategy IDを分離し、新OOSへ継承しません。
+
+OOSは毎日、以下を保存します。
+- record date
+- Fixed60 signal / Top2
+- CFTC source report
+- Stage21 regime
+- funded targets
+- intended execution date
+- equity / drawdown
+
+最初の約3か月はCAGRで判断せず、data timing・CFTC/M3 state・next-open execution parityを監査します。
+
+事前固定gate:
+- MaxDD -17%: AMBER review
+- MaxDD -25%: RED kill
+- 12M+: CAGR <0 かつ MaxDD <=-17%: RED
+- 24M+: gross CAGR <15%: RED
+- 36M+: gross CAGR <25%: RED
+
+rule変更時は新strategy IDと新OOS clockを作成します。
 
 ## Validation
 
 ```bash
-npm run test
-npm run typecheck
-npm run lint
-npm run build
 npm run check
 ```
 
-testsはfuture-filing leakage、Universe cap/score、0/20/80、surge、QQQ comparison、Top2、adaptive weights、70% cap、next-open、overnight gap、stop、circuit、persistent recovery、transaction cost、legacy fixed TICKERS非依存を検証します。
-
-## Known limitations
-
-- 単一銘柄のovernight gap自体は防げません。翌Openで実現損益へ反映します。
-- SEC/Yahooの公開データ品質・訂正・欠損に依存します。
-- Dashboardは注文計画を表示しますがbrokerへ自動発注しません。実約定との差は運用時に記録が必要です。
-- 研究結果は将来のperformanceを保証しません。
+tests / TypeScript / ESLint / Next.js buildを一括実行します。
