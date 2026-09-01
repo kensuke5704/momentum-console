@@ -19,13 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen SBI all-GLDM surrogate with cash defense
+      - name: Screen SBI GLDM-only cash defense with G sleeve reassigned to Fixed60
         run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-gold-cash.ts
-          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g' scripts/_sbi-gold-cash.ts
-          node --import tsx scripts/_sbi-gold-cash.ts
-      - name: Screen SBI all-SLV surrogate with cash defense
-        run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-silver-cash.ts
-          sed -i 's/GLDM/SLV/g; s/IEF/SLV/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g' scripts/_sbi-silver-cash.ts
-          node --import tsx scripts/_sbi-silver-cash.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-gold-nog.ts
+          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.5525,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g' scripts/_sbi-gold-nog.ts
+          node --import tsx scripts/_sbi-gold-nog.ts
