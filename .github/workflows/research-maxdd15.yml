@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen late tail Stage 8
-        run: node --import tsx scripts/cagr40-late-tail-stage8.ts
+      - name: Screen L2 emergency Stage 9
+        run: node --import tsx scripts/cagr40-l2-emergency-stage9.ts
