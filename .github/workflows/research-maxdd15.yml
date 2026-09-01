@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen TQQQ forward planning CAGR
-        run: node --import tsx scripts/maxdd15-stage8-tqqq-planning.ts
+      - name: Screen Fixed60 volatility governor
+        run: node --import tsx scripts/maxdd15-stage9-fixed60-volgov.ts
