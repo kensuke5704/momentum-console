@@ -51,3 +51,43 @@ Return source: abnormal intraday range expansion with close near high, independe
 - signal close -> enter next open
 - hold 10 closes
 - stop 12%, circuit 15%, 10bp/side
+
+## Candidate L — Overnight Accumulation
+Return source: persistent close-to-open accumulation rather than close-to-close momentum.
+- PIT Dynamic Universe
+- QQQ > 200DMA
+- stock > 100DMA
+- cumulative 20-session overnight log return > +5%
+- cumulative overnight log return > cumulative intraday log return
+- rank by overnight minus intraday log return
+- Top5 equal weight
+- signal close -> enter next open
+- hold 20 closes
+- stop 12%, circuit 15%, 10bp/side
+
+## Candidate M — Gap-Up Follow-Through
+Return source: discrete positive overnight information shock followed by same-day confirmation.
+- PIT Dynamic Universe
+- QQQ > 200DMA
+- stock > 100DMA before event
+- open >= prior close * 1.05
+- same-day close > open
+- close in upper half of daily range
+- rank by gap size times intraday confirmation
+- Top5 equal weight
+- signal close -> enter next open
+- hold 5 closes
+- stop 10%, circuit 12%, 10bp/side
+
+## Candidate N — Intraday Accumulation / Overnight Weakness
+Return source: repeated regular-session demand masked by weak overnight pricing.
+- PIT Dynamic Universe
+- QQQ > 200DMA
+- stock > 100DMA
+- cumulative 20-session intraday log return > +8%
+- cumulative 20-session overnight log return < 0%
+- rank by intraday minus overnight log return
+- Top5 equal weight
+- signal close -> enter next open
+- hold 10 closes
+- stop 12%, circuit 15%, 10bp/side
