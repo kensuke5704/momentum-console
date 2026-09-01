@@ -12,7 +12,7 @@ Primary screen:
 - MaxDD > -40%
 - monthly correlation with Production Fixed60 <= 0.60
 - positive in at least 30% of Fixed60 negative months
-- +1-session-delay CAGR remains >= 10% if candidate passes baseline
+- +1-session-delay CAGR remains >= 10%
 
 ## Results so far
 - I Shock Continuation: rejected — CAGR 6.72%, +1 delay 5.03%.
@@ -23,50 +23,23 @@ Primary screen:
 - N Intraday Accumulation: rejected — CAGR -3.28%.
 - O Volatility-Managed Nasdaq Trend: secondary — CAGR 28.24%, MaxDD -28.91%, +1 delay 27.59%, but Fixed60 correlation 0.638 > preregistered 0.60 ceiling.
 - P Turn-of-Month TQQQ: rejected — CAGR 10.59%, +1 delay 1.82%.
+- Q Abnormal Participation Continuation: rejected — CAGR 4.41%, +1 delay 0.46%.
+- R Low-Participation Pullback: rejected — CAGR -1.73%, only one completed position cycle.
+- S High-Participation Price Absorption: rejected — approximately flat, only two completed position cycles.
 
-## Candidate Q — Abnormal Participation Continuation
-Return source: unusual market participation accompanying a positive price move.
-- research-only Yahoo daily volume; Production market-data types remain unchanged
-- PIT Dynamic Universe
-- QQQ > 200DMA
-- stock > 100DMA
-- current close-to-close return > +1%
-- current raw dollar turnover (Yahoo raw close × raw volume) > 2.5 × median prior-20-session raw dollar turnover
-- current close in upper 50% of adjusted daily high-low range
-- rank by dollar-turnover multiple × positive daily return
-- Top5 equal weight
-- close signal -> next-open entry
-- hold 10 closes
-- stop 12%, circuit 15%, cost 10bp/side
+## Candidate T — VIX-Gated Short-Volatility Risk Premium
+Return source: volatility risk premium rather than individual-stock momentum.
+- research-only Yahoo histories for `SVXY` and `^VIX`; Production data pipeline remains unchanged
+- instrument: SVXY + cash only
+- risk-on signal at close when BOTH:
+  - QQQ close > QQQ 200-session SMA
+  - VIX close < 25
+- otherwise target cash
+- target is 100% SVXY or 100% cash; no partial exposure
+- signal at close -> execute target change at next US open
+- transaction cost: 10bp per side / target switch
+- no stop, circuit, or additional volatility targeting; the two preregistered regime conditions are the complete risk rule
+- +1-session-delay stress executes each target change one additional US session later
+- historical comparison ends 2026-08-25
 
-## Candidate R — Low-Participation Pullback Reversal
-Return source: pullback inside an established trend without confirming heavy participation.
-- research-only Yahoo daily volume
-- PIT Dynamic Universe
-- QQQ > 200DMA
-- stock > 100DMA
-- current close-to-close return <= -3%
-- current raw dollar turnover < 0.70 × median prior-20-session raw dollar turnover
-- rank by absolute negative return / dollar-turnover multiple
-- Top5 equal weight
-- close signal -> next-open entry
-- hold 5 closes
-- stop 10%, circuit 12%, cost 10bp/side
-
-## Candidate S — High-Participation Price Absorption
-Return source: unusually large participation with little net price movement and a strong close, interpreted as possible absorption rather than directional momentum.
-- research-only Yahoo daily volume
-- PIT Dynamic Universe
-- QQQ > 200DMA
-- stock > 100DMA
-- current raw dollar turnover > 2.5 × median prior-20-session raw dollar turnover
-- absolute close-to-close return < 1%
-- current close in upper 25% of adjusted daily high-low range
-- rank by dollar-turnover multiple × close-location value
-- Top5 equal weight
-- close signal -> next-open entry
-- hold 10 closes
-- stop 12%, circuit 15%, cost 10bp/side
-
-### Volume-data integrity rule
-The research loader obtains Yahoo raw close and raw volume solely to calculate raw dollar turnover = raw close × raw volume. This product is economically comparable across ordinary share splits because the raw price/share-count changes offset each other. Existing split-adjusted OHLC remains the sole price source for signals other than participation, portfolio marking, and execution. Production `PricePoint`, `sync:data`, and app data are not modified.
+Candidate T is deliberately simple. The VIX threshold, QQQ trend length, and exposure must not be tuned after observing its result under this strategy definition.
