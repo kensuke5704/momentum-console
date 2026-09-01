@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen core drawdown BTAL Stage 6
-        run: node --import tsx scripts/cagr40-coredd-btal-stage6.ts
+      - name: Screen core circuit Stage 7
+        run: node --import tsx scripts/cagr40-core-circuit-stage7.ts
