@@ -3,57 +3,11 @@ import test from "node:test";
 import { evaluateOosActionGate } from "../src/lib/oos-action-gate";
 import type { ForwardOosResult } from "../src/lib/types";
 
-function sample(overrides: Partial<ForwardOosResult> = {}): ForwardOosResult {
-  return {
-    strategyId: "momentum-fixed60-2026-08-v1",
-    startedAt: "2026-08-31",
-    asOf: "2026-09-30",
-    source: "Yahoo Finance adjusted OHLC",
-    baselineBacktestEquity: 1,
-    equityCurve: [{ date: "2026-08-31", equity: 1, drawdown: 0 }],
-    stats: { cagr: 0.3, maxDrawdown: -0.1, annualizedVolatility: 0.2, calmar: 3, finalEquity: 1.02 },
-    records: [],
-    ...overrides,
-  };
-}
+function sample(overrides:Partial<ForwardOosResult>={}):ForwardOosResult{return{strategyId:"momentum-stage21-sbi-2026-09-v1",startedAt:"2026-09-02",asOf:"2026-10-02",source:"Yahoo Finance adjusted OHLC",baselineBacktestEquity:1,equityCurve:[{date:"2026-09-02",equity:1,drawdown:0}],stats:{cagr:.3,maxDrawdown:-.1,annualizedVolatility:.2,calmar:3,finalEquity:1.02},records:[],...overrides}}
 
-test("OOS gate keeps warmup green when drawdown is contained", () => {
-  const gate = evaluateOosActionGate(sample());
-  assert.equal(gate.level, "GREEN");
-  assert.equal(gate.blocksNewEntries, false);
-});
-
-test("OOS gate turns amber at -30% max drawdown", () => {
-  const gate = evaluateOosActionGate(sample({ stats: { cagr: 0.3, maxDrawdown: -0.30, annualizedVolatility: 0.2, calmar: 1, finalEquity: 0.8 } }));
-  assert.equal(gate.level, "AMBER");
-});
-
-test("OOS gate turns red at -40% max drawdown regardless of horizon", () => {
-  const gate = evaluateOosActionGate(sample({ stats: { cagr: -0.5, maxDrawdown: -0.40, annualizedVolatility: 0.5, calmar: -1, finalEquity: 0.6 } }));
-  assert.equal(gate.level, "RED");
-  assert.equal(gate.blocksNewEntries, true);
-});
-
-test("OOS gate turns red after 12 months when CAGR is negative and max drawdown exceeds 30%", () => {
-  const gate = evaluateOosActionGate(sample({
-    asOf: "2027-09-01",
-    stats: { cagr: -0.01, maxDrawdown: -0.31, annualizedVolatility: 0.3, calmar: -0.03, finalEquity: 0.98 },
-  }));
-  assert.equal(gate.level, "RED");
-});
-
-test("OOS gate turns red at 24 months if gross CAGR is already below the after-tax 20% hurdle", () => {
-  const gate = evaluateOosActionGate(sample({
-    asOf: "2028-09-01",
-    stats: { cagr: 0.19, maxDrawdown: -0.2, annualizedVolatility: 0.3, calmar: 0.95, finalEquity: 1.4 },
-  }));
-  assert.equal(gate.level, "RED");
-});
-
-test("OOS gate stays green after 24 months when gross CAGR clears the hurdle", () => {
-  const gate = evaluateOosActionGate(sample({
-    asOf: "2028-09-01",
-    stats: { cagr: 0.35, maxDrawdown: -0.2, annualizedVolatility: 0.3, calmar: 1.75, finalEquity: 1.8 },
-  }));
-  assert.equal(gate.level, "GREEN");
-});
+test("Stage21 warmup stays green while drawdown is contained",()=>assert.equal(evaluateOosActionGate(sample()).level,"GREEN"));
+test("Stage21 turns amber at its 17% historical DD review boundary",()=>assert.equal(evaluateOosActionGate(sample({stats:{cagr:.3,maxDrawdown:-.17,annualizedVolatility:.2,calmar:1.7,finalEquity:.9}})).level,"AMBER"));
+test("Stage21 turns red at the 25% kill boundary",()=>{const g=evaluateOosActionGate(sample({stats:{cagr:-.3,maxDrawdown:-.25,annualizedVolatility:.5,calmar:-1.2,finalEquity:.7}}));assert.equal(g.level,"RED");assert.equal(g.blocksNewEntries,true)});
+test("Stage21 turns red after 12 months when CAGR is negative and DD breaches 17%",()=>assert.equal(evaluateOosActionGate(sample({asOf:"2027-09-03",stats:{cagr:-.01,maxDrawdown:-.18,annualizedVolatility:.3,calmar:-.05,finalEquity:.98}})).level,"RED"));
+test("Stage21 turns red after 24 months below 15% gross CAGR",()=>assert.equal(evaluateOosActionGate(sample({asOf:"2028-09-03",stats:{cagr:.14,maxDrawdown:-.1,annualizedVolatility:.2,calmar:1.4,finalEquity:1.3}})).level,"RED"));
+test("Stage21 stays green after 24 months above the preregistered hurdle",()=>assert.equal(evaluateOosActionGate(sample({asOf:"2028-09-03",stats:{cagr:.30,maxDrawdown:-.1,annualizedVolatility:.2,calmar:3,finalEquity:1.7}})).level,"GREEN"));
