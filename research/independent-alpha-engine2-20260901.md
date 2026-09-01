@@ -91,3 +91,16 @@ Return source: repeated regular-session demand masked by weak overnight pricing.
 - signal close -> enter next open
 - hold 10 closes
 - stop 12%, circuit 15%, 10bp/side
+
+## Candidate O — Volatility-Managed Nasdaq Trend
+Return source: time-series trend plus volatility risk budgeting, with no individual-stock selection.
+- instrument: TQQQ + cash only
+- risk-on when QQQ close > QQQ 200DMA; otherwise cash
+- estimate annualized TQQQ volatility from trailing 20 close-to-close returns
+- target annualized portfolio volatility: 30%
+- TQQQ weight = min(100%, 30% / trailing TQQQ volatility)
+- signal/target weight fixed at close and executed next US open
+- daily rebalance to the target weight
+- transaction cost: 10bp on traded notional
+- +1-session-delay version repeats the same target with one additional session lag
+- no stop/circuit overlay; volatility scaling and QQQ trend gate are the complete risk engine
