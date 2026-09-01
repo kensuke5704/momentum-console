@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen Fixed60 volatility governor
-        run: node --import tsx scripts/maxdd15-stage9-fixed60-volgov.ts
+      - name: Screen residual cash TQQQ
+        run: node --import tsx scripts/maxdd15-stage10-residual-tqqq.ts
