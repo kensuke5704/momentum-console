@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen barbell Stage 16
-        run: node --import tsx scripts/cagr40-barbell-stage16.ts
+      - name: Screen volatility target Stage 17
+        run: node --import tsx scripts/cagr40-vol-target-stage17.ts
