@@ -19,8 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen SBI GLDM-only cash defense with G sleeve reassigned to Fixed60
+      - name: Screen rounded SBI Stage21 weights
         run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-gold-nog.ts
-          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.5525,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g' scripts/_sbi-gold-nog.ts
-          node --import tsx scripts/_sbi-gold-nog.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-stage21-rounded.ts
+          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' scripts/_sbi-stage21-rounded.ts
+          node --import tsx scripts/_sbi-stage21-rounded.ts
