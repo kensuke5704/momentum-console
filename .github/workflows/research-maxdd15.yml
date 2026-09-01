@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen M3 constant BTAL Stage 11
-        run: node --import tsx scripts/cagr40-m3-constant-btal-stage11.ts
+      - name: Screen inverse ETF hedge Stage 12
+        run: node --import tsx scripts/cagr40-inverse-hedge-stage12.ts
