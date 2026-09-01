@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen crisis hedge Stage 3
-        run: node --import tsx scripts/cagr40-crisis-hedge-stage3.ts
+      - name: Screen dynamic BTAL Stage 4
+        run: node --import tsx scripts/cagr40-dynamic-btal-stage4.ts
