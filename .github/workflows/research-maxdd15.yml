@@ -1,15 +1,15 @@
-name: Research MaxDD 15 Portfolio
+name: Research CAGR40 Orthogonal Engines
 
 on:
   push:
-    branches: ["research/maxdd15-portfolio-20260901"]
+    branches: ["research/cagr40-orthogonal-20260901"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  maxdd15:
+  screen:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen residual cash TQQQ
-        run: node --import tsx scripts/maxdd15-stage10-residual-tqqq.ts
+      - name: Screen orthogonal Stage 1 engines
+        run: node --import tsx scripts/cagr40-orthogonal-stage1.ts
