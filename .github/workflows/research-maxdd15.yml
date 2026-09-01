@@ -24,10 +24,10 @@ jobs:
       - name: Screen SBI SHY substitute
         run: |
           cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-shy.ts
-          sed -i 's/"IEF"/"SHY"/g' scripts/_sbi-shy.ts
+          sed -i 's/IEF/SHY/g' scripts/_sbi-shy.ts
           node --import tsx scripts/_sbi-shy.ts
       - name: Screen SBI TLT substitute
         run: |
           cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-tlt.ts
-          sed -i 's/"IEF"/"TLT"/g' scripts/_sbi-tlt.ts
+          sed -i 's/IEF/TLT/g' scripts/_sbi-tlt.ts
           node --import tsx scripts/_sbi-tlt.ts
