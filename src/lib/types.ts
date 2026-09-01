@@ -1,3 +1,5 @@
+import type {PortfolioConfigView,PortfolioLiveState,PortfolioTarget} from "./portfolio-types";
+
 export type PricePoint = {
   date: string;
   open: number;
@@ -111,6 +113,9 @@ export type OosRecord = {
   targetWeights: number[];
   marketState: string;
   riskState: string;
+  portfolioState?: string;
+  portfolioTargets?: PortfolioTarget[];
+  cftc?: {reportDate:string|null;net:number|null;priorNet:number|null;yellow:boolean};
   entryPrices: Record<string, number>;
   exitPrices: Record<string, number>;
   return: number | null;
@@ -152,7 +157,11 @@ export type DashboardPayload = {
   source: "live" | "snapshot";
   warning?: string;
   latestPrices?: Record<string, LatestPrice>;
+  /** Frozen Fixed60 inner-engine config used for ranking and inner risk state. */
   config: StrategyConfig;
+  /** Production portfolio wrapper. Its strategyId is the OOS/production identity. */
+  portfolioConfig: PortfolioConfigView;
+  portfolioState: PortfolioLiveState;
   currentUniverse: UniverseMonth | null;
   currentSignal: MonthlySignal | null;
   liveState: LiveStrategyState;
