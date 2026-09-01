@@ -19,8 +19,43 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen rounded SBI Stage21 weights
+      - name: Screen Stage21 plateau neighborhood
         run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-stage21-rounded.ts
-          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' scripts/_sbi-stage21-rounded.ts
-          node --import tsx scripts/_sbi-stage21-rounded.ts
+          make_base () {
+            cp scripts/cagr40-sbi-stage18.ts "$1"
+            sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.22/g; s/sh:\.14875,c:\.2975/sh:0,c:.445/g; s/f:\.7225,g:\.1275/f:.85,g:0/g; s/f:\.425,g:\.1275/f:.555,g:0/g; s/f:\.1275,g:\.1275/f:.255,g:0/g; s/gold:\.1121875,bond:\.1121875/gold:.1125,bond:.1125/g; s/gold:\.149375,bond:\.149375/gold:.15,bond:.15/g' "$1"
+          }
+
+          make_base scripts/_p0-center.ts
+          echo '=== P0 CENTER rounded ==='
+          node --import tsx scripts/_p0-center.ts
+
+          make_base scripts/_p1-normal80.ts
+          sed -i 's/f:.85,g:0,gold:.075,bond:.075/f:.80,g:0,gold:.10,bond:.10/' scripts/_p1-normal80.ts
+          echo '=== P1 NORMAL 80/20 ==='
+          node --import tsx scripts/_p1-normal80.ts
+
+          make_base scripts/_p2-normal90.ts
+          sed -i 's/f:.85,g:0,gold:.075,bond:.075/f:.90,g:0,gold:.05,bond:.05/' scripts/_p2-normal90.ts
+          echo '=== P2 NORMAL 90/10 ==='
+          node --import tsx scripts/_p2-normal90.ts
+
+          make_base scripts/_p3-def-fixed-low.ts
+          sed -i 's/f:.555,g:0,gold:.1125,bond:.1125,sh:0,c:.22/f:.545,g:0,gold:.1125,bond:.1125,sh:0,c:.23/; s/f:.255,g:0,gold:.15,bond:.15,sh:0,c:.445/f:.245,g:0,gold:.15,bond:.15,sh:0,c:.455/' scripts/_p3-def-fixed-low.ts
+          echo '=== P3 DEF Fixed60 -1pt ==='
+          node --import tsx scripts/_p3-def-fixed-low.ts
+
+          make_base scripts/_p4-def-fixed-high.ts
+          sed -i 's/f:.555,g:0,gold:.1125,bond:.1125,sh:0,c:.22/f:.565,g:0,gold:.1125,bond:.1125,sh:0,c:.21/; s/f:.255,g:0,gold:.15,bond:.15,sh:0,c:.445/f:.265,g:0,gold:.15,bond:.15,sh:0,c:.435/' scripts/_p4-def-fixed-high.ts
+          echo '=== P4 DEF Fixed60 +1pt ==='
+          node --import tsx scripts/_p4-def-fixed-high.ts
+
+          make_base scripts/_p5-def-gold-low.ts
+          sed -i 's/f:.555,g:0,gold:.1125,bond:.1125,sh:0,c:.22/f:.555,g:0,gold:.1075,bond:.1075,sh:0,c:.23/; s/f:.255,g:0,gold:.15,bond:.15,sh:0,c:.445/f:.255,g:0,gold:.145,bond:.145,sh:0,c:.455/' scripts/_p5-def-gold-low.ts
+          echo '=== P5 DEF GLDM -1pt ==='
+          node --import tsx scripts/_p5-def-gold-low.ts
+
+          make_base scripts/_p6-def-gold-high.ts
+          sed -i 's/f:.555,g:0,gold:.1125,bond:.1125,sh:0,c:.22/f:.555,g:0,gold:.1175,bond:.1175,sh:0,c:.21/; s/f:.255,g:0,gold:.15,bond:.15,sh:0,c:.445/f:.255,g:0,gold:.155,bond:.155,sh:0,c:.435/' scripts/_p6-def-gold-high.ts
+          echo '=== P6 DEF GLDM +1pt ==='
+          node --import tsx scripts/_p6-def-gold-high.ts
