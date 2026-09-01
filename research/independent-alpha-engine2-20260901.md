@@ -104,3 +104,13 @@ Return source: time-series trend plus volatility risk budgeting, with no individ
 - transaction cost: 10bp on traded notional
 - +1-session-delay version repeats the same target with one additional session lag
 - no stop/circuit overlay; volatility scaling and QQQ trend gate are the complete risk engine
+
+## Candidate P — Turn-of-Month TQQQ
+Return source: calendar-linked month-end / month-start flow rather than trend or stock selection.
+- instrument: TQQQ + cash only
+- invest 100% at the open of the last US trading session of each calendar month
+- remain invested through the first three US trading sessions of the next month
+- exit at the open immediately following the third trading session
+- no price/trend filter; calendar is known ex ante
+- 10bp transaction cost per side
+- +1-session-delay stress shifts both entry and exit one US trading session later
