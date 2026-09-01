@@ -19,8 +19,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen SBI GLDM+SLV with SHY defense
+      - name: Screen SBI all-GLDM surrogate with cash defense
         run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-slv-shy.ts
-          sed -i 's/IEF/SLV/g; s/"SH"\]/"SHY"\]/g; s/m\.histories\.SH)/m.histories.SHY)/g' scripts/_sbi-slv-shy.ts
-          node --import tsx scripts/_sbi-slv-shy.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-gold-cash.ts
+          sed -i 's/IEF/GLDM/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g' scripts/_sbi-gold-cash.ts
+          node --import tsx scripts/_sbi-gold-cash.ts
+      - name: Screen SBI all-SLV surrogate with cash defense
+        run: |
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-silver-cash.ts
+          sed -i 's/GLDM/SLV/g; s/IEF/SLV/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g' scripts/_sbi-silver-cash.ts
+          node --import tsx scripts/_sbi-silver-cash.ts
