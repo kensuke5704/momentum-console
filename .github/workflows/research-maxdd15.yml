@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen defensive managed futures substitution Stage 10
-        run: node --import tsx scripts/cagr40-defensive-managed-futures-stage10.ts
+      - name: Screen volatility guard Stage 12
+        run: node --import tsx scripts/cagr40-volatility-guard-stage12.ts
