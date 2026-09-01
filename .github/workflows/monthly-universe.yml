@@ -3,9 +3,9 @@ name: Refresh Point-in-Time Universe
 on:
   workflow_dispatch:
   schedule:
-    # 07:00 UTC is after the prior US month-end close and before the next US open.
+    # 00:30 UTC is after the prior US month-end close and before the next US open.
     # Days 1-4 cover weekends/holidays while the fallback keeps trading active.
-    - cron: "0 7 1-4 * *"
+    - cron: "30 0 1-4 * *"
 
 permissions:
   contents: write

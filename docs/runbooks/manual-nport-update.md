@@ -66,9 +66,10 @@ observation date is always the latest official US month-end close.
   new Top 80 is used for the normal month-end signal and the order remains a
   next-session-open order.
 - The displayed import deadline is the first US trading day of the next
-  required quarter's update month at 16:00 JST (07:00 UTC). The existing US
-  trading calendar skips weekends and NYSE holidays. This cutoff is safely
-  before 09:30 ET in both EST and EDT and matches the Universe-selection job.
+  required quarter's update month at 09:00 JST. The existing US trading
+  calendar skips weekends and NYSE holidays. This leaves a validation buffer
+  before the 09:30 JST Universe-selection job and remains safely before 09:30
+  ET in both EST and EDT.
   Import, validation, Universe generation, and signal generation must finish by
   that timestamp; otherwise the fallback flow applies.
 - If it is not available, the monthly job must continue with the previous valid
