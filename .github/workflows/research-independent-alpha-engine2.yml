@@ -18,5 +18,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run preregistered candidates I J K
-        run: node --import tsx scripts/independent-alpha-engine2-stage1.ts
+      - name: Run preregistered candidates L M N
+        run: node --import tsx scripts/independent-alpha-engine2-stage2.ts
