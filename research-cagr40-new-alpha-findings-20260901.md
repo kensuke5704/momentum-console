@@ -64,7 +64,7 @@ Result:
 - rolling36 worst CAGR 20.66%
 - planning 41.03%
 
-This is the best current same-sample frontier preserving planning >=40% while materially reducing DD. It still fails the 17% objective. Do not fine-tune defensive weights further.
+This is the strongest same-sample frontier that preserves planning >=40% without adding a new external signal. It still fails the 17% objective. Do not fine-tune defensive weights further.
 
 ## Stage 12 — Cboe volatility guards on frozen Stage11
 Official Cboe VIX and VIX9D daily histories, one-session lagged. Preregistered rules:
@@ -80,7 +80,7 @@ Results:
 Conclusion: these option-implied volatility stress rules do not improve the Stage11 frontier. Do not tune VIX/VIX9D thresholds further on this sample.
 
 ## Stage 13 — STLFSI4 financial-stress guard
-Official St. Louis Fed Financial Stress Index, weekly. To avoid release-timing look-ahead, only observations at least 7 calendar days old were eligible. Single natural rule: defensive when lagged STLFSI4 > 0 (the index's published normal/stress boundary).
+Official St. Louis Fed Financial Stress Index, weekly. To avoid release-timing look-ahead, only observations at least 7 calendar days old were eligible. Single natural rule: defensive when lagged STLFSI4 > 0.
 
 Result:
 - CAGR 39.12%
@@ -92,13 +92,91 @@ Result:
 
 Reject. It slightly reduces return and does not solve DD.
 
+## Stage 14 — CFTC Nasdaq Asset Manager positioning, full defensive
+Independent PIT source: CFTC Traders in Financial Futures futures-only data for NASDAQ MINI (contract code 209742). API field validation found 1,055 weekly observations from 2006-06-13 through 2026-08-25.
+
+Preregistered signal:
+- Asset Manager net = long - short.
+- One-week lag.
+- Risk signal when latest net is lower than four weekly reports earlier.
+- Signal sends portfolio directly to the frozen Stage11 Deep allocation; M3 unchanged.
+
+Result:
+- CAGR 39.10%
+- MaxDD -17.15%
+- annualized vol 20.72%
+- stress median 36.80%
+- rolling36 median 37.97%
+- rolling36 worst 20.57%
+- planning 36.80%
+
+Conclusion: CFTC positioning contains meaningful anticipatory risk information because DD improved from -18.28% to -17.15%, but full Deep defense on every deterioration is too expensive in return. Do not tune the four-week lookback or introduce an optimized threshold.
+
+## Stage 15 — CFTC Yellow midpoint state
+To avoid a new weight parameter, Yellow was defined mechanically as the exact arithmetic midpoint of Stage11 Normal and Deep allocations.
+
+States:
+- Normal: Fixed60 72.25%, G 12.75%, DBMF 15%.
+- Yellow: Fixed60 42.50%, G 12.75%, BTAL 7.4375%, DBMF 22.4375%, cash 14.875%.
+- Deep: Fixed60 12.75%, G 12.75%, BTAL 14.875%, DBMF 29.875%, cash 29.75%.
+- CFTC four-week deterioration -> Yellow; frozen M3 -> Deep and overrides Yellow.
+
+Result:
+- CAGR 41.86%
+- MaxDD -16.98%
+- annualized vol 22.33%
+- stress median 39.88%
+- rolling36 median 38.50%
+- rolling36 worst 20.71%
+- planning 38.50%
+
+Conclusion: this is the first structure to achieve the historical ~17% MaxDD target with a still-high return profile, but planning proxy remains about 1.5 percentage points below 40%.
+
+## Stage 16 — CFTC open-interest-normalized positioning
+Preregistered before result. Same one-week lag, same four-week directional comparison, same Yellow/Deep states. Only the CFTC signal value was structurally normalized to Asset Manager net percent of open interest: `pct_of_oi_asset_mgr_long - pct_of_oi_asset_mgr_short`.
+
+Result:
+- CAGR 40.47%
+- MaxDD -16.97%
+- annualized vol 21.69%
+- stress median 37.79%
+- rolling36 median 36.53%
+- rolling36 worst 22.13%
+- planning 36.53%
+
+Reject. OI normalization preserves the DD benefit but reduces rolling/planning return further. Do not tune the CFTC participant class, lookback, or Yellow weights on this sample.
+
+## Stage 17 — Cboe Total Put/Call flow
+Independent options-flow source. Cboe daily market-statistics pages were successfully retrieved for all 1,670 QQQ trading dates from 2020-01-01 through 2026-08-25 (100% coverage).
+
+Preregistered rule:
+- TOTAL PUT/CALL RATIO only.
+- One-session lag.
+- Yellow when latest 5-observation mean > latest 20-observation mean.
+- M3 -> Deep and overrides Yellow.
+- No absolute put/call threshold.
+
+Result:
+- CAGR 33.05%
+- MaxDD -18.29%
+- annualized vol 20.99%
+- stress median 32.96%
+- rolling36 median 31.42%
+- rolling36 worst 19.37%
+- planning 31.42%
+
+Reject. This options-flow trend is too frequently defensive, severely reducing return without improving DD. Do not tune put/call thresholds or lookbacks on this sample.
+
 ## Current research conclusion
-1. The return side of the objective is feasible in historical robustness terms: multiple structures have planning proxies above 40%.
-2. Managed futures materially improve diversification; Stage11 currently gives planning 41.03% with MaxDD -18.28%.
-3. Credit spreads, VIX/VIX9D, and STLFSI4 do not push the same architecture to 17% DD.
-4. Same-sample allocation or threshold grid search is now prohibited: no denser Fixed60/cash, BTAL/DBMF, VIX, OAS, or volatility-target tuning.
-5. The next useful evidence must come from a genuinely different PIT return/positioning source.
+1. Historical architectures with planning proxy >40% are available, but their MaxDD remains about 18-23%.
+2. Stage11 is the best current architecture that keeps planning >=40%: planning 41.03%, MaxDD -18.28%.
+3. CFTC Asset Manager positioning is the only new external risk source tested so far that materially pushes DD to the target neighborhood: Stage15 reaches MaxDD -16.98%, but planning falls to 38.50%.
+4. OI normalization, VIX/VIX9D, HY OAS, STLFSI4 and Total Put/Call do not bridge the remaining return/DD gap.
+5. The empirical frontier is therefore now approximately:
+   - preserve planning >=40% -> Stage11 around -18.3% MaxDD;
+   - achieve ~17% historical MaxDD -> Stage15 around 38.5% planning.
+6. The remaining gap is small numerically but should NOT be closed by denser threshold or allocation search on the same 2020-2026 sample. That would create another layer of overfitting.
+7. Further same-source mining is prohibited: do not tune CFTC four-week lookback, participant category, magnitude threshold, Yellow weights, VIX, OAS, put/call, BTAL/DBMF ratio, or Fixed60/cash weights on this sample.
+8. The next useful evidence must come from either a genuinely new independent return source with high return density or actual Forward OOS evidence. SEC annual fundamentals AO/AP/AQ remain untested only because companyfacts access was data-blocked in GitHub Actions.
 
-Next preregistered research direction: CFTC Traders in Financial Futures positioning for Nasdaq-100 futures. Use weekly published positioning with an explicit release lag and a directional change signal rather than an optimized extreme threshold. This source is structurally distinct from price, volatility, credit, and N-PORT data.
-
-Do not modify Fixed60 Production mechanics based on this work.
+Production Fixed60 remains unchanged. None of these same-sample research structures is Production-approved or True Forward OOS validated.
