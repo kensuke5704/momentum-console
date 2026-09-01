@@ -19,5 +19,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen SBI trend-gated Stage 20
-        run: node --import tsx scripts/cagr40-sbi-trend-stage20.ts
+      - name: Screen SBI SHY+SH baseline
+        run: |
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-shy-base.ts
+          sed -i 's/IEF/SHY/g' scripts/_sbi-shy-base.ts
+          node --import tsx scripts/_sbi-shy-base.ts
+      - name: Screen SBI SHY+QID hedge
+        run: |
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-qid.ts
+          sed -i 's/IEF/SHY/g; s/"SH"/"QID"/g; s/\.SH/\.QID/g' scripts/_sbi-qid.ts
+          node --import tsx scripts/_sbi-qid.ts
+      - name: Screen SBI SHY+cash hedge replacement
+        run: |
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-cash.ts
+          sed -i 's/IEF/SHY/g; s/sh:\.074375,c:\.14875/sh:0,c:.223125/g; s/sh:\.14875,c:\.2975/sh:0,c:.44625/g' scripts/_sbi-cash.ts
+          node --import tsx scripts/_sbi-cash.ts
