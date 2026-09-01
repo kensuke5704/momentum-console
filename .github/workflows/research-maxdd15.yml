@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen tail circuit Stage 2
-        run: node --import tsx scripts/cagr40-tail-circuit-stage2.ts
+      - name: Screen crisis hedge Stage 3
+        run: node --import tsx scripts/cagr40-crisis-hedge-stage3.ts
