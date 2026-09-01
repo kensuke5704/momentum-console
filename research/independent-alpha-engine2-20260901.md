@@ -45,7 +45,35 @@ Rules:
 - Targets are calculated after the close and rebalanced at the next US open.
 - Portfolio is rebalanced to the four fixed target weights whenever needed; transaction cost is 10bp on absolute traded notional.
 - No additional stop/circuit, volatility target, ranking, or cross-sleeve selection.
-- +1-session-delay stress applies the same target vector one additional session later.
 - Historical comparison ends 2026-08-25.
 
-The four sleeves and 200-session trend rule are frozen before observing Candidate U. No sleeve deletion, sector substitution, or trend-length tuning is permitted under Candidate U after results are known.
+### Initial screen result
+- CAGR: 25.47%
+- MaxDD: -36.26%
+- +1-session delay CAGR: 25.76%
+- +1-session delay MaxDD: -36.64%
+- monthly correlation with Fixed60: 0.529
+- positive in Fixed60 negative months: 8/17 = 47.1%
+- all preregistered initial screens: PASS
+
+### Preregistered robustness matrix
+No parameters are selected from these results. Candidate U stays defined by the 200-session / four-sleeve baseline above.
+
+Stress-only variants to run once:
+1. transaction cost 30bp on traded notional
+2. +2-session execution delay
+3. backtest start 2021-01-01
+4. 150-session trend length
+5. 250-session trend length
+6. remove Nasdaq sleeve, keep other sleeve caps at 25% and residual in cash
+7. remove small-cap sleeve, same treatment
+8. remove financial sleeve, same treatment
+9. remove energy sleeve, same treatment
+
+Additional diagnostics:
+- yearly returns
+- rolling 12M and rolling 36M annualized-return distributions
+- stress CAGR median / p10 / worst
+- worst sleeve-removal CAGR retention versus baseline
+
+Candidate U is promoted to PROMISING only if the stress set remains economically positive without a single sleeve explaining most of the baseline and without execution/cost stress collapsing the result. No stress variant may replace the frozen baseline.
