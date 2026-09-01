@@ -23,9 +23,11 @@ jobs:
         run: node --import tsx scripts/cagr40-sbi-stage18.ts
       - name: Screen SBI SHY substitute
         run: |
-          sed 's/"IEF"/"SHY"/g' scripts/cagr40-sbi-stage18.ts > /tmp/sbi-shy.ts
-          node --import tsx /tmp/sbi-shy.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-shy.ts
+          sed -i 's/"IEF"/"SHY"/g' scripts/_sbi-shy.ts
+          node --import tsx scripts/_sbi-shy.ts
       - name: Screen SBI TLT substitute
         run: |
-          sed 's/"IEF"/"TLT"/g' scripts/cagr40-sbi-stage18.ts > /tmp/sbi-tlt.ts
-          node --import tsx /tmp/sbi-tlt.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-tlt.ts
+          sed -i 's/"IEF"/"TLT"/g' scripts/_sbi-tlt.ts
+          node --import tsx scripts/_sbi-tlt.ts
