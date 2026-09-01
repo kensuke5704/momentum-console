@@ -77,16 +77,41 @@ Results:
 
 Conclusion: credit-market information can preserve a >40% planning-return proxy, but it does not solve the approximately 22-23% drawdown regime. Do not tune OAS thresholds further on this sample.
 
+## Stage 8 — static DBMF managed-futures sleeve
+Purpose: add an independent managed-futures return stream without changing the frozen M3 trigger. DBMF weights were preregistered at 0/10/15/20%; all original M3 weights were proportionally scaled by `(1-w)`.
+
+Daily fixed-weight screen:
+- 0% DBMF: CAGR 52.59%, MaxDD -23.30%, planning 47.79%.
+- 10% DBMF: CAGR 48.03%, MaxDD -21.44%, planning 43.56%.
+- 15% DBMF: CAGR 45.75%, MaxDD -20.50%, planning 41.47%.
+- 20% DBMF: CAGR 43.47%, MaxDD -19.54%, planning 39.27%.
+
+No weight between these preregistered points was searched. 15% is the largest tested allocation that preserved planning >=40%; 20% crossed below the planning-return gate.
+
+Conclusion: managed futures materially improve the return/DD frontier, but static allocation alone still does not reach 15-17% MaxDD.
+
+## Stage 9 — operational rebalance verification of 15% DBMF
+The 15% sleeve was re-tested using monthly portfolio rebalancing plus immediate rebalance only when the frozen M3 state changes. Portfolio turnover was charged at 10bp one-way, with a 30bp stress.
+
+Result:
+- CAGR 45.98%
+- MaxDD -20.19%
+- annualized volatility 25.55%
+- stress median CAGR 44.43%
+- rolling36 median CAGR 42.34%
+- rolling36 worst CAGR 22.23%
+- planning proxy 42.34%
+
+Conclusion: the DBMF benefit survives a substantially more operational allocation model and is not an artifact of daily fixed-weight rebalancing. It remains short of the 17% DD objective.
+
 ## Current research conclusion
 Two constraints are now empirically distinct:
 1. Historical architectures with a planning-return proxy above 40% are available.
-2. The same architectures retain roughly 22-24% MaxDD.
-3. Risk targeting can push MaxDD to about 17%, but the planning proxy falls toward 30%.
+2. Managed futures improve the best observed frontier to roughly 42% planning CAGR with ~20% MaxDD under monthly rebalance.
+3. The 15-17% MaxDD objective is still not reached without reducing the planning proxy below 40%.
 
-Price-only ETF architectures, N-PORT flow, and a simple credit-spread overlay have not bridged that gap. SEC annual fundamentals remain untested only because the current GitHub Actions environment cannot retrieve SEC companyfacts reliably.
+Price-only ETF architectures, N-PORT flow, a simple credit-spread overlay, and a static managed-futures sleeve have not bridged the full gap. SEC annual fundamentals remain untested only because the current GitHub Actions environment cannot retrieve SEC companyfacts reliably.
 
-The next useful work should emphasize either:
-- an independent return stream with materially better return density than G/N-PORT flow, or
-- a genuinely anticipatory risk variable that is demonstrably active before the existing 2020-style drawdown rather than after it begins.
+The next structural test is to keep the 15% normal-state DBMF sleeve fixed and replace 50% or 100% of the M3 defensive BTAL sleeve with DBMF, without modifying the M3 trigger or searching additional thresholds.
 
-Do not grid-search existing price, BTAL, TQQQ, OAS, or N-PORT thresholds on the 2020-2026 sample. Do not modify Fixed60 Production mechanics based on this work.
+Do not grid-search existing price, BTAL, TQQQ, OAS, DBMF, or N-PORT thresholds on the 2020-2026 sample. Do not modify Fixed60 Production mechanics based on this work.
