@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen two-tier hard circuit Stage 14
-        run: node --import tsx scripts/cagr40-two-tier-stage14.ts
+      - name: Screen shock quarantine Stage 13
+        run: node --import tsx scripts/cagr40-shock-quarantine-stage13.ts
