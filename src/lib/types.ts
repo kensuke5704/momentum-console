@@ -104,6 +104,7 @@ export type BacktestResult = {
 };
 export type OosRecord = {
   strategyId: string;
+  recordDate?: string;
   signalMonth: string;
   signalDate: string;
   executionDate: string | null;
