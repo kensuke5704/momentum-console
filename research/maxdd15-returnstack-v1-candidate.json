@@ -1,0 +1,48 @@
+{
+  "researchId": "maxdd15-returnstack-v1-candidate",
+  "status": "frozen-research-candidate-forward-oos-required",
+  "frozenAt": "2026-09-01",
+  "historicalResearchEnd": "2026-08-25",
+  "objective": {
+    "historicalCagrMin": 0.35,
+    "historicalMaxDrawdownFloor": -0.17
+  },
+  "underlying": {
+    "fixed60Weight": 0.50,
+    "gWeight": 0.20,
+    "dbmfWeight": 0.30,
+    "fixed60StrategyId": "momentum-fixed60-2026-08-v1",
+    "gStrategyId": "independent-top5-breakout-v1",
+    "dbmfMode": "buy-and-hold"
+  },
+  "riskGovernor": {
+    "lookbackSessions": 60,
+    "targetAnnualizedVolatility": 0.18,
+    "minExposure": 0.35,
+    "maxExposure": 1.00,
+    "warmupSessions": 60,
+    "warmupExposure": 0.70,
+    "usesPriorReturnsOnly": true
+  },
+  "returnStackMultiplier": 1.10,
+  "effectiveGrossExposure": {
+    "minApprox": 0.385,
+    "maxApprox": 1.10,
+    "warmupApprox": 0.77
+  },
+  "historicalResult": {
+    "cagr": 0.3678667040322554,
+    "maxDrawdown": -0.1423456599623648,
+    "annualizedVolatility": 0.18366189223109922,
+    "calmar": 2.5843197757453003,
+    "finalEquity": 8.016388962428481
+  },
+  "governance": [
+    "Production Fixed60 remains unchanged.",
+    "Do not tune Fixed60 or G rules from this candidate.",
+    "Do not tune DBMF replacement asset, 60-session lookback, 18% volatility target, exposure floor/cap, or 1.10 multiplier on the same historical sample.",
+    "Any signal-changing implementation change requires a new research ID.",
+    "Historical MaxDD is not a guaranteed future drawdown cap.",
+    "Forward OOS is required before production consideration."
+  ]
+}
