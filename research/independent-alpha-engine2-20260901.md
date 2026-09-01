@@ -31,9 +31,9 @@ Return source: unusual market participation accompanying a positive price move.
 - QQQ > 200DMA
 - stock > 100DMA
 - current close-to-close return > +1%
-- current dollar volume (raw volume × adjusted close) > 2.5 × median prior-20-session dollar volume
+- current raw dollar turnover (Yahoo raw close × raw volume) > 2.5 × median prior-20-session raw dollar turnover
 - current close in upper 50% of adjusted daily high-low range
-- rank by dollar-volume multiple × positive daily return
+- rank by dollar-turnover multiple × positive daily return
 - Top5 equal weight
 - close signal -> next-open entry
 - hold 10 closes
@@ -46,8 +46,8 @@ Return source: pullback inside an established trend without confirming heavy par
 - QQQ > 200DMA
 - stock > 100DMA
 - current close-to-close return <= -3%
-- current dollar volume < 0.70 × median prior-20-session dollar volume
-- rank by absolute negative return / dollar-volume multiple
+- current raw dollar turnover < 0.70 × median prior-20-session raw dollar turnover
+- rank by absolute negative return / dollar-turnover multiple
 - Top5 equal weight
 - close signal -> next-open entry
 - hold 5 closes
@@ -59,14 +59,14 @@ Return source: unusually large participation with little net price movement and 
 - PIT Dynamic Universe
 - QQQ > 200DMA
 - stock > 100DMA
-- current dollar volume > 2.5 × median prior-20-session dollar volume
+- current raw dollar turnover > 2.5 × median prior-20-session raw dollar turnover
 - absolute close-to-close return < 1%
 - current close in upper 25% of adjusted daily high-low range
-- rank by dollar-volume multiple × close-location value
+- rank by dollar-turnover multiple × close-location value
 - Top5 equal weight
 - close signal -> next-open entry
 - hold 10 closes
 - stop 12%, circuit 15%, cost 10bp/side
 
 ### Volume-data integrity rule
-Yahoo raw volume is used only as a relative participation measure. Split-adjusted OHLC from the existing dataset remains the price source. Any session where the adjusted/raw close factor changes materially versus the prior session is excluded from Q/R/S signal generation to prevent split events from masquerading as participation shocks.
+The research loader obtains Yahoo raw close and raw volume solely to calculate raw dollar turnover = raw close × raw volume. This product is economically comparable across ordinary share splits because the raw price/share-count changes offset each other. Existing split-adjusted OHLC remains the sole price source for signals other than participation, portfolio marking, and execution. Production `PricePoint`, `sync:data`, and app data are not modified.
