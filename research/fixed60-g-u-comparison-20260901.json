@@ -1,0 +1,33 @@
+{
+  "status": "HISTORICAL_RESEARCH_ONLY",
+  "asOf": "2026-09-01",
+  "historicalPeriod": {"start":"2020-01-01","end":"2026-08-25"},
+  "method": "All three engines recomputed on the same historical cutoff. Portfolio blends use fixed daily-rebalanced weights applied to daily engine returns. This is not True Forward OOS and is not a Production allocation decision.",
+  "standalone": {
+    "fixed60": {"cagr":0.6199809387396764,"maxDrawdown":-0.31127223620169275,"annualizedVolatility":0.3457758714150616,"calmar":1.9917643356343286},
+    "g": {"strategyId":"independent-top5-breakout-v1","cagr":0.23394902872181955,"maxDrawdown":-0.27558362349021714,"annualizedVolatility":0.21966937685690863,"calmar":0.8489221012442506},
+    "u": {"strategyId":"independent-diversified-leveraged-trend-v1","cagr":0.2546668073932228,"maxDrawdown":-0.3625830044958128,"annualizedVolatility":0.33706476708627414,"calmar":0.7023682970120121}
+  },
+  "monthlyCorrelations": {"fixed60_g":0.3249087841846317,"fixed60_u":0.5291636542773238,"g_u":0.2525777525488285},
+  "complement": {
+    "gPositiveInFixed60NegativeMonths":{"positive":8,"total":17,"share":0.47058823529411764},
+    "uPositiveInFixed60NegativeMonths":{"positive":8,"total":17,"share":0.47058823529411764},
+    "uPositiveInGNegativeMonths":{"positive":14,"total":30,"share":0.4666666666666667},
+    "gPositiveInUNegativeMonths":{"positive":9,"total":32,"share":0.28125}
+  },
+  "referenceBlends": {
+    "g50_u50":{"cagr":0.2596742402321892,"maxDrawdown":-0.24565011862929187,"annualizedVolatility":0.237061287878824,"calmar":1.0570898222282603,"fixed60Correlation":0.5427915771288917},
+    "fixed80_g10_u10":{"cagr":0.5535131599685417,"maxDrawdown":-0.28310195790733184,"annualizedVolatility":0.3002275435346968,"calmar":1.9551724900105563},
+    "fixed70_g15_u15":{"cagr":0.5188136239156906,"maxDrawdown":-0.268879132418844,"annualizedVolatility":0.28025077259557163,"calmar":1.92954216732414},
+    "fixed60_g20_u20":{"cagr":0.48336032976389065,"maxDrawdown":-0.25457120751582574,"annualizedVolatility":0.262765084133843,"calmar":1.8987234828347268},
+    "fixed50_g25_u25":{"cagr":0.4472405810639142,"maxDrawdown":-0.24018338283618723,"annualizedVolatility":0.24829732095862492,"calmar":1.8620796150953816},
+    "allEqual":{"cagr":0.38579658156780994,"maxDrawdown":-0.2299498727769218,"annualizedVolatility":0.2323734096965079,"calmar":1.6777420961744893}
+  },
+  "interpretation": [
+    "G and U are materially independent from each other historically; their monthly correlation is approximately 0.253.",
+    "The 50/50 G-U research basket historically improves diversification versus either G or U alone: CAGR 25.97% with MaxDD -24.57%.",
+    "Adding G/U to Fixed60 reduces historical volatility and MaxDD but also reduces CAGR. None of the tested fixed allocations dominates standalone Fixed60 on historical Calmar ratio.",
+    "Therefore no Fixed60/G/U allocation is selected or optimized from this historical sample. Allocation selection remains deferred pending separate True Forward OOS evidence for G and U."
+  ],
+  "governance": {"productionChanged":false,"allocationFrozen":false,"noSameSampleWeightOptimization":true,"gAndURemainSeparateFrozenStrategies":true}
+}
