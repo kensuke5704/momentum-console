@@ -14,103 +14,59 @@ Primary screen:
 - positive in at least 30% of Fixed60 negative months
 - +1-session-delay CAGR remains >= 10% if candidate passes baseline
 
-## Candidate I — Shock Continuation Basket
-Return source: large positive daily price shock with persistent trend.
+## Results so far
+- I Shock Continuation: rejected — CAGR 6.72%, +1 delay 5.03%.
+- J Failed Gap Reversal: rejected — no trades under preregistered specification.
+- K Range Expansion Continuation: rejected — CAGR 2.01%, +1 delay -1.33%.
+- L Overnight Accumulation: rejected — CAGR 2.84%, MaxDD -42.63%.
+- M Gap-Up Follow-Through: rejected — CAGR 0.71%.
+- N Intraday Accumulation: rejected — CAGR -3.28%.
+- O Volatility-Managed Nasdaq Trend: secondary — CAGR 28.24%, MaxDD -28.91%, +1 delay 27.59%, but Fixed60 correlation 0.638 > preregistered 0.60 ceiling.
+- P Turn-of-Month TQQQ: rejected — CAGR 10.59%, +1 delay 1.82%.
+
+## Candidate Q — Abnormal Participation Continuation
+Return source: unusual market participation accompanying a positive price move.
+- research-only Yahoo daily volume; Production market-data types remain unchanged
 - PIT Dynamic Universe
 - QQQ > 200DMA
 - stock > 100DMA
-- today's close-to-close return > +2.0 x trailing 20-session realized daily volatility
-- rank by standardized shock size
+- current close-to-close return > +1%
+- current dollar volume (raw volume × adjusted close) > 2.5 × median prior-20-session dollar volume
+- current close in upper 50% of adjusted daily high-low range
+- rank by dollar-volume multiple × positive daily return
 - Top5 equal weight
-- signal close -> enter next open
+- close signal -> next-open entry
 - hold 10 closes
-- stop 12%, circuit 15%, 10bp/side
+- stop 12%, circuit 15%, cost 10bp/side
 
-## Candidate J — Failed Gap Reversal
-Return source: negative overnight news shock followed by intraday rejection/recovery.
+## Candidate R — Low-Participation Pullback Reversal
+Return source: pullback inside an established trend without confirming heavy participation.
+- research-only Yahoo daily volume
 - PIT Dynamic Universe
 - QQQ > 200DMA
-- stock > 100DMA before event
-- open <= prior close * 0.95
-- same-day close > open and close recovers at least half of the overnight gap
-- rank by recovery strength
+- stock > 100DMA
+- current close-to-close return <= -3%
+- current dollar volume < 0.70 × median prior-20-session dollar volume
+- rank by absolute negative return / dollar-volume multiple
 - Top5 equal weight
-- signal close -> enter next open
+- close signal -> next-open entry
 - hold 5 closes
-- stop 10%, circuit 12%, 10bp/side
+- stop 10%, circuit 12%, cost 10bp/side
 
-## Candidate K — Range Expansion Continuation
-Return source: abnormal intraday range expansion with close near high, independent of 20-day price breakout.
+## Candidate S — High-Participation Price Absorption
+Return source: unusually large participation with little net price movement and a strong close, interpreted as possible absorption rather than directional momentum.
+- research-only Yahoo daily volume
 - PIT Dynamic Universe
 - QQQ > 200DMA
 - stock > 100DMA
-- true range / prior close > 2.0 x median of prior 20-session true-range ratios
-- close in top 20% of day's high-low range
-- rank by normalized range expansion
+- current dollar volume > 2.5 × median prior-20-session dollar volume
+- absolute close-to-close return < 1%
+- current close in upper 25% of adjusted daily high-low range
+- rank by dollar-volume multiple × close-location value
 - Top5 equal weight
-- signal close -> enter next open
+- close signal -> next-open entry
 - hold 10 closes
-- stop 12%, circuit 15%, 10bp/side
+- stop 12%, circuit 15%, cost 10bp/side
 
-## Candidate L — Overnight Accumulation
-Return source: persistent close-to-open accumulation rather than close-to-close momentum.
-- PIT Dynamic Universe
-- QQQ > 200DMA
-- stock > 100DMA
-- cumulative 20-session overnight log return > +5%
-- cumulative overnight log return > cumulative intraday log return
-- rank by overnight minus intraday log return
-- Top5 equal weight
-- signal close -> enter next open
-- hold 20 closes
-- stop 12%, circuit 15%, 10bp/side
-
-## Candidate M — Gap-Up Follow-Through
-Return source: discrete positive overnight information shock followed by same-day confirmation.
-- PIT Dynamic Universe
-- QQQ > 200DMA
-- stock > 100DMA before event
-- open >= prior close * 1.05
-- same-day close > open
-- close in upper half of daily range
-- rank by gap size times intraday confirmation
-- Top5 equal weight
-- signal close -> enter next open
-- hold 5 closes
-- stop 10%, circuit 12%, 10bp/side
-
-## Candidate N — Intraday Accumulation / Overnight Weakness
-Return source: repeated regular-session demand masked by weak overnight pricing.
-- PIT Dynamic Universe
-- QQQ > 200DMA
-- stock > 100DMA
-- cumulative 20-session intraday log return > +8%
-- cumulative 20-session overnight log return < 0%
-- rank by intraday minus overnight log return
-- Top5 equal weight
-- signal close -> enter next open
-- hold 10 closes
-- stop 12%, circuit 15%, 10bp/side
-
-## Candidate O — Volatility-Managed Nasdaq Trend
-Return source: time-series trend plus volatility risk budgeting, with no individual-stock selection.
-- instrument: TQQQ + cash only
-- risk-on when QQQ close > QQQ 200DMA; otherwise cash
-- estimate annualized TQQQ volatility from trailing 20 close-to-close returns
-- target annualized portfolio volatility: 30%
-- TQQQ weight = min(100%, 30% / trailing TQQQ volatility)
-- signal/target weight fixed at close and executed next US open
-- daily rebalance to the target weight
-- transaction cost: 10bp on traded notional
-- +1-session-delay version repeats the same target with one additional session lag
-- no stop/circuit overlay; volatility scaling and QQQ trend gate are the complete risk engine
-
-## Candidate P — Turn-of-Month TQQQ
-Return source: calendar-linked month-end / month-start flow rather than trend or stock selection.
-- instrument: TQQQ + cash only
-- invest 100% at the open of the last US trading session of each calendar month
-- remain invested through the first three US trading sessions of the next month
-- exit at the open immediately following the third trading session
-- no price/trend filter; calendar is known ex ante
-- 10bp transaction cost per side
-- +1-session-delay stress shifts both entry and exit one US trading session later
+### Volume-data integrity rule
+Yahoo raw volume is used only as a relative participation measure. Split-adjusted OHLC from the existing dataset remains the price source. Any session where the adjusted/raw close factor changes materially versus the prior session is excluded from Q/R/S signal generation to prevent split events from masquerading as participation shocks.
