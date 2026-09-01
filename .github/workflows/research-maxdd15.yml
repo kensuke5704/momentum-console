@@ -19,8 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen SBI GLDM+SLV with SH defense
+      - name: Screen SBI GLDM+SLV with SHY defense
         run: |
-          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-slv-sh.ts
-          sed -i 's/IEF/SLV/g' scripts/_sbi-slv-sh.ts
-          node --import tsx scripts/_sbi-slv-sh.ts
+          cp scripts/cagr40-sbi-stage18.ts scripts/_sbi-slv-shy.ts
+          sed -i 's/IEF/SLV/g; s/"SH"\]/"SHY"\]/g; s/m\.histories\.SH)/m.histories.SHY)/g' scripts/_sbi-slv-shy.ts
+          node --import tsx scripts/_sbi-slv-shy.ts
