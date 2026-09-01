@@ -1,0 +1,60 @@
+{
+  "strategyId": "independent-diversified-leveraged-trend-v1",
+  "status": "FROZEN_PROMISING_FORWARD_OOS_REQUIRED",
+  "frozenAt": "2026-09-01",
+  "historicalResearchEnd": "2026-08-25",
+  "trueForwardOosStart": "2026-09-01",
+  "firstPotentialExecutionAfterOosSignal": "2026-09-02",
+  "note": "2026-08-26 through 2026-08-31 are a pre-freeze unused gap, not True Forward OOS, because those market observations existed before the strategy freeze.",
+  "rules": {
+    "sleeves": [
+      { "signalInstrument": "QQQ", "tradeInstrument": "TQQQ", "maxWeight": 0.25 },
+      { "signalInstrument": "IWM", "tradeInstrument": "TNA", "maxWeight": 0.25 },
+      { "signalInstrument": "XLF", "tradeInstrument": "FAS", "maxWeight": 0.25 },
+      { "signalInstrument": "XLE", "tradeInstrument": "ERX", "maxWeight": 0.25 }
+    ],
+    "trend": { "type": "close_above_sma", "sessions": 200 },
+    "inactiveSleeveWeight": 0,
+    "residual": "cash",
+    "signalTime": "US close",
+    "execution": "next US open",
+    "rebalance": "daily to fixed sleeve targets",
+    "transactionCostOnAbsoluteTradedNotional": 0.001,
+    "stop": null,
+    "portfolioCircuit": null,
+    "ranking": null,
+    "volatilityTarget": null
+  },
+  "historicalBaseline": {
+    "cagr": 0.25466685758270646,
+    "maxDrawdown": -0.36258303856914686,
+    "annualizedVolatility": 0.33706471843772406,
+    "calmar": 0.7023683694297793,
+    "finalEquity": 4.515419717645742,
+    "fixed60MonthlyCorrelation": 0.529163646678148,
+    "positiveInFixed60NegativeMonths": 0.47058823529411764
+  },
+  "robustness": {
+    "delay1Cagr": 0.2575962621408183,
+    "cost30bpCagr": 0.22952920765637774,
+    "delay2Cagr": 0.2333005448067258,
+    "start2021Cagr": 0.24313187888240684,
+    "trend150Cagr": 0.2257679343972947,
+    "trend250Cagr": 0.2256701769012821,
+    "stressMedianCagr": 0.2256701769012821,
+    "stressP10Cagr": 0.19076207063025002,
+    "stressWorstCagr": 0.13711531455793557,
+    "worstSleeveRemovalRetention": 0.5384105174086328,
+    "rolling36MMedian": 0.14456969177898826,
+    "rolling36MP10": 0.0614138869064276,
+    "rolling36MWorst": -0.00035150690957208575,
+    "rolling36MPositiveShare": 0.9989059080962801
+  },
+  "governance": {
+    "parameterOptimizationAfterFreeze": false,
+    "sleeveSubstitutionUnderSameStrategyId": false,
+    "signalChangingBugFixRequiresNewStrategyId": true,
+    "productionFixed60Unchanged": true,
+    "keepOosSeparateFromFixed60AndCandidateG": true
+  }
+}
