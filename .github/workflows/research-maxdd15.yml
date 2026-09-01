@@ -19,7 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen CFTC positioning guard Stage 14
-        run: |
-          sed -i 's/asset_mgr_positions_long_all/asset_mgr_positions_long/g; s/asset_mgr_positions_short_all/asset_mgr_positions_short/g' scripts/cagr40-cftc-positioning-stage14.ts
-          node --import tsx scripts/cagr40-cftc-positioning-stage14.ts
+      - name: Screen CFTC Yellow-state Stage 15
+        run: node --import tsx scripts/cagr40-cftc-yellow-stage15.ts
