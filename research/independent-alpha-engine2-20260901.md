@@ -26,20 +26,26 @@ Primary screen:
 - Q Abnormal Participation Continuation: rejected — CAGR 4.41%, +1 delay 0.46%.
 - R Low-Participation Pullback: rejected — CAGR -1.73%, only one completed position cycle.
 - S High-Participation Price Absorption: rejected — approximately flat, only two completed position cycles.
+- T VIX-Gated Short-Volatility: rejected — CAGR 2.39%, MaxDD -39.55%, +1 delay 4.05% despite low Fixed60 correlation 0.287.
 
-## Candidate T — VIX-Gated Short-Volatility Risk Premium
-Return source: volatility risk premium rather than individual-stock momentum.
-- research-only Yahoo histories for `SVXY` and `^VIX`; Production data pipeline remains unchanged
-- instrument: SVXY + cash only
-- risk-on signal at close when BOTH:
-  - QQQ close > QQQ 200-session SMA
-  - VIX close < 25
-- otherwise target cash
-- target is 100% SVXY or 100% cash; no partial exposure
-- signal at close -> execute target change at next US open
-- transaction cost: 10bp per side / target switch
-- no stop, circuit, or additional volatility targeting; the two preregistered regime conditions are the complete risk rule
-- +1-session-delay stress executes each target change one additional US session later
-- historical comparison ends 2026-08-25
+## Candidate U — Diversified Leveraged Trend Ensemble
+Return source: four distinct equity risk-premium sleeves rather than individual-stock selection or a single Nasdaq trend.
 
-Candidate T is deliberately simple. The VIX threshold, QQQ trend length, and exposure must not be tuned after observing its result under this strategy definition.
+Research-only Yahoo histories; Production data pipeline is unchanged.
+
+Four fixed sleeves, each with maximum 25% portfolio target:
+- Nasdaq: signal QQQ > QQQ 200-session SMA; instrument TQQQ
+- US small caps: signal IWM > IWM 200-session SMA; instrument TNA
+- US financials: signal XLF > XLF 200-session SMA; instrument FAS
+- US energy: signal XLE > XLE 200-session SMA; instrument ERX
+
+Rules:
+- Each sleeve target is 25% when its underlying trend is on, otherwise 0%.
+- Remaining capital stays in cash.
+- Targets are calculated after the close and rebalanced at the next US open.
+- Portfolio is rebalanced to the four fixed target weights whenever needed; transaction cost is 10bp on absolute traded notional.
+- No additional stop/circuit, volatility target, ranking, or cross-sleeve selection.
+- +1-session-delay stress applies the same target vector one additional session later.
+- Historical comparison ends 2026-08-25.
+
+The four sleeves and 200-session trend rule are frozen before observing Candidate U. No sleeve deletion, sector substitution, or trend-length tuning is permitted under Candidate U after results are known.
