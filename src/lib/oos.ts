@@ -1,9 +1,10 @@
 import { performanceStats } from "./backtest";
+import { PRODUCTION_PORTFOLIO } from "./portfolio-config";
 import type { BacktestResult, EquityPoint, ForwardOosResult } from "./types";
 
-// Fixed60 was frozen on 2026-08-30. The first post-freeze US signal session is
-// 2026-08-31; execution remains next-session-open (2026-09-01 when applicable).
-export const OOS_START_DATE = "2026-08-31";
+// Stage21 rounded v1 was production-approved after the SBI whole-share account
+// realism audit. Its Forward OOS clock is separate from legacy Fixed60 OOS.
+export const OOS_START_DATE = PRODUCTION_PORTFOLIO.oosStartDate;
 
 export function emptyForwardOos(strategyId: string): ForwardOosResult {
   const equityCurve: EquityPoint[] = [{ date: OOS_START_DATE, equity: 1, drawdown: 0 }];
@@ -28,8 +29,6 @@ export function updateForwardOos(backtest: BacktestResult, existing?: ForwardOos
   const previouslyProvisional = new Set(prior.provisionalDates ?? []);
   const currentlyProvisional = new Set(provisionalDates);
 
-  // Confirmed OOS dates are immutable. A validated regular-close fallback is
-  // replaceable exactly once, when Yahoo publishes the completed adjusted row.
   if (baseline != null) {
     for (const point of actual) {
       if (!byDate.has(point.date) || previouslyProvisional.has(point.date)) {
@@ -49,9 +48,7 @@ export function updateForwardOos(backtest: BacktestResult, existing?: ForwardOos
     strategyId: backtest.strategyId,
     startedAt: OOS_START_DATE,
     asOf: lastActual ?? null,
-    source: provisionalDates.length
-      ? "Yahoo Finance adjusted OHLC + validated regular-session close"
-      : "Yahoo Finance adjusted OHLC",
+    source: provisionalDates.length ? "Yahoo Finance adjusted OHLC + validated regular-session close" : "Yahoo Finance adjusted OHLC",
     baselineBacktestEquity: baseline,
     equityCurve,
     stats: performanceStats(equityCurve),

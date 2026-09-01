@@ -8,15 +8,15 @@ async function main() {
   const dashboardFile = JSON.parse(await readFile(dashboardPath, "utf8")) as { dashboard: DashboardPayload };
   const dashboard = dashboardFile.dashboard;
   const dataThrough = dashboard.backtest.equityCurve.at(-1)?.date ?? null;
-  const frozen = { strategyId: dashboard.config.strategyId, frozenAt: OOS_START_DATE, dataThrough, backtest: dashboard.backtest };
-  const oos = emptyForwardOos(dashboard.config.strategyId);
+  const strategyId = dashboard.portfolioConfig.strategyId;
+  if (dashboard.backtest.strategyId !== strategyId) throw new Error(`Cannot freeze mismatched backtest ${dashboard.backtest.strategyId} for ${strategyId}`);
+  const frozen = { strategyId, frozenAt: OOS_START_DATE, dataThrough, backtest: dashboard.backtest };
+  const oos = emptyForwardOos(strategyId);
   const nextDashboard = { ...dashboard, oos };
 
   await writeFile(resolve("public/data/backtest-frozen.json"), `${JSON.stringify(frozen)}\n`);
   await writeFile(resolve("public/data/oos-performance.json"), `${JSON.stringify(oos)}\n`);
   await writeFile(dashboardPath, `${JSON.stringify({ dashboard: nextDashboard })}\n`);
-
-  console.log(`Frozen backtest through ${dataThrough ?? "no data"}; Forward OOS starts ${OOS_START_DATE}`);
+  console.log(`Frozen Stage21 backtest through ${dataThrough ?? "no data"}; clean Forward OOS starts ${OOS_START_DATE}`);
 }
-
 main().catch((error) => { console.error(error); process.exitCode = 1; });

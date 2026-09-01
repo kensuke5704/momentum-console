@@ -1,22 +1,20 @@
-import { runStrategySimulation } from "./backtest";
 import { PRODUCTION_STRATEGY } from "./config";
-import { buildExpectedCagrModel } from "./expected-cagr";
 import { emptyForwardOos, OOS_START_DATE } from "./oos";
 import { applyExtraordinaryRebalance } from "./nport-operations";
+import { PRODUCTION_PORTFOLIO } from "./portfolio-config";
+import { buildStage21Portfolio } from "./portfolio/stage21";
 import { buildMonthlySignal } from "./strategy/momentum";
 import { nextUsTradingSession } from "./trading-calendar";
+import type { CftcPositionRow } from "./cftc";
 import type { BacktestResult, DashboardPayload, ForwardOosResult, LatestPrice, NportOperations, PricePoint, UniverseMonth } from "./types";
 
 const mean = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 
-export function buildDashboardPayload(histories: Record<string, PricePoint[]>, universeHistory: UniverseMonth[], source: "live" | "snapshot" = "live", persisted?: { oos?: ForwardOosResult; frozenBacktest?: BacktestResult; nportOperations?: NportOperations; latestPrices?: Record<string, LatestPrice> }): DashboardPayload {
-  const { backtest, state } = runStrategySimulation({ histories, universeHistory });
+export function buildDashboardPayload(histories: Record<string, PricePoint[]>, universeHistory: UniverseMonth[], cftcRows: CftcPositionRow[], source: "live" | "snapshot" = "live", persisted?: { oos?: ForwardOosResult; frozenBacktest?: BacktestResult; nportOperations?: NportOperations; latestPrices?: Record<string, LatestPrice> }): DashboardPayload {
+  const stage21 = buildStage21Portfolio(histories, universeHistory, cftcRows);
   const currentUniverse = universeHistory.at(-1) ?? null;
   const qqq = histories.QQQ ?? [];
   const signalIndex = currentUniverse ? qqq.findIndex((point) => point.date === currentUniverse.asOf) : -1;
-  // Keep the displayed signal in lock-step with the state-machine clock. A newly
-  // committed month-end Universe must not be evaluated against an earlier QQQ
-  // close while the actual signal-date daily row is still unavailable.
   const currentSignal = currentUniverse && signalIndex >= 0
     ? buildMonthlySignal({ universe: currentUniverse, histories, qqq, nextSessionDate: qqq[signalIndex + 1]?.date ?? nextUsTradingSession(currentUniverse.asOf), config: PRODUCTION_STRATEGY })
     : null;
@@ -24,27 +22,26 @@ export function buildDashboardPayload(histories: Record<string, PricePoint[]>, u
   const sma = qqq.length >= PRODUCTION_STRATEGY.recovery.qqqDailySmaDays ? mean(qqq.slice(-PRODUCTION_STRATEGY.recovery.qqqDailySmaDays).map((point) => point.close)) : null;
   const prior = qqq.at(-(PRODUCTION_STRATEGY.recovery.qqqMomentumDays + 1))?.close;
 
-  // Never let a frozen backtest or Forward OOS series from a prior strategy
-  // survive a production strategy-id change.
-  const displayedBacktest = persisted?.frozenBacktest?.strategyId === PRODUCTION_STRATEGY.strategyId ? persisted.frozenBacktest : backtest;
-  const displayedOos = persisted?.oos?.strategyId === PRODUCTION_STRATEGY.strategyId && persisted.oos.startedAt === OOS_START_DATE
+  const displayedBacktest = persisted?.frozenBacktest?.strategyId === PRODUCTION_PORTFOLIO.strategyId ? persisted.frozenBacktest : stage21.backtest;
+  const displayedOos = persisted?.oos?.strategyId === PRODUCTION_PORTFOLIO.strategyId && persisted.oos.startedAt === OOS_START_DATE
     ? persisted.oos
-    : emptyForwardOos(PRODUCTION_STRATEGY.strategyId);
-  const expectedCagr = buildExpectedCagrModel(displayedBacktest.equityCurve, PRODUCTION_STRATEGY.strategyId);
+    : emptyForwardOos(PRODUCTION_PORTFOLIO.strategyId);
 
-  const dashboard: DashboardPayload = {
+  let dashboard: DashboardPayload = {
     generatedAt: new Date().toISOString(),
     source,
     ...(persisted?.latestPrices ? { latestPrices: persisted.latestPrices } : {}),
     config: PRODUCTION_STRATEGY,
+    portfolioConfig: PRODUCTION_PORTFOLIO,
+    portfolioState: stage21.portfolioState,
     currentUniverse,
     currentSignal,
-    liveState: state,
+    liveState: stage21.innerState,
     qqq: { close, monthlyMa: currentSignal?.qqqMonthlyMa ?? null, dailySma: sma, momentum20d: close && prior ? close / prior - 1 : null },
     oos: displayedOos,
     backtest: displayedBacktest,
-    ...(expectedCagr ? { expectedCagr } : {}),
     nportOperations: persisted?.nportOperations,
   };
-  return persisted?.nportOperations ? applyExtraordinaryRebalance(dashboard, persisted.nportOperations) : dashboard;
+  if (persisted?.nportOperations) dashboard = applyExtraordinaryRebalance(dashboard, persisted.nportOperations);
+  return dashboard;
 }
