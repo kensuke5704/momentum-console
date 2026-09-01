@@ -11,6 +11,7 @@ permissions:
 jobs:
   alpha-engine2:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Run preregistered candidate P
-        run: node --import tsx scripts/independent-alpha-engine2-stage4.ts
+      - name: Run preregistered candidates Q R S
+        run: node --import tsx scripts/independent-alpha-engine2-stage5-volume.ts
