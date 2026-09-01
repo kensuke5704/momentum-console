@@ -2,7 +2,8 @@ import { PRODUCTION_STRATEGY } from "./config";
 import { PRODUCTION_PORTFOLIO } from "./portfolio-config";
 import { initialEngineState } from "./strategy/state-machine";
 import { emptyForwardOos } from "./oos";
-import type { DashboardPayload, PortfolioLiveState } from "./types";
+import type { DashboardPayload } from "./types";
+import type { PortfolioLiveState } from "./portfolio-types";
 
 const state = initialEngineState();
 const portfolioState: PortfolioLiveState = {
