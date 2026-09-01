@@ -19,5 +19,5 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Screen orthogonal hedges
-        run: node --import tsx scripts/maxdd15-stage5-hedges.ts
+      - name: Screen DBMF portfolio governors
+        run: node --import tsx scripts/maxdd15-stage6-governors.ts
