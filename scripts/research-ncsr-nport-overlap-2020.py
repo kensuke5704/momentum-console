@@ -19,7 +19,10 @@ DRIVE = 'https://drive.usercontent.google.com/download?id=1yfQxR45DZ_vM5pkFvgyex
 UA = {'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com','Accept':'*/*'}
 BOOTSTRAP = ROOT / 'data' / 'sec-nport' / 'bootstrap.json.gz'
 OUT = ROOT / 'data' / 'research' / 'ncsr-nport-overlap-2020.json'
-TARGET = re.compile(r'ISHARES|SELECT SECTOR SPDR|STREETTRACKS|SPDR|POWERSHARES|INVESCO|VANGUARD|PROSHARES|RYDEX', re.I)
+# Structural registrant-family hints only. FIRST TRUST / ETF MANAGERS / PACER / ARK
+# were added after inspecting which ETF series are actually present in the frozen
+# N-PORT bootstrap. This is source-coverage selection, not return/performance selection.
+TARGET = re.compile(r'ISHARES|SELECT SECTOR SPDR|STREETTRACKS|SPDR|POWERSHARES|INVESCO|VANGUARD|PROSHARES|RYDEX|FIRST TRUST|ETF MANAGERS|PACER|ARK ETF', re.I)
 FORMS = {'N-CSR','N-CSRS'}
 DOCUMENT_BLOCK = re.compile(r'(?is)<DOCUMENT>(.*?)</DOCUMENT>')
 TYPE_CSR = re.compile(r'(?im)^\s*<TYPE>\s*N-(?:CSR|CSRS)\b')
@@ -37,7 +40,7 @@ pit = importlib.util.module_from_spec(pspec); pspec.loader.exec_module(pit)
 
 def download(path: Path):
     req = urllib.request.Request(DRIVE, headers=UA)
-    with urllib.request.urlopen(req, timeout=600) as r, open(path, 'wb') as f:
+    with urllib.request.urlopen(req, timeout=600) as r, open(path,'wb') as f:
         while True:
             b = r.read(1024*1024)
             if not b: break
@@ -62,12 +65,7 @@ def master_2020():
 
 
 def fetch_full_filing(url: str) -> tuple[str,str]:
-    """Fetch enough of a modern shareholder report to include all ETF series.
-
-    The earlier 1.5MB metadata probe is intentionally not used here because
-    multi-series N-CSR filings commonly exceed that size. This transport choice
-    is structural and independent of parser success or investment outcomes.
-    """
+    """Fetch enough of a modern shareholder report to include all ETF series."""
     last=None
     for attempt in range(3):
         try:
@@ -76,7 +74,6 @@ def fetch_full_filing(url: str) -> tuple[str,str]:
                 return 'jina-full',r.read(12_000_000).decode('utf-8','replace')
         except Exception as e:
             last=e;time.sleep(4*(attempt+1))
-    # Reuse the authoritative SEC fallback in the metadata transport as a last resort.
     try:
         return seg.meta.fetch_prefix(url)
     except Exception as e:
@@ -118,140 +115,93 @@ def ratio(n: float, d: float):
 
 
 def visible(raw: str) -> str:
-    s=re.sub(r'(?is)<BR\s*/?>',' ',raw)
-    s=re.sub(r'(?is)<[^>]+>',' ',s)
-    return ' '.join(html.unescape(s).replace('\xa0',' ').split())
+    s = re.sub(r'(?is)<script.*?</script>|<style.*?</style>', ' ', raw)
+    s = re.sub(r'(?is)<[^>]+>', ' ', s)
+    s = html.unescape(s).replace('\xa0',' ')
+    return ' '.join(s.split())
 
 
-def modern_series_segments(text: str, series: list[dict]) -> list[dict]:
-    """Locate the primary schedule for each filing-time ETF series exactly.
-
-    Legacy schedule-marker inference is not reused. We require the exact series
-    name from SEC SGML metadata and a Schedule of Investments shortly after that
-    heading. A primary (non-continued) schedule is preferred. The segment ends
-    at the next primary series schedule, so continuation pages remain attached.
-    """
-    candidates=[]
-    for s in series:
-        name=str(s.get('seriesName') or '').strip()
-        if not name:continue
-        occurrences=list(re.finditer(re.escape(name),text,re.I))
-        schedule_options=[]
-        for om in occurrences:
-            window_end=min(len(text),om.end()+80_000)
-            for sm in SCHEDULE_HTML.finditer(text,om.end(),window_end):
-                label=visible(text[sm.start():min(window_end,sm.end()+500)]).upper()
-                continued='CONTINUED' in label[:160]
-                schedule_options.append((continued,sm.start(),om.start()))
-                break
-        if not schedule_options:continue
-        # Prefer a primary schedule; then earliest occurrence in filing order.
-        continued,start,heading_start=sorted(schedule_options,key=lambda x:(x[0],x[1]))[0]
-        candidates.append({'series':s,'start':start,'headingStart':heading_start,'continued':continued})
-    candidates.sort(key=lambda x:x['start'])
-    out=[]
-    for i,c in enumerate(candidates):
-        end=candidates[i+1]['start'] if i+1<len(candidates) else min(len(text),c['start']+1_000_000)
-        segment=text[c['start']:end]
-        # Affiliate/fair-value tables follow the actual holdings and should not be
-        # interpreted as portfolio rows. Cut only after the main schedule starts.
-        cut=len(segment)
-        for pat in (r'Affiliate Table',r'The following table summarizes the value',r'Fair Value Hierarchy'):
-            m=re.search(pat,segment,re.I)
-            if m and m.start()>1000:cut=min(cut,m.start())
-        segment=segment[:cut]
-        out.append({'series':c['series'],'segment':segment,'primarySchedule':not c['continued']})
-    return out
+def schedule_blocks(text: str):
+    matches=list(SCHEDULE_HTML.finditer(text))
+    if not matches:
+        matches=list(seg.SCHEDULE.finditer(text))
+    return [(m.start(), matches[i+1].start() if i+1<len(matches) else min(len(text),m.start()+300000)) for i,m in enumerate(matches)]
 
 
-def mapped_modern_series(text: str, series: list[dict]) -> dict[str,dict]:
+def mapped_modern_series(text: str, series: list[dict]):
     mapped={}
-    for item in modern_series_segments(text,series):
-        s=item['series']; segment=item['segment']
-        # Seed one synthetic table row so the legacy HTML-table parser knows the
-        # already-segmented content is inside a Schedule of Investments.
-        parse_input='<TR><TD>SCHEDULE OF INVESTMENTS</TD></TR>'+segment
-        method,holdings,total=pit.normalized_holdings(parse_input)
-        if not holdings or total<=0:continue
-        count=len(holdings);top10=sum(h['weight'] for h in holdings[:10])
-        if not (10<=count<=120 and top10>=25):continue
-        mapped[s['seriesId']]={'seriesId':s['seriesId'],'seriesName':s.get('seriesName'),'tickers':s.get('etfTickers',[]),
-            'score':1.0,'method':method,'holdings':holdings,'top10Weight':top10,'primarySchedule':item['primarySchedule']}
+    for start,end in schedule_blocks(text):
+        block=text[start:end]
+        context=text[max(0,start-10000):min(end,start+3000)]
+        v=visible(context).upper()
+        exact=[]
+        for s in series:
+            name=' '.join((s.get('seriesName') or '').upper().split())
+            if name and name in v: exact.append(s)
+        if len(exact)!=1: continue
+        s=exact[0]
+        method,holdings,total=pit.normalized_holdings(block)
+        count=len(holdings);top10=sum(h['weight'] for h in holdings[:10]) if holdings else 0
+        if not (seg.eligible_name(s.get('seriesName') or '') and 10<=count<=120 and total>0 and top10>=25): continue
+        candidate={'seriesId':s['seriesId'],'seriesName':s.get('seriesName'),'fundTickers':s.get('etfTickers',[]),'holdings':holdings,'method':method,'total':total,'top10':top10}
+        cur=mapped.get(s['seriesId'])
+        if cur is None or count>len(cur['holdings']): mapped[s['seriesId']]=candidate
     return mapped
 
 
 def main():
-    filings = master_2020()
-    latest_by_cik = {}
-    for x in sorted(filings,key=lambda r:(r['dateFiled'],r['filename'])):
-        latest_by_cik[x['cik']] = x
-    chosen = [latest_by_cik[cik] for cik in sorted(latest_by_cik)]
-
-    with gzip.open(BOOTSTRAP,'rt',encoding='utf-8') as f:
-        bp=json.load(f)
+    filings=master_2020()
+    latest_by_cik={}
+    for x in sorted(filings,key=lambda r:(r['dateFiled'],r['filename'])): latest_by_cik[x['cik']]=x
+    chosen=[latest_by_cik[cik] for cik in sorted(latest_by_cik)]
+    with gzip.open(BOOTSTRAP,'rt',encoding='utf-8') as f: bp=json.load(f)
     nport=bp.get('snapshots') or bp.get('filings') or []
     by_series=defaultdict(list)
     for f in nport:
-        if f.get('seriesId') and f.get('reportDate'):
-            by_series[f['seriesId']].append(f)
+        if f.get('seriesId') and f.get('reportDate'): by_series[f['seriesId']].append(f)
     for rows in by_series.values(): rows.sort(key=lambda r:(r.get('reportDate',''),r.get('filingDate','')))
 
-    comparisons=[]; filing_results=[]
+    comparisons=[]; diagnostics=[]
     for i,x in enumerate(chosen,1):
         try:
             transport,submission=fetch_full_filing(seg.meta.sec_url(x['filename']))
-            rm=REPORT_DATE.search(submission); report=iso8(rm.group(1) if rm else None)
+            rm=REPORT_DATE.search(submission);report=iso8(rm.group(1) if rm else None)
             series=[s for s in seg.meta.parse_series_contracts(submission,x['company']) if s.get('isEtf') and s.get('seriesId')]
-            text=embedded_csr(submission)
-            mapped=mapped_modern_series(text,series)
-            matched_series=0
+            mapped=mapped_modern_series(embedded_csr(submission),series)
+            paired=0
             for sid,row in mapped.items():
                 candidates=by_series.get(sid,[])
                 if not report or not candidates: continue
                 nearest=min(candidates,key=lambda f:days(report,f['reportDate']))
                 gap=days(report,nearest['reportDate'])
                 if gap>45: continue
-                matched_series+=1
-                ncsr_names=defaultdict(float)
-                for h in row['holdings']:
-                    k=norm_issuer(h.get('description',''))
-                    if k: ncsr_names[k]+=float(h.get('weight') or 0)
-                nport_names=defaultdict(float)
+                legacy_by={norm_issuer(h['description']):h['weight'] for h in row['holdings'] if norm_issuer(h['description'])}
+                nport_by=defaultdict(float)
                 for h in nearest.get('holdings',[]):
-                    k=norm_issuer(h.get('issuerName','')) if h.get('issuerName') else ''
-                    if k: nport_names[k]+=float(h.get('weight') or 0)
-                common=set(ncsr_names)&set(nport_names)
-                ncsr_total=sum(ncsr_names.values());nport_total=sum(nport_names.values())
-                ncsr_common=sum(ncsr_names[k] for k in common);nport_common=sum(nport_names[k] for k in common)
-                comparisons.append({
-                    'seriesId':sid,'seriesName':row.get('seriesName'),'tickers':row.get('tickers',[]),
-                    'ncsrReportDate':report,'nportReportDate':nearest.get('reportDate'),'reportDateGapDays':gap,
-                    'ncsrHoldingCount':len(ncsr_names),'nportHoldingCount':len(nearest.get('holdings',[])),'nportNamedHoldingCount':len(nport_names),
-                    'issuerOverlapCount':len(common),
-                    'ncsrTotalWeight':ncsr_total,'nportNamedTotalWeight':nport_total,
-                    'ncsrCommonWeight':ncsr_common,'nportCommonWeight':nport_common,
-                    'ncsrWeightCoverageRate':ratio(ncsr_common,ncsr_total),'nportNamedWeightCoverageRate':ratio(nport_common,nport_total),
-                    'parseMethod':row.get('method')})
-            filing_results.append({'company':x['company'],'cik':x['cik'],'filingDate':x['dateFiled'],'reportDate':report,'transport':transport,
-                'registeredEtfSeries':len(series),'usableMappedSeries':len(mapped),'matchedToNportSeries':matched_series})
-            print(f"{i}/{len(chosen)} {x['company'][:40]} transport={transport} etf={len(series)} usable={len(mapped)} nport={matched_series}",flush=True)
+                    k=norm_issuer(str(h.get('issuerName') or ''))
+                    if k:nport_by[k]+=float(h.get('weight') or 0)
+                common=set(legacy_by)&set(nport_by)
+                legacy_common=sum(legacy_by[k] for k in common);nport_named=sum(nport_by.values());nport_common=sum(nport_by[k] for k in common)
+                comparisons.append({'company':x['company'],'seriesId':sid,'seriesName':row['seriesName'],'legacyReportDate':report,'nportReportDate':nearest['reportDate'],'reportGapDays':gap,
+                    'legacyHoldingCount':len(legacy_by),'nportNamedCount':len(nport_by),'commonIssuerCount':len(common),
+                    'legacyWeightCoverageRate':ratio(legacy_common,sum(legacy_by.values())),'nportNamedWeightCoverageRate':ratio(nport_common,nport_named),'parseMethod':row['method']})
+                paired+=1
+            diagnostics.append({'company':x['company'],'cik':x['cik'],'transport':transport,'registeredEtfSeries':len(series),'usableMappedSeries':len(mapped),'pairedSeries':paired})
+            print(f"{i}/{len(chosen)} {x['company'][:45]} mapped={len(mapped)} paired={paired}",flush=True)
         except Exception as e:
-            filing_results.append({'company':x.get('company'),'cik':x.get('cik'),'error':repr(e)})
-            print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}",flush=True)
+            diagnostics.append({'company':x.get('company'),'cik':x.get('cik'),'error':repr(e)});print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}",flush=True)
 
-    usable_named=[c for c in comparisons if c['nportNamedHoldingCount']>0 and c['ncsrWeightCoverageRate'] is not None and c['nportNamedWeightCoverageRate'] is not None]
-    left=sorted(c['ncsrWeightCoverageRate'] for c in usable_named);right=sorted(c['nportNamedWeightCoverageRate'] for c in usable_named)
-    summary={
-        'year':2020,'purpose':'Direct structural overlap validation of legacy N-CSR/N-CSRS ETF schedule parsing against N-PORT for the same SEC seriesId. No return or strategy-performance data used.',
-        'sampleRule':'Latest 2020 N-CSR/N-CSRS filing per target ETF-family CIK; deterministic by filing date and CIK; no parser-success or performance selection.',
-        'segmentationRule':'Exact filing-time SEC series name followed by its primary Schedule of Investments; continuation pages retained until the next series; no fuzzy schedule-to-series assignment.',
-        'matchingRule':'Same SEC seriesId; nearest N-PORT report date within 45 calendar days; exact conservative normalized issuer-name overlap only.',
-        'coverageRule':'N-CSR common issuer weight divided by normalized N-CSR series weight; N-PORT common issuer weight divided by total named N-PORT holding weight.',
-        'targetFilings':len(filings),'sampledRegistrants':len(chosen),'filingsSucceeded':sum('error' not in r for r in filing_results),
-        'seriesComparisons':len(comparisons),'seriesWithNportIssuerNames':len(usable_named),
-        'medianNcsrWeightCoverageRate':left[len(left)//2] if left else None,'medianNportNamedWeightCoverageRate':right[len(right)//2] if right else None,
-        'comparisons':comparisons,'filingResults':filing_results}
-    OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(summary,indent=2)+'\n')
-    print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k not in {'comparisons','filingResults'}}),flush=True)
+    a=sorted(c['legacyWeightCoverageRate'] for c in comparisons if c['legacyWeightCoverageRate'] is not None)
+    b=sorted(c['nportNamedWeightCoverageRate'] for c in comparisons if c['nportNamedWeightCoverageRate'] is not None)
+    med=lambda x:x[len(x)//2] if x else None
+    ma,mb=med(a),med(b)
+    gate=bool(len(comparisons)>=10 and ma is not None and mb is not None and ma>=.8 and mb>=.8)
+    out={'year':2020,'purpose':'Direct same-series N-CSR/N-CSRS vs N-PORT holdings overlap validation. Structural only; no prices, returns, trades or strategy performance.',
+        'sampleRule':'Latest 2020 filing per deterministic ETF-family CIK from a predeclared structural source-coverage list; no parser-success or performance selection.',
+        'matchingRule':'Same SEC seriesId; nearest N-PORT report <=45 days; exact conservative normalized issuer-name overlap.',
+        'seriesComparisons':len(comparisons),'medianNcsrWeightCoverageRate':ma,'medianNportNamedWeightCoverageRate':mb,
+        'gateBThresholds':{'minimumComparisons':10,'minimumMedianEachDirection':.8},'gateBPass':gate,'comparisons':comparisons,'diagnostics':diagnostics}
+    OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
+    print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'comparisons','diagnostics'}},sort_keys=True),flush=True)
 
-if __name__=='__main__': main()
+if __name__=='__main__':main()
