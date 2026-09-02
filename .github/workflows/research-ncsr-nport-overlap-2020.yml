@@ -28,3 +28,5 @@ jobs:
           name: ncsr-nport-overlap-2020
           path: data/research/ncsr-nport-overlap-2020.json
           if-no-files-found: warn
+
+# Re-run marker: structural reproducibility validation only; no return/performance data.
