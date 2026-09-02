@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "research" / "npx-security-master-2006.json"
-SAMPLE_COUNT = 24
+SAMPLE_COUNT = 96
 
 spec = importlib.util.spec_from_file_location("pilot", ROOT / "scripts" / "research-npx-security-master-2006.py")
 pilot = importlib.util.module_from_spec(spec)
