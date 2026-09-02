@@ -1,0 +1,27 @@
+name: Research NCSR Schedule Diagnostic 2020
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-ncsr-schedule-diagnostic-2020.py"
+      - "scripts/research-nq-series-metadata-2006.py"
+      - ".github/workflows/research-ncsr-schedule-diagnostic-2020.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-ncsr-schedule-diagnostic-2020.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ncsr-schedule-diagnostic-2020
+          path: data/research/ncsr-schedule-diagnostic-2020.json
+          if-no-files-found: warn
