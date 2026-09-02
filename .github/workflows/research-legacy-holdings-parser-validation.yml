@@ -1,0 +1,28 @@
+name: Research Legacy Holdings Parser Validation
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-legacy-holdings-parser.py"
+      - "scripts/research-legacy-holdings-parser-validation.py"
+      - ".github/workflows/research-legacy-holdings-parser-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate holdings parser structurally
+        run: python3 scripts/research-legacy-holdings-parser-validation.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-holdings-parser-validation
+          path: data/research/legacy-holdings-parser-validation.json
+          if-no-files-found: warn
