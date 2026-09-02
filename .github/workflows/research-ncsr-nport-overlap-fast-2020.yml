@@ -6,6 +6,10 @@ on:
     paths:
       - "scripts/research-ncsr-nport-overlap-fast-2020.py"
       - "scripts/research-ncsr-nport-overlap-2020.py"
+      - "scripts/research-nq-parser-pilot.py"
+      - "scripts/research-nq-pit-holdings-2006.py"
+      - "scripts/research-nq-series-segmentation-2006.py"
+      - "scripts/research-nq-series-metadata-2006.py"
       - ".github/workflows/research-ncsr-nport-overlap-fast-2020.yml"
   workflow_dispatch:
 
