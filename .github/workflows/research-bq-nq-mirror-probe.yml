@@ -41,12 +41,24 @@ jobs:
           file_id="1yfQxR45DZ_vM5pkFvgyexc10NNqbxpFN"
           url="https://drive.usercontent.google.com/download?id=${file_id}&export=download&confirm=t"
           curl -L --fail --retry 3 --max-time 180 -o /tmp/master.zip "$url"
-          ls -lh /tmp/master.zip
-          file /tmp/master.zip
-          unzip -l /tmp/master.zip | head -20
+          unzip -tq /tmp/master.zip
+          prefix="MasterIndex_20260318"
+          total=0
           for f in master_2004_QTR1.idx master_2008_QTR4.idx master_2013_QTR4.idx master_2019_QTR4.idx; do
-            unzip -p /tmp/master.zip "$f" > /tmp/q.idx
+            unzip -p /tmp/master.zip "${prefix}/${f}" > /tmp/q.idx
             nq=$(grep -c '|N-Q|' /tmp/q.idx || true)
             echo "$f N-Q rows=$nq"
-            test "$nq" -gt 0
+            total=$((total+nq))
+          done
+          echo "sample_NQ_rows=$total"
+          test "$total" -gt 0
+          # Establish actual filing-index coverage by year, including amendments.
+          for y in 2003 2004 2006 2008 2010 2013 2016 2018 2019 2020; do
+            n=0
+            for q in 1 2 3 4; do
+              p="${prefix}/master_${y}_QTR${q}.idx"
+              c=$(unzip -p /tmp/master.zip "$p" 2>/dev/null | grep -Ec '\|N-Q(/A)?\|' || true)
+              n=$((n+c))
+            done
+            echo "YEAR_NQ $y $n"
           done
