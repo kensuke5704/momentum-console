@@ -11,7 +11,6 @@ import {
   GaugeIcon,
   GearIcon,
   TrendUpIcon,
-  WalletIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -28,7 +27,7 @@ import { evaluateOosActionGate } from "@/lib/oos-action-gate";
 import type { PortfolioTarget } from "@/lib/portfolio-types";
 import type { DashboardPayload, EquityPoint, MomentumCandidate, UniverseMember } from "@/lib/types";
 
-type Tab = "overview" | "universe" | "portfolio" | "oos" | "backtest" | "schedule";
+type Tab = "overview" | "universe" | "oos" | "backtest" | "schedule";
 type DetailKey = "regime" | "action" | "execution" | "target" | "cftc" | "m3" | "fixed60" | "oos";
 type SortDirection = "asc" | "desc";
 type CombinedSortKey =
@@ -50,8 +49,7 @@ type CombinedRow = UniverseMember & {
 
 const tabs = [
   ["overview", "Overview", GaugeIcon],
-  ["universe", "Universe / Ranking", DatabaseIcon],
-  ["portfolio", "Portfolio", WalletIcon],
+  ["universe", "Universe", DatabaseIcon],
   ["oos", "OOS", ChartLineUpIcon],
   ["backtest", "Backtest", ClockCounterClockwiseIcon],
   ["schedule", "Settings", GearIcon],
@@ -98,6 +96,17 @@ function StatusMetric({ label, value, onClick }: { label: string; value: string;
   </button>;
 }
 
+type DefinitionItem = { name: string; meaning: string };
+
+function DefinitionList({ current, items }: { current: string; items: DefinitionItem[] }) {
+  return <div className="detail-definitions">
+    {items.map((item) => <div className={`detail-definition${item.name === current ? " current" : ""}`} key={item.name}>
+      <div><strong>{item.name}</strong>{item.name === current && <span>CURRENT</span>}</div>
+      <p>{item.meaning}</p>
+    </div>)}
+  </div>;
+}
+
 function Section({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return <section className={`dynamic-card${className ? ` ${className}` : ""}`}><header><h2>{title}</h2></header>{children}</section>;
 }
@@ -106,7 +115,7 @@ function AllocationBand({ targets, compact = false }: { targets: PortfolioTarget
   if (!targets.length) return <div className="empty-state">No allocation</div>;
   return <div className={`allocation-band${compact ? " compact" : ""}`} aria-label={targetText(targets)}>
     {targets.map((target, index) => <div
-      className={`allocation-segment allocation-segment-${index % 5}`}
+      className={`allocation-segment allocation-segment-${index % 5}${target.symbol === "CASH" ? " allocation-segment-cash" : ""}`}
       key={`${target.symbol}-${target.role}`}
       style={{ flexBasis: `${target.weight * 100}%`, flexGrow: target.weight }}
       title={`${target.symbol} ${pct(target.weight, 1)}`}
@@ -171,7 +180,6 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
         {data.warning && <div className="data-warning">{data.warning}</div>}
         {tab === "overview" && <Overview data={data} />}
         {tab === "universe" && <UniverseRanking data={data} />}
-        {tab === "portfolio" && <Portfolio data={data} />}
         {tab === "oos" && <Oos data={data} />}
         {tab === "backtest" && <Backtest data={data} />}
         {tab === "schedule" && <Schedule data={data} />}
@@ -187,6 +195,7 @@ function Overview({ data }: { data: DashboardPayload }) {
   const action = portfolio.nextAction;
   const actionLabel = action.type === "REBALANCE_NEXT_OPEN" ? "REBALANCE" : action.type === "HOLD" ? "HOLD" : "REVIEW";
   const execution = action.executionDate ? usOpenJst(action.executionDate) : "NO ORDER";
+  const executionState = action.executionDate ? "NEXT OPEN" : "NO ORDER";
 
   useEffect(() => {
     if (!detail) return;
@@ -214,37 +223,53 @@ function Overview({ data }: { data: DashboardPayload }) {
       <StatusMetric label="OOS Gate" value={gate.level} onClick={() => setDetail("oos")} />
     </div>
 
-    <Section title="Current Allocation"><AllocationBand targets={portfolio.targets} /></Section>
+    <div className="dynamic-metric-grid four overview-input-grid">
+      <Metric label="CFTC Used (PIT)" value={portfolio.cftc.reportDate ?? "—"} nowrap />
+      <Metric label="CFTC Net" value={portfolio.cftc.net == null ? "—" : Math.round(portfolio.cftc.net).toLocaleString()} />
+      <Metric label="Prior 4W" value={portfolio.cftc.priorNet == null ? "—" : Math.round(portfolio.cftc.priorNet).toLocaleString()} />
+      <Metric label="M3 Gap" value={pct(portfolio.m3.gap)} />
+    </div>
 
     {detail && <div className="modal-backdrop" onMouseDown={() => setDetail(null)}>
       <div className="action-modal action-detail-modal" role="dialog" aria-modal="true" aria-labelledby="action-detail-title" onMouseDown={(event) => event.stopPropagation()}>
         <header><div><span>DETAIL</span><h2 id="action-detail-title">{title}</h2></div><button type="button" aria-label="Close" onClick={() => setDetail(null)}><XIcon size={20} /></button></header>
         <div className="action-detail-body">
-          {detail === "regime" && <><strong className="action-detail-value">{portfolio.regime}</strong><dl className="action-detail-grid">
-            <div><dt>CFTC</dt><dd>{portfolio.cftc.yellow ? "YELLOW" : "CLEAR"}</dd></div>
-            <div><dt>M3 Deep</dt><dd>{portfolio.m3.deep ? "ON" : "OFF"}</dd></div>
-            <div><dt>Inner Fixed60</dt><dd>{portfolio.fixed60.riskState}</dd></div>
-            <div><dt>OOS Gate</dt><dd>{gate.level}</dd></div>
-          </dl></>}
-          {detail === "action" && <><strong className="action-detail-value">{actionLabel}</strong><p>{action.reason}</p></>}
-          {detail === "execution" && <><strong className="action-detail-value nowrap">{execution}</strong><p>{action.executionDate ? `${action.executionDate} US market open` : "No order scheduled."}</p></>}
+          {detail === "regime" && <DefinitionList current={portfolio.regime} items={[
+            { name: "NORMAL", meaning: "Base allocation: Fixed60 85%, GLDM 15%, Cash 0%." },
+            { name: "YELLOW", meaning: "CFTC caution allocation: Fixed60 55.5%, GLDM 22.5%, Cash 22%." },
+            { name: "DEEP", meaning: "M3 defensive allocation: Fixed60 25.5%, GLDM 30%, Cash 44.5%." },
+          ]} />}
+          {detail === "action" && <DefinitionList current={actionLabel} items={[
+            { name: "HOLD", meaning: "Target is unchanged. No rebalance order is created." },
+            { name: "REBALANCE", meaning: "Target changed. Rebalance is scheduled for the next US market open." },
+          ]} />}
+          {detail === "execution" && <DefinitionList current={executionState} items={[
+            { name: "NO ORDER", meaning: "No execution is currently scheduled." },
+            { name: "NEXT OPEN", meaning: "Execute the displayed target at the next US market open after close confirmation." },
+          ]} />}
           {detail === "target" && <><AllocationBand targets={action.targets} /><p>100% total / no leverage</p></>}
-          {detail === "cftc" && <><strong className="action-detail-value">{portfolio.cftc.yellow ? "YELLOW" : "CLEAR"}</strong><dl className="action-detail-grid three">
-            <div><dt>CFTC Used (PIT)</dt><dd className="nowrap">{portfolio.cftc.reportDate ?? "—"}</dd></div>
-            <div><dt>Net</dt><dd>{portfolio.cftc.net == null ? "—" : Math.round(portfolio.cftc.net).toLocaleString()}</dd></div>
-            <div><dt>Prior 4W</dt><dd>{portfolio.cftc.priorNet == null ? "—" : Math.round(portfolio.cftc.priorNet).toLocaleString()}</dd></div>
-          </dl></>}
-          {detail === "m3" && <><strong className="action-detail-value">{portfolio.m3.deep ? "ON" : "OFF"}</strong><dl className="action-detail-grid">
-            <div><dt>Core 20D</dt><dd>{pct(portfolio.m3.coreReturn20)}</dd></div>
-            <div><dt>QQQ 20D</dt><dd>{pct(portfolio.m3.qqqReturn20)}</dd></div>
-            <div><dt>Gap</dt><dd>{pct(portfolio.m3.gap)}</dd></div>
-            <div><dt>Recovery</dt><dd>{portfolio.m3.recoveryConfirm}</dd></div>
-          </dl></>}
-          {detail === "fixed60" && <><strong className="action-detail-value">{portfolio.fixed60.riskState}</strong><dl className="action-detail-grid two">
-            <div><dt>Strategy</dt><dd>{portfolio.fixed60.strategyId}</dd></div>
-            <div><dt>Positions</dt><dd>{portfolio.fixed60.symbols.length ? portfolio.fixed60.symbols.map((symbol, index) => `${symbol} ${pct(portfolio.fixed60.innerWeights[index], 0)}`).join(" / ") : "CASH"}</dd></div>
-          </dl></>}
-          {detail === "oos" && <><strong className="action-detail-value">{gate.level}</strong><p>{gate.instruction}</p><p className="detail-secondary">{gate.reason}</p></>}
+          {detail === "cftc" && <DefinitionList current={portfolio.cftc.yellow ? "YELLOW" : "CLEAR"} items={[
+            { name: "CLEAR", meaning: "The latest PIT-eligible Asset Manager net position is not below the report from four releases earlier." },
+            { name: "YELLOW", meaning: "The latest PIT-eligible net position is below the report from four releases earlier." },
+          ]} />}
+          {detail === "m3" && <DefinitionList current={portfolio.m3.deep ? "ON" : "OFF"} items={[
+            { name: "OFF", meaning: "The defensive M3 condition is inactive." },
+            { name: "ON", meaning: "Core 20-session return is negative and trails QQQ by at least 10 percentage points. Exit requires five confirmations above the -3 point recovery gap." },
+          ]} />}
+          {detail === "fixed60" && <DefinitionList current={portfolio.fixed60.riskState} items={[
+            { name: "INVESTED", meaning: "The inner momentum portfolio is invested." },
+            { name: "LOCKED_MARKET", meaning: "The QQQ monthly gate is Risk Off. Portfolio remains locked in Cash." },
+            { name: "LOCKED_STOP", meaning: "An individual stop triggered a full-portfolio exit and recovery lock." },
+            { name: "LOCKED_CIRCUIT", meaning: "The portfolio circuit breaker triggered a full exit and recovery lock." },
+            { name: "WAITING_RECOVERY", meaning: "Recovery conditions have not completed ten consecutive closes." },
+            { name: "READY_NEXT_OPEN", meaning: "Recovery is confirmed. Entry is scheduled for the next US market open." },
+            { name: "CASH", meaning: "No inner momentum positions are currently held." },
+          ]} />}
+          {detail === "oos" && <DefinitionList current={gate.level} items={[
+            { name: "GREEN", meaning: "No preregistered OOS gate is breached. Continue the frozen rules." },
+            { name: "AMBER", meaning: "OOS drawdown reached the 17% review boundary. Review without changing or automatically stopping the strategy." },
+            { name: "RED", meaning: "A kill or long-horizon hurdle is breached. Block new entries and move to Cash at the next US market open." },
+          ]} />}
         </div>
       </div>
     </div>}
@@ -293,7 +318,7 @@ function UniverseRanking({ data }: { data: DashboardPayload }) {
     else { setSortKey(key); setDirection("asc"); }
   };
 
-  return <Section title="Universe / Momentum Ranking"><div className="table-scroll"><table className="dynamic-table combined-ranking-table">
+  return <Section title="Universe"><div className="table-scroll"><table className="dynamic-table combined-ranking-table">
     <thead><tr>
       <SortHeader label="Universe" sortKey="universeRank" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="Ticker" sortKey="symbol" activeKey={sortKey} direction={direction} onSort={changeSort} />
@@ -309,20 +334,6 @@ function UniverseRanking({ data }: { data: DashboardPayload }) {
       <td>{row.universeRank}</td><td><strong>{row.symbol}</strong></td><td>{row.etfCount}</td><td>{row.universeScore.toFixed(2)}</td><td>{row.momentumRank ?? "—"}</td><td>{pct(row.candidate?.threeMonth)}</td><td>{pct(row.candidate?.sixMonth)}</td><td>{row.candidate?.score == null ? "—" : row.candidate.score.toFixed(3)}</td><td>{row.status}</td>
     </tr>)}</tbody>
   </table></div></Section>;
-}
-
-function Portfolio({ data }: { data: DashboardPayload }) {
-  const portfolio = data.portfolioState;
-  return <div className="dynamic-stack">
-    <Section title="Production Target"><AllocationBand targets={portfolio.targets} /></Section>
-    <Section title="Regime Inputs" className="metric-section"><div className="dynamic-metric-grid five">
-      <Metric label="Regime" value={portfolio.regime} />
-      <Metric label="CFTC Used (PIT)" value={portfolio.cftc.reportDate ?? "—"} nowrap />
-      <Metric label="CFTC Net" value={portfolio.cftc.net == null ? "—" : Math.round(portfolio.cftc.net).toLocaleString()} />
-      <Metric label="Prior 4W" value={portfolio.cftc.priorNet == null ? "—" : Math.round(portfolio.cftc.priorNet).toLocaleString()} />
-      <Metric label="M3 Gap" value={pct(portfolio.m3.gap)} />
-    </div></Section>
-  </div>;
 }
 
 function Oos({ data }: { data: DashboardPayload }) {
