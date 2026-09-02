@@ -5,6 +5,7 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-beancounter-probe.py"
+      - "scripts/research-beancounter-shard-map.py"
       - ".github/workflows/research-beancounter-probe.yml"
   workflow_dispatch:
 
@@ -18,3 +19,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/research-beancounter-probe.py
+      - run: python3 scripts/research-beancounter-shard-map.py
