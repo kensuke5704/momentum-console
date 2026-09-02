@@ -135,8 +135,29 @@ def norm_series_text(raw: str) -> str:
     return ' '.join(re.sub(r'[^A-Z0-9]+', ' ', s).split())
 
 
+def _toc_href_heading(text: str, m: re.Match) -> bool:
+    """True only when the heading text is wrapped by an HTML href anchor.
+
+    The fixed 2020 First Trust report contains a table-of-contents link whose visible
+    label is exactly "Portfolio of Investments". Treating that navigation link as a
+    section delimiter created a false schedule block. Real section anchors may use
+    id/name attributes; this filter rejects only an open <A ... href=...> wrapping
+    the heading, so it does not exclude non-navigation anchors.
+    """
+    prefix = text[max(0, m.start() - 800):m.start()]
+    open_a = prefix.upper().rfind('<A')
+    close_a = prefix.upper().rfind('</A>')
+    if open_a <= close_a:
+        return False
+    open_tag = prefix[open_a:]
+    if not re.search(r'(?is)<A\b[^>]*\bHREF\s*=', open_tag):
+        return False
+    suffix = text[m.end():min(len(text), m.end() + 800)]
+    return re.search(r'(?is)</A\s*>', suffix) is not None
+
+
 def schedule_blocks(text: str):
-    matches=list(SCHEDULE_HTML.finditer(text))
+    matches=[m for m in SCHEDULE_HTML.finditer(text) if not _toc_href_heading(text, m)]
     if not matches:
         matches=list(seg.SCHEDULE.finditer(text))
     return [(m.start(), matches[i+1].start() if i+1<len(matches) else min(len(text),m.start()+300000)) for i,m in enumerate(matches)]
