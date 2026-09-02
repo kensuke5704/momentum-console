@@ -118,8 +118,12 @@
 .allocation-segment-2 { background: #89a797; color: #10140f; }
 .allocation-segment-3 { background: #c8cec5; color: #10140f; }
 .allocation-segment-4 { background: #68776b; color: #f8faf6; }
-.allocation-segment:not(.allocation-segment-cash) { color: #f8faf6; }
-.allocation-segment-cash { color: #10140f; }
+.allocation-segment:not(.allocation-segment-cash),
+.allocation-segment:not(.allocation-segment-cash) strong,
+.allocation-segment:not(.allocation-segment-cash) span { color: #f8faf6; }
+.allocation-segment-cash,
+.allocation-segment-cash strong,
+.allocation-segment-cash span { color: #10140f; }
 
 .metric-section > .dynamic-metric-grid {
   border: 0;
