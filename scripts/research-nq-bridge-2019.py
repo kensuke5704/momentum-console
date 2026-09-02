@@ -48,13 +48,12 @@ def samples(filings):
     return out
 
 def main():
-    filings=index_2019(); forms=defaultdict(int); months=defaultdict(int); nq_months=defaultdict(int)
+    filings=index_2019(); forms=defaultdict(int); form_months=defaultdict(lambda:defaultdict(int))
     for x in filings:
-        forms[x['form']]+=1
-        months[x['dateFiled'][:7]]+=1
-        if x['form']=='N-Q':nq_months[x['dateFiled'][:7]]+=1
+        forms[x['form']]+=1; form_months[x['form']][x['dateFiled'][:7]]+=1
     samp=samples(filings)
-    print('2019 filings',len(filings),'forms',dict(forms),'nqMonths',dict(sorted(nq_months.items())),'samples',len(samp),flush=True)
+    print('2019 filings',len(filings),'forms',dict(forms),'samples',len(samp),flush=True)
+    print('N-Q filing months',dict(sorted(form_months['N-Q'].items())),flush=True)
     results=[]
     for i,x in enumerate(samp,1):
         try:
@@ -69,7 +68,7 @@ def main():
     ok=[r for r in results if 'error' not in r]
     def rate(fn):return sum(1 for r in ok if fn(r))/len(ok) if ok else None
     counts=sorted(r['parsedHoldings'] for r in ok)
-    summary={'year':2019,'allTargetFilings':len(filings),'formCounts':dict(forms),'monthCounts':dict(sorted(months.items())),'nqMonthCounts':dict(sorted(nq_months.items())),'sampleRule':'Three deterministic N-Q filings per filing month at 25/50/75 percent index positions.','sampleCount':len(samp),'fetchSuccess':len(ok),'fetchRate':len(ok)/len(samp) if samp else None,'atLeast10HoldingsRate':rate(lambda r:r['parsedHoldings']>=10),'atLeast20HoldingsRate':rate(lambda r:r['parsedHoldings']>=20),'atLeast50HoldingsRate':rate(lambda r:r['parsedHoldings']>=50),'lowNoiseAnd20Rate':rate(lambda r:r['parsedHoldings']>=20 and r['noiseRate']<=.05),'medianParsedHoldings':counts[len(counts)//2] if counts else None,'results':results}
+    summary={'year':2019,'allTargetFilings':len(filings),'formCounts':dict(forms),'formMonthCounts':{f:dict(sorted(m.items())) for f,m in form_months.items()},'nqFilingMonths':dict(sorted(form_months['N-Q'].items())),'sampleRule':'Three deterministic N-Q filings per filing month at 25/50/75 percent index positions.','sampleCount':len(samp),'fetchSuccess':len(ok),'fetchRate':len(ok)/len(samp) if samp else None,'atLeast10HoldingsRate':rate(lambda r:r['parsedHoldings']>=10),'atLeast20HoldingsRate':rate(lambda r:r['parsedHoldings']>=20),'atLeast50HoldingsRate':rate(lambda r:r['parsedHoldings']>=50),'lowNoiseAnd20Rate':rate(lambda r:r['parsedHoldings']>=20 and r['noiseRate']<=.05),'medianParsedHoldings':counts[len(counts)//2] if counts else None,'results':results}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(summary,indent=2)+'\n')
     print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k!='results'}),flush=True)
 
