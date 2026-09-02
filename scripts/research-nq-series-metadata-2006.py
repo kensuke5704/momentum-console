@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import re
+import time
+import urllib.error
 import urllib.request
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -16,6 +18,9 @@ UA = {
     "Accept": "text/plain,text/html,*/*",
 }
 ETF_HINT = re.compile(r"ETF|EXCHANGE[ -]TRADED|ISHARES|STREETTRACKS|SPDR|POWERSHARES|RYDEX|VANGUARD|PROSHARES", re.I)
+STRONG_ETF_REGISTRANT = re.compile(r"ISHARES|STREETTRACKS|SELECT SECTOR SPDR|SPDR TRUST|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
+ETF_TEXT = re.compile(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", re.I)
+ETF_CLASS = re.compile(r"ETF\s+SHARES?|EXCHANGE[ -]TRADED", re.I)
 
 
 def sec_url(filename: str) -> str:
@@ -25,13 +30,29 @@ def sec_url(filename: str) -> str:
 def fetch_prefix(url: str) -> tuple[str, str]:
     # GitHub-hosted runners are blocked by SEC Archives in this environment.
     # Jina is only a transport bridge; the underlying URL remains the SEC filing.
-    req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return "jina", r.read(1_500_000).decode("utf-8", "replace")
+    last: Exception | None = None
+    for attempt in range(4):
+        try:
+            req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
+            with urllib.request.urlopen(req, timeout=35) as r:
+                return "jina", r.read(1_500_000).decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code != 429:
+                raise
+        except Exception as e:
+            last = e
+        time.sleep(1.5 * (attempt + 1))
+    assert last is not None
+    raise last
+
+
+def tag_value(text: str, tag: str) -> str | None:
+    m = re.search(rf"(?im)<{re.escape(tag)}>\s*([^\r\n<]+)", text)
+    return " ".join(m.group(1).split()) if m else None
 
 
 def values(text: str, tag: str) -> list[str]:
-    # Legacy EDGAR submissions commonly use SGML tags without explicit closing tags.
     out = []
     for m in re.finditer(rf"(?im)<{re.escape(tag)}>\s*([^\r\n<]+)", text):
         v = " ".join(m.group(1).split())
@@ -40,10 +61,41 @@ def values(text: str, tag: str) -> list[str]:
     return out
 
 
+def parse_series_contracts(text: str, company: str) -> list[dict]:
+    out: list[dict] = []
+    blocks = re.findall(r"(?is)<SERIES>(.*?)</SERIES>", text)
+    for block in blocks:
+        series_id = tag_value(block, "SERIES-ID")
+        series_name = tag_value(block, "SERIES-NAME")
+        classes = []
+        class_blocks = re.findall(r"(?is)<CLASS-CONTRACT>(.*?)</CLASS-CONTRACT>", block)
+        for cb in class_blocks:
+            classes.append({
+                "id": tag_value(cb, "CLASS-CONTRACT-ID"),
+                "name": tag_value(cb, "CLASS-CONTRACT-NAME"),
+                "ticker": tag_value(cb, "CLASS-CONTRACT-TICKER-SYMBOL"),
+            })
+        explicit_series = bool(series_name and ETF_TEXT.search(series_name))
+        explicit_class = any(c.get("name") and ETF_CLASS.search(c["name"]) for c in classes)
+        strong_registrant = bool(STRONG_ETF_REGISTRANT.search(company))
+        is_etf = explicit_series or explicit_class or strong_registrant
+        etf_tickers = [c["ticker"].upper() for c in classes if c.get("ticker") and (explicit_series or strong_registrant or (c.get("name") and ETF_CLASS.search(c["name"])))]
+        out.append({
+            "seriesId": series_id,
+            "seriesName": series_name,
+            "classes": classes,
+            "explicitSeriesEtf": explicit_series,
+            "explicitClassEtf": explicit_class,
+            "strongEtfRegistrant": strong_registrant,
+            "isEtf": is_etf,
+            "etfTickers": list(dict.fromkeys(etf_tickers)),
+        })
+    return out
+
+
 def choose_samples(filings: list[dict]) -> list[dict]:
     nq = [x for x in filings if x.get("form") == "N-Q"]
     hinted = [x for x in nq if ETF_HINT.search(str(x.get("company") or ""))]
-    # Keep all distinct hinted registrants up to 36 filings, then add a deterministic broad sample.
     chosen: list[dict] = []
     seen_cik: set[str] = set()
     for x in hinted:
@@ -62,15 +114,15 @@ def choose_samples(filings: list[dict]) -> list[dict]:
     return chosen
 
 
-def inspect_one(i: int, total: int, x: dict) -> dict:
+def inspect_one(i: int, x: dict) -> dict:
     url = sec_url(x["filename"])
     try:
         method, text = fetch_prefix(url)
-        series_names = values(text, "SERIES-NAME")
-        series_ids = values(text, "SERIES-ID")
-        class_names = values(text, "CLASS-CONTRACT-NAME")
-        tickers = values(text, "CLASS-CONTRACT-TICKER-SYMBOL")
-        etf_series = [s for s in series_names if re.search(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", s, re.I)]
+        series = parse_series_contracts(text, str(x.get("company") or ""))
+        flat_series_names = values(text, "SERIES-NAME")
+        flat_tickers = values(text, "CLASS-CONTRACT-TICKER-SYMBOL")
+        etf_series = [s for s in series if s["isEtf"]]
+        etf_tickers = list(dict.fromkeys(t for s in etf_series for t in s["etfTickers"]))
         return {
             "index": i,
             "cik": x["cik"],
@@ -78,12 +130,11 @@ def inspect_one(i: int, total: int, x: dict) -> dict:
             "dateFiled": x["dateFiled"],
             "filename": x["filename"],
             "method": method,
-            "seriesNames": series_names[:80],
-            "seriesIds": series_ids[:80],
-            "classNames": class_names[:80],
-            "tickers": tickers[:80],
-            "etfSeriesNames": etf_series[:80],
-            "containsEtfText": bool(re.search(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", text, re.I)),
+            "seriesBlockCount": len(series),
+            "seriesNames": flat_series_names[:120],
+            "tickers": flat_tickers[:160],
+            "classifiedEtfSeries": etf_series[:120],
+            "classifiedEtfTickers": etf_tickers[:160],
         }
     except Exception as e:
         return {
@@ -101,8 +152,8 @@ def main() -> None:
     samples = choose_samples(idx["filings"])
     print(f"samples={len(samples)}", flush=True)
     results = []
-    with ThreadPoolExecutor(max_workers=16) as pool:
-        futures = [pool.submit(inspect_one, i, len(samples), x) for i, x in enumerate(samples, 1)]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(inspect_one, i, x) for i, x in enumerate(samples, 1)]
         for future in as_completed(futures):
             r = future.result()
             results.append(r)
@@ -110,34 +161,35 @@ def main() -> None:
                 print(f"{r['index']}/{len(samples)} FAIL {r.get('company')} {r['error']}", flush=True)
             else:
                 print(
-                    f"{r['index']}/{len(samples)} {r['dateFiled']} {r['company'][:36]} method={r['method']} "
-                    f"series={len(r['seriesNames'])} tickers={len(r['tickers'])} etfSeries={len(r['etfSeriesNames'])}",
+                    f"{r['index']}/{len(samples)} {r['company'][:38]} blocks={r['seriesBlockCount']} "
+                    f"series={len(r['seriesNames'])} tickers={len(r['tickers'])} "
+                    f"etfSeries={len(r['classifiedEtfSeries'])} etfTickers={len(r['classifiedEtfTickers'])}",
                     flush=True,
                 )
-                if r["seriesNames"]:
-                    print("  SERIES", json.dumps(r["seriesNames"][:6]), flush=True)
-                if r["tickers"]:
-                    print("  TICKERS", json.dumps(r["tickers"][:12]), flush=True)
+                if r["classifiedEtfTickers"]:
+                    print("  ETF_TICKERS", json.dumps(r["classifiedEtfTickers"][:20]), flush=True)
     results.sort(key=lambda r: r["index"])
 
     ok = [r for r in results if "error" not in r]
     methods = Counter(r["method"] for r in ok)
     with_series = [r for r in ok if r["seriesNames"]]
     with_ticker = [r for r in ok if r["tickers"]]
-    with_etf_series = [r for r in ok if r["etfSeriesNames"]]
+    with_structured_series = [r for r in ok if r["seriesBlockCount"] > 0]
+    with_etf = [r for r in ok if r["classifiedEtfSeries"]]
+    with_etf_ticker = [r for r in ok if r["classifiedEtfTickers"]]
     summary = {
         "year": 2006,
-        "sampleRule": "Up to 36 distinct ETF-hint registrants plus 24 deterministic broad N-Q samples.",
+        "sampleRule": "Up to 36 distinct ETF-hint registrants plus 24 deterministic broad N-Q samples. Classification uses only filing-time registrant, series, class and ticker metadata.",
         "sampleCount": len(samples),
         "fetchSuccess": len(ok),
         "fetchRate": len(ok) / len(samples) if samples else None,
         "fetchMethods": dict(methods),
-        "withSeriesMetadata": len(with_series),
         "seriesMetadataRate": len(with_series) / len(ok) if ok else None,
-        "withTickerMetadata": len(with_ticker),
         "tickerMetadataRate": len(with_ticker) / len(ok) if ok else None,
-        "withExplicitEtfSeriesName": len(with_etf_series),
-        "explicitEtfSeriesRate": len(with_etf_series) / len(ok) if ok else None,
+        "structuredSeriesRate": len(with_structured_series) / len(ok) if ok else None,
+        "classifiedEtfRegistrantRate": len(with_etf) / len(ok) if ok else None,
+        "classifiedEtfTickerRate": len(with_etf_ticker) / len(ok) if ok else None,
+        "classifiedEtfTickers": sorted(set(t for r in ok for t in r["classifiedEtfTickers"])),
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
