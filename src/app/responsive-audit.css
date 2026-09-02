@@ -105,6 +105,7 @@
 .allocation-segment:last-child { border-right: 0; }
 .allocation-segment strong,
 .allocation-segment span {
+  color: inherit;
   font-family: "Roboto Mono", monospace;
   line-height: 1.1;
   overflow: hidden;
@@ -113,27 +114,24 @@
 }
 .allocation-segment strong { font-size: clamp(11px, 1.3vw, 16px); }
 .allocation-segment span { font-size: clamp(9px, 1vw, 12px); }
-.allocation-segment-0 { background: #174f32; color: #f8faf6; }
-.allocation-segment-1 { background: #397357; color: #f8faf6; }
-.allocation-segment-2 { background: #89a797; color: #10140f; }
-.allocation-segment-3 { background: #c8cec5; color: #10140f; }
-.allocation-segment-4 { background: #68776b; color: #f8faf6; }
-.allocation-segment:not(.allocation-segment-cash),
-.allocation-segment:not(.allocation-segment-cash) strong,
-.allocation-segment:not(.allocation-segment-cash) span { color: #f8faf6; }
-.allocation-segment-cash,
-.allocation-segment-cash strong,
-.allocation-segment-cash span { color: #10140f; }
-
 .metric-section > .dynamic-metric-grid {
   border: 0;
   padding: 0 !important;
 }
 
 .metric-nowrap strong {
-  font-size: clamp(16px, 1.75vw, 24px);
   white-space: nowrap;
 }
+
+.dynamic-metric { min-width: 0; overflow: hidden; }
+.dynamic-metric > span { min-width: 0; overflow-wrap: anywhere; }
+.dynamic-metric > strong { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+.dynamic-metric > strong.metric-value-compact { font-size: clamp(17px, 1.65vw, 24px); }
+.dynamic-metric > strong.metric-value-dense { font-size: clamp(13px, 1.25vw, 18px); line-height: 1.15; }
+
+.positions-table { min-width: 620px; }
+.positions-table td,
+.positions-table th { width: 25%; }
 
 .simple-table { display: block !important; padding: 0 !important; }
 .simple-table > div {
@@ -370,7 +368,11 @@
   .dynamic-metric-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .dynamic-metric { min-width: 0; padding: 14px 12px !important; }
   .dynamic-metric strong { font-size: 16px !important; overflow-wrap: anywhere; }
-  .dynamic-metric.metric-nowrap strong { font-size: 13px !important; white-space: nowrap; }
+  .dynamic-metric strong.metric-value-compact { font-size: 14px !important; }
+  .dynamic-metric strong.metric-value-dense { font-size: 12px !important; }
+  .dynamic-metric.metric-nowrap strong { white-space: nowrap; }
+
+  .positions-table { min-width: 0; }
 
   .dynamic-metric-grid.five > .dynamic-metric:last-child {
     border-right: 0;
