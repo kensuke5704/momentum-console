@@ -1,0 +1,20 @@
+name: Research BeanCounter CUSIP Diagnostic
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-beancounter-cusip-diagnostic.py"
+      - ".github/workflows/research-beancounter-cusip-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-beancounter-cusip-diagnostic.py
