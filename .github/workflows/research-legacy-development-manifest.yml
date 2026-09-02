@@ -1,0 +1,25 @@
+name: Research Legacy Development Manifest
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-legacy-development-manifest.py"
+      - ".github/workflows/research-legacy-development-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deterministic N-Q transport manifest
+        run: python3 scripts/research-legacy-development-manifest.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-development-manifest
+          path: data/research/legacy-development-manifest.json
