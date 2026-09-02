@@ -1,0 +1,26 @@
+name: Research First Trust Table Layout Diagnostic 2020
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-first-trust-table-layout-diagnostic-2020.py"
+      - "scripts/research-legacy-universe-reproducibility-fast-2020.py"
+      - ".github/workflows/research-first-trust-table-layout-diagnostic-2020.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-first-trust-table-layout-diagnostic-2020.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: first-trust-table-layout-diagnostic-2020
+          path: data/research/first-trust-table-layout-diagnostic-2020.json
