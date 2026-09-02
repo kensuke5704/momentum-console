@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import time
 import urllib.request
 import zipfile
@@ -14,7 +13,7 @@ repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
 ORIGINAL = repro.ov.master_2020
-TARGET = re.compile(r'FIRST TRUST', re.I)
+TARGET_CIK = '1424212'  # First Trust Exchange-Traded Fund III; predeclared from the 2016 structural anchor sample.
 
 
 def robust_download(path: Path) -> None:
@@ -42,7 +41,7 @@ repro.ov.download = robust_download
 
 
 def filtered_master():
-    return [x for x in ORIGINAL() if TARGET.search(str(x.get('company') or ''))]
+    return [x for x in ORIGINAL() if str(x.get('cik') or '') == TARGET_CIK]
 
 
 repro.ov.master_2020 = filtered_master
