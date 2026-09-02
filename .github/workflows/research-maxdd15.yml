@@ -19,5 +19,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Patch diagnostic output for selected Stage21
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/stage21-spa.ts')
+          s=p.read_text()
+          old='function spa(ds:number[][],block:number){const k=ds.length,n=ds[0].length,mu=ds.map(mean),sig=ds.map(x=>hacSd(x,10)),t=mu.map((m,i)=>Math.sqrt(n)*m/sig[i]),obs=Math.max(0,...t),cut=-Math.sqrt(2*Math.log(Math.log(n))),muC=mu.map((m,i)=>t[i]<cut?m:0),rand=rng(SEED+block),p=1/block;let ge=0;for(let b=0;b<B;b++){const sums=new Float64Array(k);let idx=Math.floor(rand()*n);for(let j=0;j<n;j++){if(j===0||rand()<p)idx=Math.floor(rand()*n);else idx=(idx+1)%n;for(let i=0;i<k;i++)sums[i]+=ds[i][idx];}let mx=0;for(let i=0;i<k;i++){const bm=sums[i]/n-mu[i]+muC[i],bt=Math.sqrt(n)*bm/sig[i];if(bt>mx)mx=bt}if(mx>=obs)ge++}return{n,k,block,bootstrap:B,observedMaxT:obs,pValue:(ge+1)/(B+1),bestIndex:t.indexOf(Math.max(...t)),bestT:Math.max(...t),cutoff:cut}}'
+          new='function spa(ds:number[][],block:number,selectedIndex=27){const k=ds.length,n=ds[0].length,mu=ds.map(mean),sig=ds.map(x=>hacSd(x,10)),t=mu.map((m,i)=>Math.sqrt(n)*m/sig[i]),obs=Math.max(0,...t),sel=Math.max(0,t[selectedIndex]),cut=-Math.sqrt(2*Math.log(Math.log(n))),muC=mu.map((m,i)=>t[i]<cut?m:0),rand=rng(SEED+block),p=1/block;let ge=0,geSel=0;for(let b=0;b<B;b++){const sums=new Float64Array(k);let idx=Math.floor(rand()*n);for(let j=0;j<n;j++){if(j===0||rand()<p)idx=Math.floor(rand()*n);else idx=(idx+1)%n;for(let i=0;i<k;i++)sums[i]+=ds[i][idx];}let mx=0;for(let i=0;i<k;i++){const bm=sums[i]/n-mu[i]+muC[i],bt=Math.sqrt(n)*bm/sig[i];if(bt>mx)mx=bt}if(mx>=obs)ge++;if(mx>=sel)geSel++}return{n,k,block,bootstrap:B,observedMaxT:obs,pValue:(ge+1)/(B+1),bestIndex:t.indexOf(Math.max(...t)),bestT:Math.max(...t),selectedIndex,selectedT:t[selectedIndex],selectedFamilyWiseP:(geSel+1)/(B+1),cutoff:cut}}'
+          if old not in s: raise SystemExit('spa function not found')
+          s=s.replace(old,new)
+          s=s.replace('{f:.85,...z,c:.15},{f:.555,...z,c:.445},{f:.255,...z,c:.745}','{...z,f:.85,c:.15},{...z,f:.555,c:.445},{...z,f:.255,c:.745}')
+          p.write_text(s)
+          PY
       - name: Run Stage21 SPA diagnostic
         run: node --import tsx scripts/stage21-spa.ts
