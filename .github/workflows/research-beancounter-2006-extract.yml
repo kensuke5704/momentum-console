@@ -1,0 +1,26 @@
+name: Research BeanCounter 2006 Extract
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-beancounter-2006-extract.py"
+      - ".github/workflows/research-beancounter-2006-extract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stream BeanCounter 2006 fund filings
+        run: python3 scripts/research-beancounter-2006-extract.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beancounter-fund-holdings-2006
+          path: data/research/beancounter-fund-holdings-2006.json
+          if-no-files-found: error
