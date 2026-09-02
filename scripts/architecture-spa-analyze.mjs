@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
-const START='2020-01-01', END='2026-08-25', B=5000, SEED=22092026;
+const START='2020-01-01', START_TOL='2020-01-10', END='2026-08-25', END_TOL='2026-08-20', B=5000, SEED=22092026;
 const mean=x=>x.reduce((a,b)=>a+b,0)/(x.length||1);
 const stdev=x=>{if(x.length<2)return 0;const m=mean(x);return Math.sqrt(x.reduce((s,v)=>s+(v-m)**2,0)/(x.length-1));};
 function stats(curve){const first=curve[0],last=curve.at(-1),years=(Date.parse(last.date)-Date.parse(first.date))/(365.25*86400000),rs=curve.slice(1).map((x,i)=>x.equity/curve[i].equity-1);let p=first.equity,dd=0;for(const x of curve){p=Math.max(p,x.equity);dd=Math.min(dd,x.equity/p-1)}const cagr=(last.equity/first.equity)**(1/years)-1;return{cagr,maxDrawdown:dd,annualizedVolatility:stdev(rs)*Math.sqrt(252),finalEquity:last.equity};}
@@ -12,11 +12,12 @@ function spa(ds,block,selectedIndex){const k=ds.length,n=ds[0].length,mu=ds.map(
 
 const files=process.argv.slice(2);if(!files.length)throw new Error('capture files required');
 const raw=[];for(const file of files){let text='';try{text=await readFile(file,'utf8')}catch{continue}for(const line of text.split(/\n+/)){if(!line.trim())continue;try{raw.push(JSON.parse(line))}catch{}}}
-const eligible=raw.filter(x=>x?.curve?.length>=1500&&x.curve[0].date<=START&&x.curve.at(-1).date>=END&&String(x.caller??'').includes('/scripts/'));
+const eligible=raw.filter(x=>x?.curve?.length>=1500&&x.curve[0].date<=START_TOL&&x.curve.at(-1).date>=END_TOL&&String(x.caller??'').includes('/scripts/'));
 const unique=[];const seen=new Set();for(const x of eligible){const c=x.curve.filter(p=>p.date>=START&&p.date<=END);if(c.length<1500)continue;const sig=createHash('sha256').update(c.slice(1).map((p,i)=>`${p.date}:${(p.equity/c[i].equity-1).toFixed(10)}`).join('|')).digest('hex');if(seen.has(sig))continue;seen.add(sig);unique.push({script:x.script,caller:x.caller,curve:c,stats:stats(c),signature:sig});}
+if(!unique.length)throw new Error(`no eligible curves: raw=${raw.length} eligible=${eligible.length}`);
 const q=JSON.parse(await readFile('public/data/market-data.json','utf8')).histories.QQQ.filter(x=>x.date>=START&&x.date<=END).sort((a,b)=>a.date.localeCompare(b.date));const qm=new Map();for(let i=1;i<q.length;i++)qm.set(q[i].date,q[i].close/q[i-1].close-1);
 let dates=[...qm.keys()];for(const u of unique){const m=rmap(u.curve);dates=dates.filter(d=>m.has(d));}
-if(dates.length<1500)throw new Error(`common sample too short: ${dates.length}`);
+if(dates.length<1500)throw new Error(`common sample too short: ${dates.length}; candidates=${unique.length}`);
 const qq=dates.map(d=>qm.get(d));const series=unique.map(u=>{const m=rmap(u.curve);return dates.map(d=>m.get(d));});const ds=series.map(r=>r.map((v,i)=>v-qq[i]));
 const target={cagr:.48607237745471776,maxDrawdown:-.16885951856003312};let selectedIndex=0,bestDist=Infinity;unique.forEach((u,i)=>{const d=Math.abs(u.stats.cagr-target.cagr)+Math.abs(u.stats.maxDrawdown-target.maxDrawdown);if(d<bestDist){bestDist=d;selectedIndex=i}});
 const blocks=[5,10,20],results=blocks.map(b=>spa(ds,b,selectedIndex));const best=results[1].bestIndex;
