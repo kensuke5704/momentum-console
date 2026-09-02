@@ -1,0 +1,27 @@
+name: Research Layline 13F NPORT Overlap
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-layline-nport-overlap.py"
+      - ".github/workflows/research-layline-overlap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  overlap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Layline 13F vs NPORT 2020 overlap pilot
+        run: python3 scripts/research-layline-nport-overlap.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: layline13f-nport-overlap-2020
+          path: data/research/layline13f-nport-overlap-2020.json
+          if-no-files-found: warn
