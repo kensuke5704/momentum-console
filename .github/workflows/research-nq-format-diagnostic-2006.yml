@@ -1,0 +1,23 @@
+name: Research NQ Format Diagnostic 2006
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-nq-format-diagnostic-2006.py"
+      - ".github/workflows/research-nq-format-diagnostic-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract 2006 filing index
+        run: python3 scripts/research-nq-index-extract.py
+      - name: Diagnose PowerShares and ProShares formats
+        run: python3 scripts/research-nq-format-diagnostic-2006.py
