@@ -30,10 +30,22 @@ jobs:
             code=$(curl -L -sS -o /tmp/nq.html -w '%{http_code}' --max-time 60 "$u" || true)
             bytes=$(wc -c </tmp/nq.html 2>/dev/null || echo 0)
             echo "$code $bytes $u"
-            if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ]; then
-              grep -Eio 'FORM N-Q|QUARTERLY (SCHEDULE|NOTICE) OF PORTFOLIO HOLDINGS' /tmp/nq.html | head -3 || true
-              ok=$((ok+1))
-            fi
+            if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ]; then ok=$((ok+1)); fi
           done
-          echo "successful=$ok/${#urls[@]}"
-          test "$ok" -ge 1
+          echo "documents_successful=$ok/${#urls[@]}"
+          test "$ok" -eq 3
+      - name: Probe historical EDGAR master indexes on mirror
+        shell: bash
+        run: |
+          set -uo pipefail
+          ok=0
+          for yq in 2004/QTR1 2008/QTR4 2013/QTR4 2019/QTR4; do
+            u="https://edgar.businessquant.com/Archives/edgar/full-index/${yq}/master.idx"
+            code=$(curl -L -sS -o /tmp/master.idx -w '%{http_code}' --max-time 60 "$u" || true)
+            bytes=$(wc -c </tmp/master.idx 2>/dev/null || echo 0)
+            nq=$(grep -c '|N-Q|' /tmp/master.idx 2>/dev/null || true)
+            echo "$yq code=$code bytes=$bytes nq_rows=$nq"
+            if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ] && [ "$nq" -gt 0 ]; then ok=$((ok+1)); fi
+          done
+          echo "indexes_successful=$ok/4"
+          test "$ok" -eq 4
