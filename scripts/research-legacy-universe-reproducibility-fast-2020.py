@@ -21,12 +21,14 @@ DENSE_FAMILIES = (
     'RYDEX ETF TRUST',
 )
 
+ORIGINAL_MASTER_2020 = repro.ov.master_2020
+
 
 def dense_index_sample():
     # Reuse the deterministic SEC master-index inventory already used by the full
     # overlap validation. This avoids data.sec.gov/submissions rate/access behavior
     # changing the research result while preserving exactly the same filing universe.
-    filings = repro.ov.master_2020()
+    filings = ORIGINAL_MASTER_2020()
     out = []
     for row in filings:
         company = str(row.get('company') or '').upper()
