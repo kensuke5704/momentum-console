@@ -1,0 +1,24 @@
+name: Research HF 13F NPORT Pilot
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-hf13f-nport-pilot.py"
+      - ".github/workflows/research-hf13f-nport-pilot.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q pyarrow
+      - run: python3 scripts/research-hf13f-nport-pilot.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hf13f-nport-pilot
+          path: data/research/hf13f-nport-pilot.json
+          if-no-files-found: warn
