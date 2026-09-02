@@ -2,6 +2,9 @@
 
 このNext.jsアプリは、SBI証券で実行可能なProduction portfolio **`momentum-stage21-sbi-2026-09-v1`** のsignal・target allocation・backtest・True Forward OOSを一元管理します。
 
+> Documentation entry point: [`docs/README.md`](docs/README.md)  
+> Current validation summary: [`docs/research/stage21-validation-summary-20260902.md`](docs/research/stage21-validation-summary-20260902.md)
+
 旧Production `momentum-fixed60-2026-08-v1` は削除していません。現在はStage21の**内側のalpha/risk engine**としてTop2選定、stop/circuit/recovery、M3 shadow計算に利用します。旧Production仕様は [`docs/legacy/momentum-fixed60-2026-08-v1.md`](docs/legacy/momentum-fixed60-2026-08-v1.md) に保存しています。
 
 ## Production portfolio
@@ -120,6 +123,20 @@ Release-aware same-sample Stage21 research through 2026-08-25:
 - rolling36 median: 約43.66%
 - rolling36 P10: 約35.19%
 - rolling36 worst: 約23.42%
+
+2026-09-02の再計算では暦年リターンは以下でした。
+
+| Year | Return |
+|---|---:|
+| 2020 | +76.67% |
+| 2021 | +55.10% |
+| 2022 | -0.34% |
+| 2023 | +86.94% |
+| 2024 | +63.96% |
+| 2025 | +45.15% |
+| 2026 YTD through 2026-08-25 | +14.44% |
+
+詳細・再現情報・PF・robustness結果は [`docs/research/stage21-validation-summary-20260902.md`](docs/research/stage21-validation-summary-20260902.md) に固定しています。
 
 これはhistorical robustness referenceであり、将来CAGR 43.66%を保証・推定する統計的expected valueではありません。24–36か月windowではCAGR 40%を下回る期間も確認されています。
 
