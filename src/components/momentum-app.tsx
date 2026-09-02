@@ -11,6 +11,7 @@ import {
   GaugeIcon,
   GearIcon,
   TrendUpIcon,
+  WalletIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -23,11 +24,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { contrastingTextColor } from "@/lib/color-contrast";
+import { latestCompletedUsTradingSession } from "@/lib/latest-session";
 import { evaluateOosActionGate } from "@/lib/oos-action-gate";
 import type { PortfolioTarget } from "@/lib/portfolio-types";
 import type { DashboardPayload, EquityPoint, MomentumCandidate, UniverseMember } from "@/lib/types";
 
-type Tab = "overview" | "universe" | "oos" | "backtest" | "schedule";
+type Tab = "overview" | "universe" | "portfolio" | "oos" | "backtest" | "schedule";
 type DetailKey = "regime" | "action" | "execution" | "target" | "cftc" | "m3" | "fixed60" | "oos";
 type SortDirection = "asc" | "desc";
 type CombinedSortKey =
@@ -50,6 +53,7 @@ type CombinedRow = UniverseMember & {
 const tabs = [
   ["overview", "Overview", GaugeIcon],
   ["universe", "Universe", DatabaseIcon],
+  ["portfolio", "Portfolio", WalletIcon],
   ["oos", "OOS", ChartLineUpIcon],
   ["backtest", "Backtest", ClockCounterClockwiseIcon],
   ["schedule", "Settings", GearIcon],
@@ -83,11 +87,24 @@ const usOpenJst = (date: string | null) => {
   return updatedAt(new Date(Date.UTC(year, month - 1, day, utcHour, 30)).toISOString());
 };
 
+const usCloseJst = (date: string) => {
+  const [year, month, day] = date.split("-").map(Number);
+  const probe = new Date(Date.UTC(year, month - 1, day, 20));
+  const nyHour = Number(new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit",
+    hour12: false,
+  }).format(probe));
+  const utcHour = nyHour === 16 ? 20 : 21;
+  return updatedAt(new Date(Date.UTC(year, month - 1, day, utcHour)).toISOString());
+};
+
 const targetText = (targets: PortfolioTarget[]) =>
   targets.map((target) => `${target.symbol} ${pct(target.weight, 1)}`).join(" / ") || "—";
 
 function Metric({ label, value, nowrap = false }: { label: string; value: string; nowrap?: boolean }) {
-  return <div className={`dynamic-metric${nowrap ? " metric-nowrap" : ""}`}><span>{label}</span><strong>{value}</strong></div>;
+  const density = value.length > 16 ? " metric-value-dense" : value.length > 10 ? " metric-value-compact" : "";
+  return <div className={`dynamic-metric${nowrap ? " metric-nowrap" : ""}`}><span>{label}</span><strong className={density.trim()} title={value}>{value}</strong></div>;
 }
 
 function StatusMetric({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
@@ -107,21 +124,26 @@ function DefinitionList({ current, items }: { current: string; items: Definition
   </div>;
 }
 
-function Section({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
-  return <section className={`dynamic-card${className ? ` ${className}` : ""}`}><header><h2>{title}</h2></header>{children}</section>;
+function Section({ title, children, className = "", asOf }: { title: string; children: React.ReactNode; className?: string; asOf?: string }) {
+  return <section className={`dynamic-card${className ? ` ${className}` : ""}`}><header><h2>{title}</h2>{asOf && <span className="section-asof">{asOf}</span>}</header>{children}</section>;
 }
+
+const ALLOCATION_BACKGROUNDS = ["#174f32", "#397357", "#89a797", "#c8cec5", "#68776b"] as const;
 
 function AllocationBand({ targets, compact = false }: { targets: PortfolioTarget[]; compact?: boolean }) {
   if (!targets.length) return <div className="empty-state">No allocation</div>;
   return <div className={`allocation-band${compact ? " compact" : ""}`} aria-label={targetText(targets)}>
-    {targets.map((target, index) => <div
-      className={`allocation-segment allocation-segment-${index % 5}${target.symbol === "CASH" ? " allocation-segment-cash" : ""}`}
-      key={`${target.symbol}-${target.role}`}
-      style={{ flexBasis: `${target.weight * 100}%`, flexGrow: target.weight }}
-      title={`${target.symbol} ${pct(target.weight, 1)}`}
-    >
-      <strong>{target.symbol}</strong><span>{pct(target.weight, 1)}</span>
-    </div>)}
+    {targets.map((target, index) => {
+      const backgroundColor = ALLOCATION_BACKGROUNDS[index % ALLOCATION_BACKGROUNDS.length];
+      return <div
+        className="allocation-segment"
+        key={`${target.symbol}-${target.role}`}
+        style={{ backgroundColor, color: contrastingTextColor(backgroundColor), flexBasis: `${target.weight * 100}%`, flexGrow: target.weight }}
+        title={`${target.symbol} ${pct(target.weight, 1)}`}
+      >
+        <strong>{target.symbol}</strong><span>{pct(target.weight, 1)}</span>
+      </div>;
+    })}
   </div>;
 }
 
@@ -180,6 +202,7 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
         {data.warning && <div className="data-warning">{data.warning}</div>}
         {tab === "overview" && <Overview data={data} />}
         {tab === "universe" && <UniverseRanking data={data} />}
+        {tab === "portfolio" && <Portfolio data={data} />}
         {tab === "oos" && <Oos data={data} />}
         {tab === "backtest" && <Backtest data={data} />}
         {tab === "schedule" && <Schedule data={data} />}
@@ -188,14 +211,51 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
   </div>;
 }
 
+const price = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const asOfLabel = (value: string) => {
+  if (!value) return "as-of —";
+  return `as-of ${value.includes("T") ? updatedAt(value) : usCloseJst(value)}`;
+};
+
+function Portfolio({ data }: { data: DashboardPayload }) {
+  const positions = data.liveState.currentPositions.map((position) => {
+    const latest = data.latestPrices?.[position.symbol];
+    const currentPrice = latest?.price ?? position.currentPrice;
+    return { ...position, currentPrice, pnl: currentPrice == null ? null : currentPrice / position.entryPrice - 1, priceAsOf: latest?.asOf ?? data.liveState.asOf };
+  });
+  const latestAsOf = positions.map((position) => position.priceAsOf).filter(Boolean).sort().at(-1) ?? data.liveState.asOf;
+
+  return <div className="dynamic-stack"><Section title="Current Positions" asOf={asOfLabel(latestAsOf)}>
+    <div className="table-scroll portfolio-table">
+      {positions.length ? <table className="dynamic-table positions-table"><thead><tr><th>Ticker</th><th>Entry Price</th><th>Current Price</th><th>P/L</th></tr></thead>
+        <tbody>{positions.map((position) => <tr key={position.symbol}>
+          <td className="ticker-data" data-label="Ticker"><strong>{position.symbol}</strong></td>
+          <td data-label="Entry Price">{price(position.entryPrice)}</td>
+          <td data-label="Current Price">{price(position.currentPrice)}</td>
+          <td data-label="P/L"><strong className={position.pnl != null && position.pnl < 0 ? "tone-bad" : "tone-good"}>{pct(position.pnl, 2)}</strong></td>
+        </tr>)}</tbody></table> : <div className="empty-state">No open positions</div>}
+    </div>
+  </Section></div>;
+}
+
 function Overview({ data }: { data: DashboardPayload }) {
   const [detail, setDetail] = useState<DetailKey | null>(null);
+  const [latestCompletedSession, setLatestCompletedSession] = useState<string | null>(null);
   const portfolio = data.portfolioState;
   const gate = evaluateOosActionGate(data.oos);
   const action = portfolio.nextAction;
   const actionLabel = action.type === "REBALANCE_NEXT_OPEN" ? "REBALANCE" : action.type === "HOLD" ? "HOLD" : "REVIEW";
   const execution = action.executionDate ? usOpenJst(action.executionDate) : "NO ORDER";
   const executionState = action.executionDate ? "NEXT OPEN" : "NO ORDER";
+  const nonLatestClose = latestCompletedSession != null && (!portfolio.asOf || portfolio.asOf < latestCompletedSession);
+
+  useEffect(() => {
+    const update = () => setLatestCompletedSession(latestCompletedUsTradingSession());
+    update();
+    const id = window.setInterval(update, 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!detail) return;
@@ -210,7 +270,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     <Section title="Next Action">
       <div className="next-action next-action-stage21">
         <button type="button" className="next-action-cell" onClick={() => setDetail("regime")}><span>Regime</span><strong>{portfolio.regime}</strong></button>
-        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><strong>{actionLabel}</strong></button>
+        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><div className="action-value-line"><strong>{actionLabel}</strong>{nonLatestClose && <span className="close-basis-warning" title={`Decision uses ${portfolio.asOf || "no"} daily close; latest completed session is ${latestCompletedSession}.`}>NON-LATEST</span>}</div></button>
         <button type="button" className="next-action-cell execution-cell" onClick={() => setDetail("execution")}><span>Execution (JST)</span><strong>{execution}</strong></button>
         <button type="button" className="next-action-cell target-cell" onClick={() => setDetail("target")}><span>Target</span><AllocationBand targets={action.targets} compact /></button>
       </div>
