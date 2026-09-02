@@ -40,7 +40,20 @@ async function main() {
   // Yahoo's long-range chart response can omit an otherwise valid isolated
   // daily bar. A separate short-range request reliably returns those rows;
   // prefer it for the recent window while preserving the full history.
-  const fetchedHistories = Object.fromEntries(symbols.map((symbol) => [symbol, mergeHistoryPoints(fullHistories[symbol] ?? [], recentHistories[symbol] ?? [])]));
+  let fetchedHistories = Object.fromEntries(symbols.map((symbol) => [symbol, mergeHistoryPoints(fullHistories[symbol] ?? [], recentHistories[symbol] ?? [])]));
+  const recentReferenceDates = (fetchedHistories.QQQ ?? []).filter((point) => point.date >= new Date(recentStartUnix * 1000).toISOString().slice(0,10)).map((point) => point.date);
+  const repairsByStartDate = new Map<string,string[]>();
+  for (const symbol of intradaySymbols.filter((value) => value !== "QQQ")) {
+    const available = new Set((fetchedHistories[symbol] ?? []).map((point) => point.date));
+    const firstMissing = recentReferenceDates.find((date) => !available.has(date));
+    if (firstMissing) repairsByStartDate.set(firstMissing,[...(repairsByStartDate.get(firstMissing) ?? []),symbol]);
+  }
+  for (const [startDate, repairSymbols] of [...repairsByStartDate].sort(([left],[right]) => left.localeCompare(right))) {
+    console.log(`Repairing ${repairSymbols.length} recent histories from missing session ${startDate}`);
+    const startUnix = Math.floor(Date.parse(`${startDate}T00:00:00Z`) / 1000);
+    const targeted = await fetchHistorySnapshots(repairSymbols, 6, startUnix);
+    fetchedHistories = { ...fetchedHistories, ...Object.fromEntries(repairSymbols.map((symbol) => [symbol, mergeHistoryPoints(fetchedHistories[symbol] ?? [], targeted[symbol]?.points ?? [])])) };
+  }
   const confirmedHistories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
   const fallbackHistories = Object.fromEntries(intradaySymbols.map((symbol) => { const fallback=validatedRegularCloseFallback(historySnapshots[symbol]??{points:[]},fetchedIntraday[symbol]??[]);return[symbol,fallback?[fallback]:[]]; }));
   let histories = merge(confirmedHistories, fallbackHistories, symbols);
