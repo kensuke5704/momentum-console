@@ -5,6 +5,7 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-nq-bridge-2019.py"
+      - "scripts/research-nq-nport-overlap-window-2019.py"
       - "scripts/research-nq-parser-pilot.py"
       - ".github/workflows/research-nq-bridge-2019.yml"
   workflow_dispatch:
@@ -19,9 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/research-nq-bridge-2019.py
+      - run: python3 scripts/research-nq-nport-overlap-window-2019.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: nq-bridge-parser-2019
-          path: data/research/nq-bridge-parser-2019.json
+          path: |
+            data/research/nq-bridge-parser-2019.json
+            data/research/nq-nport-overlap-window-2019.json
           if-no-files-found: warn
