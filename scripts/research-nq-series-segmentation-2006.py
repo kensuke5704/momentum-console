@@ -20,6 +20,7 @@ pspec.loader.exec_module(nqpilot)
 
 TARGET = re.compile(r"SELECT SECTOR SPDR|STREETTRACKS|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
 SCHEDULE = re.compile(r"SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS|PORTFOLIO HOLDINGS|STATEMENT OF INVESTMENTS", re.I)
+PRIMARY_NQ = re.compile(r"(?is)<DOCUMENT>.*?<TYPE>\s*N-Q\b.*?<FILENAME>\s*([^\s<]+)")
 
 
 def norm(s: str) -> str:
@@ -37,6 +38,16 @@ def occurrences(text: str, series_name: str) -> list[int]:
     return [m.start() for m in pat.finditer(text)]
 
 
+def primary_nq_text(filing: dict, submission_text: str) -> tuple[str, str]:
+    m = PRIMARY_NQ.search(submission_text)
+    if not m:
+        return "submission", submission_text
+    primary = m.group(1).strip()
+    folder = filing["filename"].rsplit("/", 1)[0]
+    _, text = meta.fetch_prefix(meta.sec_url(folder + "/" + primary))
+    return primary, text
+
+
 def best_anchor(hits: list[int], schedules: list[int]) -> tuple[int | None, int | None]:
     pairs = [(abs(h - q), h, q) for h in hits for q in schedules]
     if not pairs:
@@ -44,13 +55,11 @@ def best_anchor(hits: list[int], schedules: list[int]) -> tuple[int | None, int 
     _, h, q = min(pairs)
     if abs(h - q) > 12000:
         return None, None
-    # Start a little before the earlier of the series title and schedule marker.
     return max(0, min(h, q) - 1500), abs(h - q)
 
 
 def parse_segment(text: str) -> tuple[str, int, float]:
     method, _, _, holdings = nqpilot.parse_holdings(text)
-    # Structural screen only. Current N-PORT eligibility also requires 10-120 holdings.
     count = len(holdings)
     total_value = sum(max(0.0, float(h.get("marketValue") or 0)) for h in holdings)
     return method, count, total_value
@@ -70,9 +79,10 @@ def main() -> None:
     results = []
     for i, x in enumerate(chosen, 1):
         try:
-            _, text = meta.fetch_prefix(meta.sec_url(x["filename"]))
-            series = meta.parse_series_contracts(text, x["company"])
+            _, submission = meta.fetch_prefix(meta.sec_url(x["filename"]))
+            series = meta.parse_series_contracts(submission, x["company"])
             etf = [s for s in series if s["isEtf"]]
+            primary_name, text = primary_nq_text(x, submission)
             sched = [m.start() for m in SCHEDULE.finditer(text)]
 
             anchors = []
@@ -98,10 +108,9 @@ def main() -> None:
                 parsed_value = 0.0
                 if local:
                     next_candidates = [a for a in boundaries if a > anchor]
-                    end = next_candidates[0] if next_candidates else min(len(text), anchor + 180000)
-                    # Avoid tiny/empty slices from duplicate nearby titles.
+                    end = next_candidates[0] if next_candidates else min(len(text), anchor + 220000)
                     if end - anchor < 2500:
-                        end = min(len(text), anchor + 180000)
+                        end = min(len(text), anchor + 220000)
                     method, parsed_holdings, parsed_value = parse_segment(text[anchor:end])
                     parsed += int(parsed_holdings > 0)
                     structurally_usable += int(10 <= parsed_holdings <= 120 and parsed_value > 0)
@@ -121,6 +130,7 @@ def main() -> None:
                 "company": x["company"],
                 "cik": x["cik"],
                 "dateFiled": x["dateFiled"],
+                "primaryDocument": primary_name,
                 "seriesCount": len(etf),
                 "scheduleMarkers": len(sched),
                 "segmentableSeries": segmentable,
@@ -129,7 +139,7 @@ def main() -> None:
                 "series": rows,
             }
             print(
-                f"{i}/{len(chosen)} {x['company'][:42]} ETFseries={len(etf)} schedules={len(sched)} "
+                f"{i}/{len(chosen)} {x['company'][:42]} primary={primary_name} ETFseries={len(etf)} schedules={len(sched)} "
                 f"segmentable={segmentable} parsed={parsed} usable10to120={structurally_usable}",
                 flush=True,
             )
@@ -156,6 +166,7 @@ def main() -> None:
         "structurallyUsableSeries": total_usable,
         "structurallyUsableRate": total_usable / total_series if total_series else None,
         "structuralEligibilityRule": "10 <= parsed holdings <= 120 and positive parsed market value; no returns used.",
+        "documentPolicy": "Parse series metadata from the complete submission SGML, but portfolio rows from the primary N-Q HTML document when discoverable.",
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
