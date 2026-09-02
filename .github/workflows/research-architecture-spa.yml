@@ -30,7 +30,7 @@ jobs:
           s=p.read_text()
           s='import { appendFileSync } from "node:fs";\n'+s
           needle='  return { cagr, maxDrawdown, annualizedVolatility: stdev(returns) * Math.sqrt(252), calmar: maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : null, finalEquity: last.equity };'
-          repl='''  const captureFile = process.env.ARCH_CAPTURE_FILE;\n  if (captureFile) {\n    const stack = new Error().stack?.split("\\n") ?? [];\n    const caller = stack[2] ?? "";\n    if (caller.includes("/scripts/")) appendFileSync(captureFile, JSON.stringify({script: process.env.ARCH_CAPTURE_SCRIPT ?? "", caller, curve}) + "\\n");\n  }\n'''+needle
+          repl='''  const captureFile = process.env.ARCH_CAPTURE_FILE;\n  if (captureFile) {\n    const stack = new Error().stack?.split("\\n") ?? [];\n    const caller = stack.find((line) => line.includes("/scripts/")) ?? "";\n    if (caller) appendFileSync(captureFile, JSON.stringify({script: process.env.ARCH_CAPTURE_SCRIPT ?? "", caller, curve}) + "\\n");\n  }\n'''+needle
           if needle not in s: raise SystemExit('performanceStats return pattern not found')
           p.write_text(s.replace(needle,repl,1))
           PY
