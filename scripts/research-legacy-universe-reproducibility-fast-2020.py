@@ -4,6 +4,7 @@ from __future__ import annotations
 import gzip
 import importlib.util
 import json
+from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,21 +73,29 @@ def normalized_holdings_with_empty_fallback(block: str):
 repro.ov.pit.normalized_holdings = normalized_holdings_with_empty_fallback
 
 
-def structural_mapped_modern_series(text: str, series: list[dict]):
-    """Map only unique exact series names and gate on parser integrity, not concentration.
+def _block_fingerprint(holdings: list[dict], total: float) -> tuple:
+    """Deduplicate exact repeated rendered blocks without using economic outcomes."""
+    names = tuple(sorted(str(h.get('description') or '').strip().upper() for h in holdings))
+    return names, round(float(total or 0), 6)
 
-    Top-10 concentration is an economic property of the ETF and therefore cannot be
-    used to decide whether a holdings table parsed correctly. Diversified/equal-weight
-    ETFs are valid inputs. The gate instead requires a unique series identity, a
-    reasonable nontrivial row count, positive value total, and the parser's structural
-    sanity checks. No prices, returns or strategy output are used.
+
+def structural_mapped_modern_series(text: str, series: list[dict]):
+    """Map exact series headings and merge all structurally valid blocks per series.
+
+    Modern shareholder reports can repeat "Portfolio of Investments" for sectors or
+    continuation tables within the same ETF. Selecting only the largest block truncates
+    the fund. Each block is therefore converted back from normalized weight to its raw
+    market-value contribution, deduplicated structurally, summed by issuer description,
+    and normalized once at the series level. No prices, returns, concentration targets,
+    ranks, or strategy outputs are used.
     """
-    mapped = {}
     blocks = repro.ov.schedule_blocks(text)
     unique_name_matches = 0
     parsed_nonempty = 0
-    structural_gate_pass = 0
+    structural_block_pass = 0
     examples = []
+    grouped: dict[str, dict] = {}
+
     for start, end in blocks:
         block = text[start:end]
         context = text[max(0, start - 10000):min(end, start + 3000)]
@@ -102,47 +111,86 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
         s = exact[0]
         method, holdings, total = repro.ov.pit.normalized_holdings(block)
         count = len(holdings)
-        top10 = sum(h['weight'] for h in holdings[:10]) if holdings else 0
         if count:
             parsed_nonempty += 1
         sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
-        gate = bool(
+        block_gate = bool(
             repro.ov.seg.eligible_name(s.get('seriesName') or '')
-            and 10 <= count <= 120
+            and count >= 2
             and total > 0
             and sane
         )
-        if gate:
-            structural_gate_pass += 1
-            candidate = {
-                'seriesId': s['seriesId'],
-                'seriesName': s.get('seriesName'),
-                'fundTickers': s.get('etfTickers', []),
-                'holdings': holdings,
-                'method': method,
-                'total': total,
-                'top10': top10,
-            }
-            cur = mapped.get(s['seriesId'])
-            if cur is None or count > len(cur['holdings']):
-                mapped[s['seriesId']] = candidate
-        if len(examples) < 20:
+        if block_gate:
+            structural_block_pass += 1
+            g = grouped.setdefault(s['seriesId'], {
+                'series': s,
+                'blocks': [],
+                'fingerprints': set(),
+            })
+            fp = _block_fingerprint(holdings, total)
+            if fp not in g['fingerprints']:
+                g['fingerprints'].add(fp)
+                g['blocks'].append({'method': method, 'holdings': holdings, 'total': float(total)})
+        if len(examples) < 30:
             examples.append({
                 'seriesId': s.get('seriesId'),
                 'seriesName': s.get('seriesName'),
                 'method': method,
                 'holdingCount': count,
                 'total': total,
-                'top10': top10,
                 'structuralSanity': sane,
-                'structuralGate': gate,
+                'structuralBlockGate': block_gate,
             })
+
+    mapped = {}
+    merge_diag = []
+    for sid, g in grouped.items():
+        raw_by_desc = defaultdict(float)
+        methods = []
+        for b in g['blocks']:
+            methods.append(b['method'])
+            total = b['total']
+            for h in b['holdings']:
+                desc = str(h.get('description') or '').strip()
+                weight = float(h.get('weight') or 0)
+                if desc and weight > 0:
+                    raw_by_desc[desc] += total * weight / 100.0
+        merged_total = sum(raw_by_desc.values())
+        holdings = [
+            {'description': desc, 'weight': 100.0 * value / merged_total}
+            for desc, value in raw_by_desc.items()
+            if value > 0 and merged_total > 0
+        ]
+        holdings.sort(key=lambda h: -h['weight'])
+        final_sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
+        final_gate = bool(10 <= len(holdings) <= 3000 and merged_total > 0 and final_sane)
+        merge_diag.append({
+            'seriesId': sid,
+            'seriesName': g['series'].get('seriesName'),
+            'mergedBlockCount': len(g['blocks']),
+            'mergedHoldingCount': len(holdings),
+            'mergedTotal': merged_total,
+            'structuralSanity': final_sane,
+            'finalGate': final_gate,
+        })
+        if final_gate:
+            mapped[sid] = {
+                'seriesId': sid,
+                'seriesName': g['series'].get('seriesName'),
+                'fundTickers': g['series'].get('etfTickers', []),
+                'holdings': holdings,
+                'method': f"merged-{len(g['blocks'])}-blocks:" + ','.join(sorted(set(methods))),
+                'total': merged_total,
+                'top10': sum(h['weight'] for h in holdings[:10]),
+            }
+
     print('LEGACY_INVESTMENT_HEADING_BLOCKS', len(blocks), flush=True)
     print('LEGACY_UNIQUE_SERIES_NAME_MATCHES', unique_name_matches, flush=True)
     print('LEGACY_PARSED_NONEMPTY_BLOCKS', parsed_nonempty, flush=True)
-    print('LEGACY_STRUCTURAL_GATE_BLOCKS', structural_gate_pass, flush=True)
+    print('LEGACY_STRUCTURAL_BLOCKS', structural_block_pass, flush=True)
     print('LEGACY_MAPPED_SERIES', len(mapped), sorted(mapped), flush=True)
     print('LEGACY_BLOCK_DIAGNOSTIC_EXAMPLES', json.dumps(examples, sort_keys=True), flush=True)
+    print('LEGACY_MERGE_DIAGNOSTICS', json.dumps(merge_diag, sort_keys=True), flush=True)
     return mapped
 
 
@@ -150,4 +198,7 @@ repro.ov.master_2020 = fixed_fixture_sample
 repro.ov.seg.meta.parse_series_contracts = shared_nport_series_contracts
 repro.ov.mapped_modern_series = structural_mapped_modern_series
 repro.OUT = ROOT / 'data' / 'research' / 'legacy-universe-reproducibility-fast-2020.json'
-repro.main()
+
+
+if __name__ == '__main__':
+    repro.main()
