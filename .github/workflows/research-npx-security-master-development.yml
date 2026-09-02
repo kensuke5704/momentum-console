@@ -1,0 +1,28 @@
+name: Research N-PX Security Master Development
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-npx-security-master-development.py"
+      - "scripts/research-npx-security-master-2006.py"
+      - ".github/workflows/research-npx-security-master-development.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  master:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pooled N-PX security master for sampled development years
+        run: python3 scripts/research-npx-security-master-development.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npx-security-master-development
+          path: data/research/npx-security-master-development.json
+          if-no-files-found: warn
