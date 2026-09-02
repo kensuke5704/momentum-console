@@ -2,13 +2,14 @@
 from __future__ import annotations
 import csv, gzip, io, json, math, re, statistics, urllib.request, zipfile
 from collections import defaultdict
-from datetime import datetime, date
+from datetime import date
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 META='https://dataverse.harvard.edu/api/datasets/:persistentId/?persistentId=doi:10.7910/DVN/TZM1QT'
 UA={'User-Agent':'momentum-console research'}
 YEAR=2020
+SOURCE_YEARS=[2019,2020]
 TOPN=80
 OUT=ROOT/'data'/'research'/'layline13f-nport-overlap-2020.json'
 
@@ -48,18 +49,11 @@ def parse_accept(s:str)->str:
     s=(s or '').strip()
     return f'{s[:4]}-{s[4:6]}-{s[6:8]}' if len(s)>=8 else ''
 
-def main():
-    a=aliases(); months=nport_months(); print(f'aliases={len(a)} months={len(months)}')
-    meta=json.loads(get(META)); files=meta['data']['latestVersion']['files']
-    target=next(x['dataFile'] for x in files if x['dataFile']['filename']==f'hr_panel_{YEAR}.zip')
-    print(f'download {target["filename"]} {target["filesize"]} bytes',flush=True)
-    payload=get(f'https://dataverse.harvard.edu/api/access/datafile/{target["id"]}')
+def add_panel(filings:dict, payload:bytes, label:str):
     with zipfile.ZipFile(io.BytesIO(payload)) as z:
         fn=z.namelist()[0]
         with z.open(fn) as raw:
             rd=csv.DictReader(io.TextIOWrapper(raw,encoding='utf-8-sig',errors='replace',newline=''))
-            # accession -> manager, accepted, total value, cusip -> [issuer,value]
-            filings={}
             for i,r in enumerate(rd,1):
                 if (r.get('putCall') or '').strip():continue
                 acc=r.get('accessionNumber') or ''; cik=r.get('cik') or ''; accepted=parse_accept(r.get('acceptanceDatetime') or '')
@@ -73,7 +67,16 @@ def main():
                 cusip=(r.get('cusip') or '').strip().upper(); issuer=(r.get('nameOfIssuer') or '').strip()
                 if not cusip:continue
                 f['total']+=v; h=f['holdings'][cusip]; h[0]=issuer; h[1]+=v
-                if i%1000000==0:print(f'rows={i:,} filings={len(filings):,}',flush=True)
+                if i%1000000==0:print(f'{label} rows={i:,} totalFilings={len(filings):,}',flush=True)
+
+def main():
+    a=aliases(); months=nport_months(); print(f'aliases={len(a)} months={len(months)}')
+    meta=json.loads(get(META)); files=meta['data']['latestVersion']['files']; by={x['dataFile']['filename']:x['dataFile'] for x in files}
+    filings={}
+    for yr in SOURCE_YEARS:
+        target=by[f'hr_panel_{yr}.zip']
+        print(f'download {target["filename"]} {target["filesize"]} bytes',flush=True)
+        add_panel(filings,get(f'https://dataverse.harvard.edu/api/access/datafile/{target["id"]}'),str(yr))
     print(f'parsed filings={len(filings):,}',flush=True)
     results=[]
     for month,m in sorted(months.items()):
@@ -99,10 +102,11 @@ def main():
             ranked.append((score,cnt,x['agg'],cusip,x['issuer'],sym))
         ranked.sort(key=lambda x:(-x[0],-x[1],-x[2],x[3]))
         top=ranked[:TOPN]; syms=[x[5] for x in top if x[5]]; target_syms=m['symbols']; inter=set(syms)&set(target_syms)
-        results.append({'month':month,'asOf':asof,'latestManagers':len(latest),'raw13fTopCount':len(top),'mapped13fTopCount':len(syms),'mappingCoverageTop80':len(syms)/TOPN,'intersection':len(inter),'overlapVsNport':len(inter)/len(target_syms) if target_syms else None,'jaccardOnMapped':len(inter)/len(set(syms)|set(target_syms)) if (set(syms)|set(target_syms)) else None,'mapped13fTopSymbols':syms,'nportSymbols':target_syms,'unmatchedTop13f':[{'cusip':x[3],'issuer':x[4],'managerCount':x[1]} for x in top if not x[5]][:20]})
-        print(f'{month} managers={len(latest)} mapped={len(syms)}/80 overlap={len(inter)}/{len(target_syms)}',flush=True)
-    cov=[x['mappingCoverageTop80'] for x in results]; ov=[x['overlapVsNport'] for x in results if x['overlapVsNport'] is not None]
-    summary={'source':'Layline Institutional Holding Reports / Harvard Dataverse DOI 10.7910/DVN/TZM1QT','year':YEAR,'method':'All-manager 13F breadth proxy; latest accepted filing per CIK; long non-option positions; production N-PORT score formula; conservative issuer-name mapping to ticker.','months':len(results),'mappingCoverageTop80':{'mean':statistics.mean(cov),'median':statistics.median(cov),'min':min(cov)},'overlapVsNport':{'mean':statistics.mean(ov),'median':statistics.median(ov),'min':min(ov),'max':max(ov)},'results':results}
+        mapped_overlap=len(inter)/len(set(syms)) if syms else None
+        results.append({'month':month,'asOf':asof,'latestManagers':len(latest),'raw13fTopCount':len(top),'mapped13fTopCount':len(syms),'mappingCoverageTop80':len(syms)/TOPN,'intersection':len(inter),'overlapVsNport':len(inter)/len(target_syms) if target_syms else None,'overlapAmongMapped13f':mapped_overlap,'jaccardOnMapped':len(inter)/len(set(syms)|set(target_syms)) if (set(syms)|set(target_syms)) else None,'mapped13fTopSymbols':syms,'nportSymbols':target_syms,'unmatchedTop13f':[{'cusip':x[3],'issuer':x[4],'managerCount':x[1]} for x in top if not x[5]][:20]})
+        print(f'{month} managers={len(latest)} mapped={len(syms)}/80 overlap={len(inter)}/{len(target_syms)} conditional={(mapped_overlap if mapped_overlap is not None else 0):.3f}',flush=True)
+    cov=[x['mappingCoverageTop80'] for x in results]; ov=[x['overlapVsNport'] for x in results if x['overlapVsNport'] is not None]; cond=[x['overlapAmongMapped13f'] for x in results if x['overlapAmongMapped13f'] is not None]
+    summary={'source':'Layline Institutional Holding Reports / Harvard Dataverse DOI 10.7910/DVN/TZM1QT','year':YEAR,'sourceYears':SOURCE_YEARS,'method':'All-manager 13F breadth proxy; latest accepted filing per CIK; long non-option positions; production N-PORT score formula; conservative issuer-name mapping to ticker.','months':len(results),'mappingCoverageTop80':{'mean':statistics.mean(cov),'median':statistics.median(cov),'min':min(cov)},'overlapVsNport':{'mean':statistics.mean(ov),'median':statistics.median(ov),'min':min(ov),'max':max(ov)},'overlapAmongMapped13f':{'mean':statistics.mean(cond),'median':statistics.median(cond),'min':min(cond),'max':max(cond)},'results':results}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(summary,indent=2)+'\n')
     print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k!='results'}))
 
