@@ -51,7 +51,11 @@ function regimeRows(fixed:EquityPoint[],g:EquityPoint[],qqqInput:PricePoint[],cf
  for(const point of shadow){const ci=shadowIndex.get(point.date)!,si=Math.max(0,ci-1);let coreReturn20:number|null=null,qqqReturn20:number|null=null,gap:number|null=null,enter=false,exit=false;
   if(si>=PRODUCTION_PORTFOLIO.m3.lookbackSessions){const signalPoint=shadow[si],qi=qqqIndex.get(signalPoint.date);if(qi!=null&&qi>=PRODUCTION_PORTFOLIO.m3.lookbackSessions){const lookback=PRODUCTION_PORTFOLIO.m3.lookbackSessions;coreReturn20=signalPoint.equity/shadow[si-lookback].equity-1;qqqReturn20=qqq[qi].close/qqq[qi-lookback].close-1;gap=coreReturn20-qqqReturn20;enter=coreReturn20<PRODUCTION_PORTFOLIO.m3.enterCoreReturnBelow&&gap<=PRODUCTION_PORTFOLIO.m3.enterUnderperformanceVsQqq;if(deep){if(gap>PRODUCTION_PORTFOLIO.m3.exitUnderperformanceVsQqq)recoveryConfirm++;else recoveryConfirm=0;exit=recoveryConfirm>=PRODUCTION_PORTFOLIO.m3.exitConfirmationSessions}}}
   if(!deep&&enter){deep=true;recoveryConfirm=0}else if(deep&&exit){deep=false;recoveryConfirm=0}
-  const cftc=cftcStatus(cftcRows,shadow[si]?.date??point.date),regime:PortfolioRegime=deep?"DEEP":cftc.yellow?"YELLOW":"NORMAL";
+  // M3 is intentionally evaluated from the prior completed shadow-core point.
+  // CFTC availability is calendar based, however, so evaluate it at the
+  // portfolio close represented by this row. Reusing the M3 signal date here
+  // delayed a newly eligible weekly report by one additional trading session.
+  const cftc=cftcStatus(cftcRows,point.date),regime:PortfolioRegime=deep?"DEEP":cftc.yellow?"YELLOW":"NORMAL";
   out.push({date:point.date,regime,cftc,m3:{deep,coreReturn20,qqqReturn20,gap,recoveryConfirm}});
  }
  return out;
