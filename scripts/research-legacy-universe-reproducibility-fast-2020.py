@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib.util
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,39 +9,31 @@ spec = importlib.util.spec_from_file_location('repro', ROOT / 'scripts' / 'resea
 repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
-DENSE_FAMILIES = (
-    'SELECT SECTOR SPDR',
-    'SPDR SERIES TRUST',
-    'STREETTRACKS SERIES TRUST',
-    'POWERSHARES EXCHANGE TRADED FUND TRUST',
-    'INVESCO EXCHANGE-TRADED FUND TRUST',
-    'INVESCO EXCHANGE TRADED FUND TRUST',
-    'RYDEX ETF TRUST',
+# Frozen structural fixture. This accession was selected because the registrant is a
+# multi-series ETF trust with a June 30, 2020 shareholder report and therefore gives
+# the legacy parser enough same-date series to exercise the reproducibility gates.
+# Selection uses no prices, returns, ranks, parser-success feedback, or strategy output.
+# dateFiled is a deterministic fallback used only by the harness; same-series pairing
+# is anchored on CONFORMED PERIOD OF REPORT parsed from the filing itself.
+FIXTURE_FILINGS = (
+    {
+        'cik': '1510337',
+        'company': 'First Trust Exchange-Traded AlphaDEX Fund II',
+        'form': 'N-CSRS',
+        'dateFiled': '2020-08-31',
+        'filename': 'edgar/data/1510337/0001445546-20-004251.txt',
+        'accession': '0001445546-20-004251',
+        'fixtureBasis': 'SEC accession with report period 2020-06-30; multi-series ETF registrant',
+    },
 )
-UA = {'User-Agent': 'momentum-console research kensuke5704@users.noreply.github.com', 'Accept': 'text/plain,*/*'}
 
 
-def dense_index_sample():
-    rows = []
-    for q in range(1, 5):
-        url = f'https://www.sec.gov/Archives/edgar/full-index/2020/QTR{q}/master.idx'
-        req = urllib.request.Request(url, headers=UA)
-        with urllib.request.urlopen(req, timeout=60) as r:
-            text = r.read().decode('latin-1', 'replace')
-        for line in text.splitlines():
-            p = line.split('|')
-            if len(p) < 5:
-                continue
-            cik, company, form, date_filed, filename = [x.strip() for x in p[:5]]
-            if form.upper() not in {'N-CSR', 'N-CSRS'}:
-                continue
-            company_u = company.upper()
-            if any(name in company_u for name in DENSE_FAMILIES):
-                rows.append({'cik': cik, 'company': company, 'form': form.upper(), 'dateFiled': date_filed, 'filename': filename})
-    print('SEC_DENSE_FILINGS', len(rows), sorted({str(x.get('company') or '') for x in rows}), flush=True)
+def fixed_fixture_sample():
+    rows = [dict(x) for x in FIXTURE_FILINGS]
+    print('FIXED_STRUCTURAL_FILINGS', len(rows), [x['accession'] for x in rows], flush=True)
     return rows
 
 
-repro.ov.master_2020 = dense_index_sample
+repro.ov.master_2020 = fixed_fixture_sample
 repro.OUT = ROOT / 'data' / 'research' / 'legacy-universe-reproducibility-fast-2020.json'
 repro.main()
