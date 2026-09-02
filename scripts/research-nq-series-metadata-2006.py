@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import re
-import time
 import urllib.request
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -27,7 +26,7 @@ def fetch_prefix(url: str) -> tuple[str, str]:
     # GitHub-hosted runners are blocked by SEC Archives in this environment.
     # Jina is only a transport bridge; the underlying URL remains the SEC filing.
     req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=20) as r:
         return "jina", r.read(1_500_000).decode("utf-8", "replace")
 
 
@@ -102,7 +101,7 @@ def main() -> None:
     samples = choose_samples(idx["filings"])
     print(f"samples={len(samples)}", flush=True)
     results = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=16) as pool:
         futures = [pool.submit(inspect_one, i, len(samples), x) for i, x in enumerate(samples, 1)]
         for future in as_completed(futures):
             r = future.result()
