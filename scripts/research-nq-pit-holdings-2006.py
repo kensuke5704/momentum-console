@@ -14,6 +14,10 @@ sspec = importlib.util.spec_from_file_location("seg", ROOT / "scripts" / "resear
 seg = importlib.util.module_from_spec(sspec)
 sspec.loader.exec_module(seg)
 
+lspec = importlib.util.spec_from_file_location("legacy_holdings", ROOT / "scripts" / "research-legacy-holdings-parser.py")
+legacy_holdings = importlib.util.module_from_spec(lspec)
+lspec.loader.exec_module(legacy_holdings)
+
 REPORT_DATE = re.compile(r"(?im)^\s*CONFORMED PERIOD OF REPORT:\s*(\d{8})\s*$")
 TARGET = re.compile(r"SELECT SECTOR SPDR|STREETTRACKS|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
 
@@ -31,8 +35,7 @@ def accession_from_filename(filename: str) -> str:
     return stem
 
 
-def normalized_holdings(block: str) -> tuple[str, list[dict], float]:
-    method, _, _, parsed = seg.nqpilot.parse_holdings(block)
+def _normalize(parsed: list[dict]) -> tuple[list[dict], float]:
     positive = []
     for h in parsed:
         value = max(0.0, float(h.get("marketValue") or 0))
@@ -49,6 +52,30 @@ def normalized_holdings(block: str) -> tuple[str, list[dict], float]:
         for h in positive:
             h["weight"] = 100.0 * h["marketValue"] / total
         positive.sort(key=lambda h: h["weight"], reverse=True)
+    return positive, total
+
+
+def _year_header_artifact(holdings: list[dict], total: float) -> bool:
+    # Observed in legacy iShares N-Q tables: the old parser returned exactly one
+    # pseudo-holding with market value equal to the prior report year (e.g. 2007,
+    # 2009) because the Schedule heading was outside the HTML <TR> rows.
+    return len(holdings) == 1 and total.is_integer() and 1900 <= total <= 2100
+
+
+def normalized_holdings(block: str) -> tuple[str, list[dict], float]:
+    method, _, _, parsed = seg.nqpilot.parse_holdings(block)
+    positive, total = _normalize(parsed)
+
+    # Preserve the established parser by default. The HTML fallback is permitted
+    # only for the specific structural year-header artifact proven in 2008/2010
+    # iShares filings. This avoids changing valid SPDR/plain-table parses merely
+    # because another parser happens to yield more rows.
+    if _year_header_artifact(positive, total):
+        fallback_raw = legacy_holdings.parse_html_table(block)
+        fallback, fallback_total = _normalize(fallback_raw)
+        if len(fallback) >= 2 and fallback_total > 0 and legacy_holdings.structural_sanity(fallback):
+            return "html-year-artifact-fallback", fallback, fallback_total
+
     return method, positive, total
 
 
@@ -146,6 +173,7 @@ def main() -> None:
         "structuralEligibilityRule": "Production name exclusions plus 10 <= parsed holdings <= 120 and normalized top-10 weight >= 25%. N-Q lacks direct N-PORT US/CORP/EC fields, so country/issuer/asset parity remains unresolved.",
         "tickerMappingStatus": "Holdings issuer descriptions are intentionally left unmapped here; issuer/security-id/ticker mapping is a separate validation stage.",
         "seriesMappingRule": "Tight pre/post schedule-heading context; exact filing-time series name preferred; ambiguous ties and near-ties rejected.",
+        "parserFallbackRule": "Established parser retained by default. HTML fallback is used only for an observed one-row year-header artifact (single pseudo-holding with total market value 1900..2100) and only when fallback rows pass structural sanity.",
         "filingsAttempted": len(chosen),
         "filingsSucceeded": sum(1 for r in filing_results if "error" not in r),
         "pitSeriesRecords": len(records),
