@@ -58,22 +58,11 @@ def filing_index_2006() -> list[dict]:
 
 
 def choose_samples(filings: list[dict]) -> list[dict]:
-    by_month: dict[str, list[dict]] = defaultdict(list)
-    for x in filings:
-        if x["form"] == "N-PX":
-            by_month[x["dateFiled"][:7]].append(x)
-    out = []
-    for month in sorted(by_month):
-        rows = by_month[month]
-        if not rows:
-            continue
-        # Two fixed quantile positions per month. No result-dependent resampling.
-        positions = [len(rows) // 3, (2 * len(rows)) // 3] if len(rows) > 1 else [0]
-        for pos in positions:
-            candidate = rows[min(len(rows) - 1, pos)]
-            if candidate not in out:
-                out.append(candidate)
-    return out
+    primary = [x for x in filings if x["form"] == "N-PX"]
+    if len(primary) <= 12:
+        return primary
+    # Twelve deterministic quantile samples across the filing-year distribution.
+    return [primary[min(len(primary) - 1, (i * len(primary)) // 12)] for i in range(12)]
 
 
 def sec_url(filename: str) -> str:
@@ -82,18 +71,18 @@ def sec_url(filename: str) -> str:
 
 def fetch_text(url: str) -> str:
     last: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
-            with urllib.request.urlopen(req, timeout=50) as r:
-                return r.read(6_000_000).decode("utf-8", "replace")
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.read(2_000_000).decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             last = e
             if e.code != 429:
                 raise
         except Exception as e:
             last = e
-        time.sleep(5 * (attempt + 1))
+        time.sleep(4 * (attempt + 1))
     assert last is not None
     raise last
 
@@ -137,12 +126,10 @@ def parse_records(text: str) -> list[dict]:
         if not issuer:
             continue
         meeting_m = MEETING_RE.search(window)
-        ticker = ticker_m.group(1).upper() if ticker_m else None
-        security_id = security_m.group(1).upper() if security_m else None
         records.append({
             "issuer": issuer,
-            "ticker": ticker,
-            "securityId": security_id,
+            "ticker": ticker_m.group(1).upper() if ticker_m else None,
+            "securityId": security_m.group(1).upper() if security_m else None,
             "meetingDateRaw": meeting_m.group(1).strip() if meeting_m else None,
         })
     out = []
@@ -168,7 +155,7 @@ def main() -> None:
             text = fetch_text(sec_url(x["filename"]))
             records = parse_records(text)
             paired = [r for r in records if r.get("ticker") and r.get("securityId")]
-            r = {**x, "bytes": len(text.encode()), "records": len(records), "pairedRecords": len(paired), "sampleRecords": records[:12]}
+            r = {**x, "bytes": len(text.encode()), "records": len(records), "pairedRecords": len(paired), "sampleRecords": records[:20]}
             print(f"{i}/{len(samples)} {x['dateFiled']} {x['company'][:38]} records={len(records)} paired={len(paired)}", flush=True)
             for rec in paired[:2]:
                 print("  ", json.dumps(rec), flush=True)
@@ -177,12 +164,11 @@ def main() -> None:
             print(f"{i}/{len(samples)} FAIL {x['company'][:38]} {e!r}", flush=True)
         results.append(r)
         if i < len(samples):
-            time.sleep(3.2)
+            time.sleep(2.0)
 
     ok = [r for r in results if "error" not in r]
     counts = sorted(r["pairedRecords"] for r in ok)
     all_records = [record for r in ok for record in r.get("sampleRecords", [])]
-    # Uniques below use only recorded samples for diagnostics, not for production mapping.
     unique_tickers = sorted({r["ticker"] for r in all_records if r.get("ticker")})
     unique_ids = sorted({r["securityId"] for r in all_records if r.get("securityId")})
     def rate(pred):
@@ -192,7 +178,7 @@ def main() -> None:
         "allNpxFilings": len(filings),
         "formCounts": dict(form_counts),
         "monthCounts": dict(month_counts),
-        "sampleRule": "Two deterministic N-PX filings per filing month at 1/3 and 2/3 positions.",
+        "sampleRule": "Twelve deterministic quantile N-PX filings across 2006 filing order.",
         "sampleCount": len(samples),
         "fetchSuccess": len(ok),
         "fetchRate": len(ok) / len(samples) if samples else None,
