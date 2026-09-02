@@ -18,12 +18,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Probe N-PX issuer ticker security-id mapping
+        run: python3 scripts/research-npx-security-master-2006.py
       - name: Extract 2006 filing index
         run: python3 scripts/research-nq-index-extract.py
       - name: Probe N-Q series and ticker metadata
         run: python3 scripts/research-nq-series-metadata-2006.py
-      - name: Probe N-PX issuer ticker security-id mapping
-        run: python3 scripts/research-npx-security-master-2006.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
