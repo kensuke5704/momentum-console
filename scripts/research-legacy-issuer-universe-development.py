@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,8 +11,10 @@ INPUT = ROOT/'data'/'research'/'legacy-pit-holdings-development.json'
 OUT = ROOT/'data'/'research'/'legacy-issuer-universe-development.json'
 YEARS=(2006,2008,2010)
 
-ss=importlib.util.spec_from_file_location('score',ROOT/'scripts'/'research-legacy-universe-score.py')
-score=importlib.util.module_from_spec(ss);ss.loader.exec_module(score)
+ss=importlib.util.spec_from_file_location('research_legacy_universe_score',ROOT/'scripts'/'research-legacy-universe-score.py')
+score=importlib.util.module_from_spec(ss)
+sys.modules[ss.name]=score
+ss.loader.exec_module(score)
 
 
 def main():
