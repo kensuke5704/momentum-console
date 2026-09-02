@@ -9,7 +9,12 @@ CATEGORY = re.compile(r'(?:^|\s)[—-]\s*\d+(?:\.\d+)?%|^TOTAL\b|^NET ASSETS?\b'
 ROW_RE = re.compile(r'(?is)<TR\b[^>]*>(.*?)</TR>')
 CELL_RE = re.compile(r'(?is)<T[DH]\b[^>]*>(.*?)</T[DH]>')
 NUM = re.compile(r'^\(?\$?\s*[-+]?\d[\d,]*(?:\.\d+)?\s*\)?$')
-HEADER = re.compile(r'^(?:SECURITY|DESCRIPTION|SHARES?|PRINCIPAL|VALUE|MARKET VALUE|COMMON STOCKS?|PREFERRED STOCKS?|SHORT[- ]TERM INVESTMENTS?)$', re.I)
+HEADER = re.compile(
+    r'^(?:SECURITY|DESCRIPTION|SHARES?|PRINCIPAL|VALUE|MARKET VALUE|'
+    r'COMMON STOCKS?|PREFERRED STOCKS?|REAL ESTATE INVESTMENT TRUSTS?|'
+    r'SHORT[- ]TERM INVESTMENTS?)(?:\s*\*+)?$',
+    re.I,
+)
 
 
 def clean(raw: str) -> str:
