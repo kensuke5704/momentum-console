@@ -7,9 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # Load the existing frozen-fixture wrapper first so this validation uses exactly the
-# same hybrid legacy parser and structural gates. That module performs its original
-# one-filing diagnostic on import; the second run below is the authoritative US-equity
-# fixture result written to a separate output file.
+# same hybrid legacy parser and structural gates.
 spec = importlib.util.spec_from_file_location(
     'fast_repro', ROOT / 'scripts' / 'research-legacy-universe-reproducibility-fast-2020.py'
 )
@@ -29,6 +27,15 @@ fast.FIXTURE_FILINGS = (
         'filename': 'edgar/data/1329377/0001445546-20-001301.txt',
         'accession': '0001445546-20-001301',
         'fixtureBasis': 'SEC shareholder report for 2019-12-31; multi-series US-equity ETF trust',
+    },
+    {
+        'cik': '1064641',
+        'company': 'SELECT SECTOR SPDR TRUST',
+        'form': 'N-CSRS',
+        'dateFiled': '2020-06-05',
+        'filename': 'edgar/data/1064641/0001193125-20-161980.txt',
+        'accession': '0001193125-20-161980',
+        'fixtureBasis': 'SEC N-CSRS for report period 2020-03-31; eleven US sector-equity SPDR funds',
     },
     {
         'cik': '1552740',
