@@ -1,0 +1,22 @@
+name: Research NPORT US Equity Fixture Inventory 2020
+
+on:
+  push:
+    branches:
+      - research/cagr40-new-alpha-20260901
+    paths:
+      - 'scripts/research-nport-us-equity-fixture-inventory-2020.py'
+      - '.github/workflows/research-nport-us-equity-fixture-inventory-2020.yml'
+  workflow_dispatch:
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory frozen NPORT structural fixture candidates
+        run: python3 scripts/research-nport-us-equity-fixture-inventory-2020.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nport-us-equity-fixture-inventory-2020
+          path: data/research/nport-us-equity-fixture-inventory-2020.json
