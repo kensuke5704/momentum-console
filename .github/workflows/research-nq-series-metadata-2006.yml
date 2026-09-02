@@ -5,6 +5,7 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-nq-series-metadata-2006.py"
+      - "scripts/research-nq-series-segmentation-2006.py"
       - "scripts/research-npx-security-master-2006.py"
       - ".github/workflows/research-nq-series-metadata-2006.yml"
   workflow_dispatch:
@@ -36,9 +37,13 @@ jobs:
         run: python3 scripts/research-nq-index-extract.py
       - name: Probe N-Q series and ticker metadata
         run: python3 scripts/research-nq-series-metadata-2006.py
+      - name: Probe N-Q series segmentation
+        run: python3 scripts/research-nq-series-segmentation-2006.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: nq-series-metadata-2006
-          path: data/research/nq-series-metadata-2006.json
+          path: |
+            data/research/nq-series-metadata-2006.json
+            data/research/nq-series-segmentation-2006.json
           if-no-files-found: warn
