@@ -1,0 +1,27 @@
+name: Research iShares N-Q Table Diagnostic
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-ishares-nq-table-diagnostic.py"
+      - ".github/workflows/research-ishares-nq-table-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose iShares N-Q table layout without prices or returns
+        run: python3 scripts/research-ishares-nq-table-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ishares-nq-table-diagnostic
+          path: data/research/ishares-nq-table-diagnostic.json
+          if-no-files-found: warn
