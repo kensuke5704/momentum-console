@@ -5,6 +5,7 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-layline-nport-overlap.py"
+      - "scripts/research-layline-signal-agreement.ts"
       - ".github/workflows/research-layline-overlap.yml"
   workflow_dispatch:
 
@@ -17,8 +18,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Run Layline 13F vs NPORT 2020 overlap pilot
         run: python3 scripts/research-layline-nport-overlap.py
+      - name: Measure production Top2 signal retention
+        run: node --import tsx scripts/research-layline-signal-agreement.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
