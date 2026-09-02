@@ -21,6 +21,18 @@ lspec.loader.exec_module(legacy_holdings)
 REPORT_DATE = re.compile(r"(?im)^\s*CONFORMED PERIOD OF REPORT:\s*(\d{8})\s*$")
 TARGET = re.compile(r"SELECT SECTOR SPDR|STREETTRACKS|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
 
+# Structural labels observed as table/group headings in legacy shareholder reports.
+# These cannot be security issuers and must not enter the holdings denominator.
+# Keep this deliberately narrow: no fuzzy/company-name inference is permitted here.
+NON_ISSUER_SECTION = re.compile(
+    r"^(?:"
+    r"COMMON\s+STOCKS?"
+    r"|REAL\s+ESTATE\s+INVESTMENT\s+TRUSTS?"
+    r"|NET\s+OTHER\s+ASSETS\s+(?:AND|&)\s+LIABILITIES"
+    r")(?:\s*\*+)?(?:\s*[\-–—:]?\s*\d+(?:\.\d+)?\s*%?)?$",
+    re.I,
+)
+
 
 def iso_yyyymmdd(raw: str | None) -> str | None:
     if not raw or len(raw) != 8:
@@ -35,12 +47,17 @@ def accession_from_filename(filename: str) -> str:
     return stem
 
 
+def _structural_non_issuer(description: str) -> bool:
+    s = " ".join(str(description or "").replace("\xa0", " ").split()).strip()
+    return bool(s and NON_ISSUER_SECTION.fullmatch(s))
+
+
 def _normalize(parsed: list[dict]) -> tuple[list[dict], float]:
     positive = []
     for h in parsed:
         value = max(0.0, float(h.get("marketValue") or 0))
         description = " ".join(str(h.get("description") or "").split())
-        if value <= 0 or not description:
+        if value <= 0 or not description or _structural_non_issuer(description):
             continue
         positive.append({
             "description": description,
@@ -169,11 +186,12 @@ def main() -> None:
         "year": 2006,
         "purpose": "Point-in-time legacy N-Q ETF-series holdings representation pilot. No return/performance data used.",
         "sampleRule": "One deterministic N-Q filing per known ETF registrant, identical registrant sample to the segmentation pilot.",
-        "weightRule": "Positive parsed market values normalized to 100 within each mapped series. These are parser-relative weights, not yet validated against reported net assets.",
+        "weightRule": "Positive parsed market values normalized to 100 within each mapped series after removing narrowly defined structural non-issuer section labels. These are parser-relative weights, not yet validated against reported net assets.",
         "structuralEligibilityRule": "Production name exclusions plus 10 <= parsed holdings <= 120 and normalized top-10 weight >= 25%. N-Q lacks direct N-PORT US/CORP/EC fields, so country/issuer/asset parity remains unresolved.",
         "tickerMappingStatus": "Holdings issuer descriptions are intentionally left unmapped here; issuer/security-id/ticker mapping is a separate validation stage.",
         "seriesMappingRule": "Tight pre/post schedule-heading context; exact filing-time series name preferred; ambiguous ties and near-ties rejected.",
         "parserFallbackRule": "Established parser retained by default. HTML fallback is used only for an observed one-row year-header artifact (single pseudo-holding with total market value 1900..2100) and only when fallback rows pass structural sanity.",
+        "nonIssuerSectionRule": "Exclude only exact generic table/group labels for Common Stocks, Real Estate Investment Trusts, and Net Other Assets and Liabilities before normalization; no fuzzy/company inference.",
         "filingsAttempted": len(chosen),
         "filingsSucceeded": sum(1 for r in filing_results if "error" not in r),
         "pitSeriesRecords": len(records),
