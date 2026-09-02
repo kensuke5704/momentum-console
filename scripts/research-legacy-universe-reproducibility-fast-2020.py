@@ -59,7 +59,61 @@ def shared_nport_series_contracts(_submission: str, _company: str):
     return out
 
 
+_original_mapped_modern_series = repro.ov.mapped_modern_series
+
+
+def diagnostic_mapped_modern_series(text: str, series: list[dict]):
+    blocks = repro.ov.schedule_blocks(text)
+    print('LEGACY_INVESTMENT_HEADING_BLOCKS', len(blocks), flush=True)
+    unique_name_matches = 0
+    parsed_nonempty = 0
+    structural_gate_pass = 0
+    examples = []
+    for start, end in blocks:
+        block = text[start:end]
+        context = text[max(0, start - 10000):min(end, start + 3000)]
+        v = repro.ov.norm_series_text(repro.ov.visible(context))
+        exact = []
+        for s in series:
+            name = repro.ov.norm_series_text(s.get('seriesName') or '')
+            if name and name in v:
+                exact.append(s)
+        if len(exact) != 1:
+            continue
+        unique_name_matches += 1
+        s = exact[0]
+        method, holdings, total = repro.ov.pit.normalized_holdings(block)
+        count = len(holdings)
+        top10 = sum(h['weight'] for h in holdings[:10]) if holdings else 0
+        if count:
+            parsed_nonempty += 1
+        gate = bool(
+            repro.ov.seg.eligible_name(s.get('seriesName') or '')
+            and 10 <= count <= 120
+            and total > 0
+            and top10 >= 25
+        )
+        if gate:
+            structural_gate_pass += 1
+        if len(examples) < 20:
+            examples.append({
+                'seriesId': s.get('seriesId'),
+                'seriesName': s.get('seriesName'),
+                'method': method,
+                'holdingCount': count,
+                'total': total,
+                'top10': top10,
+                'structuralGate': gate,
+            })
+    print('LEGACY_UNIQUE_SERIES_NAME_MATCHES', unique_name_matches, flush=True)
+    print('LEGACY_PARSED_NONEMPTY_BLOCKS', parsed_nonempty, flush=True)
+    print('LEGACY_STRUCTURAL_GATE_BLOCKS', structural_gate_pass, flush=True)
+    print('LEGACY_BLOCK_DIAGNOSTIC_EXAMPLES', json.dumps(examples, sort_keys=True), flush=True)
+    return _original_mapped_modern_series(text, series)
+
+
 repro.ov.master_2020 = fixed_fixture_sample
 repro.ov.seg.meta.parse_series_contracts = shared_nport_series_contracts
+repro.ov.mapped_modern_series = diagnostic_mapped_modern_series
 repro.OUT = ROOT / 'data' / 'research' / 'legacy-universe-reproducibility-fast-2020.json'
 repro.main()
