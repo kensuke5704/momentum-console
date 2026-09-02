@@ -61,6 +61,29 @@
   word-break: normal;
 }
 
+.action-value-line {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.action-value-line > strong {
+  font-family: "Roboto Mono", monospace;
+  font-size: 23px;
+  line-height: 1.15;
+}
+
+.action-value-line > .close-basis-warning {
+  border: 1px solid currentColor;
+  color: var(--danger);
+  flex: 0 0 auto;
+  font-size: 8px;
+  line-height: 1;
+  padding: 4px 5px;
+  white-space: nowrap;
+}
+
 .execution-cell > strong {
   font-size: 23px;
   white-space: nowrap;
@@ -357,6 +380,9 @@
   .next-action-cell > span { font-size: 9px; line-height: 1.2; }
   .next-action-cell > strong,
   .next-action-cell.execution-cell > strong { font-size: 17px; line-height: 1.2; white-space: nowrap; }
+  .action-value-line { gap: 5px; }
+  .action-value-line > strong { font-size: 17px; line-height: 1.2; }
+  .action-value-line > .close-basis-warning { font-size: 7px; padding: 3px; }
 
   .allocation-band { min-height: 108px; }
   .allocation-band.compact { min-height: 64px; }

@@ -25,6 +25,7 @@ import {
   YAxis,
 } from "recharts";
 import { contrastingTextColor } from "@/lib/color-contrast";
+import { latestCompletedUsTradingSession } from "@/lib/latest-session";
 import { evaluateOosActionGate } from "@/lib/oos-action-gate";
 import type { PortfolioTarget } from "@/lib/portfolio-types";
 import type { DashboardPayload, EquityPoint, MomentumCandidate, UniverseMember } from "@/lib/types";
@@ -240,12 +241,21 @@ function Portfolio({ data }: { data: DashboardPayload }) {
 
 function Overview({ data }: { data: DashboardPayload }) {
   const [detail, setDetail] = useState<DetailKey | null>(null);
+  const [latestCompletedSession, setLatestCompletedSession] = useState<string | null>(null);
   const portfolio = data.portfolioState;
   const gate = evaluateOosActionGate(data.oos);
   const action = portfolio.nextAction;
   const actionLabel = action.type === "REBALANCE_NEXT_OPEN" ? "REBALANCE" : action.type === "HOLD" ? "HOLD" : "REVIEW";
   const execution = action.executionDate ? usOpenJst(action.executionDate) : "NO ORDER";
   const executionState = action.executionDate ? "NEXT OPEN" : "NO ORDER";
+  const nonLatestClose = latestCompletedSession != null && (!portfolio.asOf || portfolio.asOf < latestCompletedSession);
+
+  useEffect(() => {
+    const update = () => setLatestCompletedSession(latestCompletedUsTradingSession());
+    update();
+    const id = window.setInterval(update, 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!detail) return;
@@ -260,7 +270,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     <Section title="Next Action">
       <div className="next-action next-action-stage21">
         <button type="button" className="next-action-cell" onClick={() => setDetail("regime")}><span>Regime</span><strong>{portfolio.regime}</strong></button>
-        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><strong>{actionLabel}</strong></button>
+        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><div className="action-value-line"><strong>{actionLabel}</strong>{nonLatestClose && <span className="close-basis-warning" title={`Decision uses ${portfolio.asOf || "no"} daily close; latest completed session is ${latestCompletedSession}.`}>NON-LATEST</span>}</div></button>
         <button type="button" className="next-action-cell execution-cell" onClick={() => setDetail("execution")}><span>Execution (JST)</span><strong>{execution}</strong></button>
         <button type="button" className="next-action-cell target-cell" onClick={() => setDetail("target")}><span>Target</span><AllocationBand targets={action.targets} compact /></button>
       </div>
