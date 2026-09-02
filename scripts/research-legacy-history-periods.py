@@ -26,6 +26,19 @@ def parse_date(raw: str) -> date:
     return date.fromisoformat(raw)
 
 
+def gate_is_open(phase: Phase) -> bool:
+    if phase.name == "DEVELOPMENT":
+        return True
+    if phase.name == "VALIDATION":
+        return os.environ.get("ALLOW_LEGACY_VALIDATION_PERFORMANCE") == "1"
+    if phase.name == "SEALED_HOLDOUT":
+        return (
+            os.environ.get("ALLOW_LEGACY_VALIDATION_PERFORMANCE") == "1"
+            and os.environ.get("ALLOW_LEGACY_SEALED_HOLDOUT_PERFORMANCE") == "1"
+        )
+    return False
+
+
 def assert_performance_window(start: date, end: date) -> list[str]:
     if end < start:
         raise SystemExit("end date precedes start date")
@@ -38,10 +51,14 @@ def assert_performance_window(start: date, end: date) -> list[str]:
         if not overlaps:
             continue
         touched.append(phase.name)
-        if phase.gate_env and os.environ.get(phase.gate_env) != "1":
+        if not gate_is_open(phase):
+            if phase.name == "SEALED_HOLDOUT":
+                requirement = "ALLOW_LEGACY_VALIDATION_PERFORMANCE=1 and ALLOW_LEGACY_SEALED_HOLDOUT_PERFORMANCE=1"
+            else:
+                requirement = f"{phase.gate_env}=1"
             raise SystemExit(
                 f"performance window touches sealed phase {phase.name} "
-                f"({phase.start}..{phase.end}); set {phase.gate_env}=1 only after the prior evaluation gate is formally opened"
+                f"({phase.start}..{phase.end}); requires {requirement} only after prior evaluation gates are formally completed"
             )
     return touched
 
