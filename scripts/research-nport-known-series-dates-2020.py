@@ -3,7 +3,9 @@ import gzip,json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 P=ROOT/'data'/'sec-nport'/'bootstrap.json.gz'
-IDS=['S000062095','S000006409','S000006410','S000006411','S000006412']
+# S000012478 = First Trust NYSE Arca Biotechnology Index Fund (FBT),
+# independently confirmed from SEC N-CEN. Existing SPDR IDs retained as controls.
+IDS=['S000012478','S000062095','S000006409','S000006410','S000006411','S000006412']
 with gzip.open(P,'rt',encoding='utf-8') as f:d=json.load(f)
 rows=d.get('snapshots') or d.get('filings') or []
 out={}
