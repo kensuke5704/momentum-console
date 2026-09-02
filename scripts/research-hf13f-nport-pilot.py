@@ -4,7 +4,7 @@
 Pilot scope: 2022Q1-2023Q4. It downloads only shards 10-11 (~1 GB), filters
 13F managers to concentrated portfolios analogous to production N-PORT ETF
 eligibility, builds the same breadth score, maps PERMCO to ticker by an
-independent raw-price fingerprint, and compares latest-public-quarter Top80
+independent price fingerprint, and compares latest-public-quarter Top80
 against the frozen N-PORT Top80. Research only; no production files changed.
 """
 from __future__ import annotations
@@ -40,10 +40,9 @@ def qend(q):
  y=int(q[:4]); n=int(q[-1]); m=n*3
  import calendar
  return date(y,m,calendar.monthrange(y,m)[1])
-def available_date(q): return qend(q)+timedelta(days=45) # conservative statutory maximum lag
+def available_date(q): return qend(q)+timedelta(days=45)
 
 def load_rows():
- # q -> manager -> list[(permco,dollar,price)]
  qs=defaultdict(lambda:defaultdict(list)); price_by=defaultdict(dict)
  for idx in SHARDS:
   name=f'data-{idx:05d}-of-00012.arrow'; p=download(name)
@@ -82,14 +81,12 @@ def score_quarter(managers):
  for perm,a in agg.items():
   cnt=len(a['mgrs'])
   if cnt<2 and a['max']<4:continue
-  # all records in a quarter share the same reporting age, so recency is monotone in aggregate weight
   score=3*math.log1p(cnt)+.5*math.log1p(a['agg'])+.5*math.log1p(a['agg'])
   ranks.append({'permco':perm,'managerCount':cnt,'aggregateWeight':a['agg'],'maxWeight':a['max'],'score':score})
  ranks.sort(key=lambda x:(-x['score'],-x['managerCount'],-x['aggregateWeight'],x['permco']))
  return ranks, len(elig)
 
 def yahoo_raw(symbol):
- # Raw close is used only as an identifier bridge, not as a return input.
  s=symbol.replace('.','-'); p1=int(datetime(2021,12,1).timestamp());p2=int(datetime(2024,2,1).timestamp())
  for host in ['query1.finance.yahoo.com','query2.finance.yahoo.com']:
   url=f'https://{host}/v8/finance/chart/{s}?period1={p1}&period2={p2}&interval=1d&events=history'
@@ -99,40 +96,44 @@ def yahoo_raw(symbol):
    rr=o.get('chart',{}).get('result',[None])[0]
    if not rr:continue
    ts=rr.get('timestamp') or []; closes=((rr.get('indicators') or {}).get('quote') or [{}])[0].get('close') or []
-   return [(date.fromtimestamp(t),c) for t,c in zip(ts,closes) if c and c>0]
+   rows=[(date.fromtimestamp(t),c) for t,c in zip(ts,closes) if c and c>0]
+   if rows:return rows
   except Exception:pass
  return []
+
+def repo_prices():
+ obj=json.loads((ROOT/'public/data/market-data.json').read_text())
+ return obj.get('histories') or {}
+
+def repo_rows(histories,symbol):
+ return [(date.fromisoformat(x['date']),float(x['close'])) for x in histories.get(symbol,[]) if x.get('close') and '2021-12-01'<=x.get('date','')<='2024-02-01']
+
 def nearest_close(rows,d):
  xs=[(dt,p) for dt,p in rows if dt<=d]
  return xs[-1][1] if xs else None
 
 def build_mapping(price_by,symbols):
- quarters=['2022Q1','2022Q2','2022Q3','2022Q4','2023Q1','2023Q2','2023Q3','2023Q4']
- # Index candidates by approximate latest price to avoid all-pairs work.
+ quarters=['2022Q1','2022Q2','2022Q3','2022Q4','2023Q1','2023Q2','2023Q3','2023Q4']; stored=repo_prices()
  mapped={}; details={}
  for si,sym in enumerate(sorted(symbols),1):
-  yr=yahoo_raw(sym)
+  yr=yahoo_raw(sym); source='yahoo'
+  if len(yr)<4:
+   yr=repo_rows(stored,sym); source='repo-fallback'
   obs={q:nearest_close(yr,qend(q)) for q in quarters}; obs={q:p for q,p in obs.items() if p}
   best=[]
   if len(obs)>=4:
    for perm,pp in price_by.items():
     common=[q for q in obs if q in pp and pp[q]>0]
     if len(common)<4:continue
-    # Raw CRSP-like price and Yahoo raw close should be nearly identical. Median relative
-    # level error is an identity criterion independent of N-PORT overlap outcome.
     errs=[abs(pp[q]-obs[q])/max(pp[q],obs[q]) for q in common]
     med=statistics.median(errs); mx=max(errs)
-    if med<=0.02:
-     best.append((med,mx,-len(common),perm))
+    if med<=0.02:best.append((med,mx,-len(common),perm))
   best.sort(); accepted=None
   if best:
-   # Require strong identity and separation when runner-up exists.
    b=best[0]; second=best[1] if len(best)>1 else None
-   if b[0]<=0.01 and (second is None or second[0]>=max(0.015,b[0]*2)):
-    accepted=b[3]
-  if accepted:
-   mapped[accepted]=sym
-  details[sym]={'permco':accepted,'bestMedianRelativeError':best[0][0] if best else None,'runnerUpError':best[1][0] if len(best)>1 else None,'points':-best[0][2] if best else 0}
+   if b[0]<=0.01 and (second is None or second[0]>=max(0.015,b[0]*2)):accepted=b[3]
+  if accepted:mapped[accepted]=sym
+  details[sym]={'permco':accepted,'bestMedianRelativeError':best[0][0] if best else None,'runnerUpError':best[1][0] if len(best)>1 else None,'points':-best[0][2] if best else 0,'priceSource':source}
   if si%25==0:print('MAPPING',si,'/',len(symbols),'accepted',sum(1 for x in details.values() if x['permco']),flush=True)
   time.sleep(.02)
  return mapped,details
@@ -155,6 +156,6 @@ def main():
   results.append({'month':x['signalMonth'],'asOf':x['asOf'],'sourceQuarter':q,'sourceAvailableDate':available_date(q).isoformat(),'mapped13fTop80':len(mapped),'mappingCoverageTop80':len(mapped)/TOPN,'intersection':inter,'overlapVsNport':inter/len(b) if b else None,'jaccardOnMapped':inter/len(a|b) if a|b else None,'13fSymbols':mapped,'nportSymbols':target})
   print('OVERLAP',x['signalMonth'],q,'mapped',len(mapped),'inter',inter,'/',len(target),flush=True)
  cov=[r['mappingCoverageTop80'] for r in results]; ov=[r['overlapVsNport'] for r in results]
- summary={'method':'Public HF all-market institutional 13F mirror; concentrated managers 10-120 assets and top10>=25%; same breadth score coefficients; conservative quarter-end+45d availability; PERMCO-to-ticker identity by multi-quarter raw-price fingerprint; compare Top80 to frozen N-PORT.', 'pilotPeriod':{'start':PILOT_START,'end':PILOT_END},'source':'kurry/institutional-holdings-13f-quarterly','sourceCoverage':'1980Q1-2024Q3','downloadedShards':SHARDS,'eligibleManagerCounts':eligible_counts,'targetSymbols':len(symbols),'mappedTargetSymbols':sum(1 for d in map_details.values() if d['permco']),'mappingCoverageTargetSymbols':sum(1 for d in map_details.values() if d['permco'])/len(symbols) if symbols else None,'months':len(results),'top80MappingCoverage':{'mean':statistics.mean(cov) if cov else None,'median':statistics.median(cov) if cov else None,'min':min(cov) if cov else None},'overlapVsNport':{'mean':statistics.mean(ov) if ov else None,'median':statistics.median(ov) if ov else None,'min':min(ov) if ov else None,'max':max(ov) if ov else None},'mappingDetails':map_details,'results':results,'limitations':['Mirror uses PERMCO and quarter-end dates, not original ticker/CUSIP/filing dates. +45 calendar days is deliberately conservative to avoid look-ahead.','13F concentrated institutional managers are an economic proxy for concentrated/thematic N-PORT ETFs, not the same filer population.','Price fingerprint is used solely for identifier mapping; ambiguous matches are rejected rather than forced.','Mirror provenance should be treated as secondary/public-research data until independently cross-checked against official SEC samples.']}
+ summary={'method':'Public HF all-market institutional 13F mirror; concentrated managers 10-120 assets and top10>=25%; same breadth score coefficients; conservative quarter-end+45d availability; PERMCO-to-ticker identity by multi-quarter price fingerprint with repository-history fallback for failed live fetches; compare Top80 to frozen N-PORT.', 'pilotPeriod':{'start':PILOT_START,'end':PILOT_END},'source':'kurry/institutional-holdings-13f-quarterly','sourceCoverage':'1980Q1-2024Q3','downloadedShards':SHARDS,'eligibleManagerCounts':eligible_counts,'targetSymbols':len(symbols),'mappedTargetSymbols':sum(1 for d in map_details.values() if d['permco']),'mappingCoverageTargetSymbols':sum(1 for d in map_details.values() if d['permco'])/len(symbols) if symbols else None,'months':len(results),'top80MappingCoverage':{'mean':statistics.mean(cov) if cov else None,'median':statistics.median(cov) if cov else None,'min':min(cov) if cov else None},'overlapVsNport':{'mean':statistics.mean(ov) if ov else None,'median':statistics.median(ov) if ov else None,'min':min(ov) if ov else None,'max':max(ov) if ov else None},'mappingDetails':map_details,'results':results,'limitations':['Mirror uses PERMCO and quarter-end dates, not original ticker/CUSIP/filing dates. +45 calendar days is deliberately conservative to avoid look-ahead.','13F concentrated institutional managers are an economic proxy for concentrated/thematic N-PORT ETFs, not the same filer population.','Price fingerprint is used solely for identifier mapping; ambiguous matches are rejected rather than forced.','Repository fallback uses stored adjusted price history only when Yahoo produces fewer than four observations; this may fail for securities with material corporate actions/dividends but does not use N-PORT overlap outcome.','Mirror provenance should be treated as secondary/public-research data until independently cross-checked against official SEC samples.']}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(summary,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k not in ['results','mappingDetails']},ensure_ascii=False),flush=True)
 if __name__=='__main__':main()
