@@ -5,6 +5,7 @@ import gzip
 import importlib.util
 import json
 import math
+import re
 import statistics
 from collections import defaultdict
 from datetime import date
@@ -81,6 +82,8 @@ def compare_ranked(left: list[dict], right: list[dict]) -> dict:
     ls = {x['symbol'] for x in lt}; rs = {x['symbol'] for x in rt}; common = ls & rs
     lr = {x['symbol']:x['rank'] for x in lt}; rr = {x['symbol']:x['rank'] for x in rt}
     denom = min(TOP_N, len(lt), len(rt))
+    right_top2 = [x['symbol'] for x in rt[:2]]
+    right_top2_retained = sum(1 for s in right_top2 if s in ls)
     return {
         'leftEligibleSymbols': len(left),
         'rightEligibleSymbols': len(right),
@@ -88,6 +91,8 @@ def compare_ranked(left: list[dict], right: list[dict]) -> dict:
         'topOverlapRate': len(common)/denom if denom else None,
         'topJaccard': len(common)/len(ls|rs) if (ls|rs) else None,
         'commonTopRankCorrelation': rank_corr(lr, rr, common),
+        'rightTop2Symbols': right_top2,
+        'rightTop2RetentionRate': right_top2_retained/len(right_top2) if right_top2 else None,
         'leftTop': lt,
         'rightTop': rt,
     }
@@ -106,6 +111,59 @@ def latest_public_nport(nport: list[dict], as_of: str, allowed_series: set[str] 
         if prev is None or (str(f.get('filingDate') or ''), str(f.get('accession') or '')) > (str(prev.get('filingDate') or ''), str(prev.get('accession') or '')):
             latest[sid] = f
     return list(latest.values())
+
+
+def issuer_aliases(raw: str) -> list[str]:
+    """Conservative legal/display-name aliases; matching still requires uniqueness.
+
+    These transformations remove presentation-only differences seen in SEC filings.
+    They do not use prices, returns, holdings overlap, ranks, or strategy outcomes.
+    """
+    s = str(raw or '').strip()
+    while True:
+        stripped = re.sub(r'\s*\((?:[a-z]{1,3}|\d{1,3})\)\s*$', '', s, flags=re.I)
+        if stripped == s:
+            break
+        s = stripped.strip()
+    s = re.sub(r'\s*\(\s*CLASS\s+[A-Z0-9.-]+\s*\)\s*', ' ', s, flags=re.I)
+    s = re.sub(r'\s+CLASS\s+[A-Z0-9.-]+\s*$', '', s, flags=re.I)
+    s = re.sub(r'\s+(?:ADR|GDR)(?:\s*\*+)?\s*$', '', s, flags=re.I)
+    s = re.sub(r'\s+\*+\s*$', '', s)
+    base = ov.norm_issuer(s)
+    if not base:
+        return []
+
+    values = [base]
+    no_the = ' '.join(t for t in base.split() if t != 'THE')
+    if no_the:
+        values.extend([no_the, f'THE {no_the}', f'{no_the} THE'])
+
+    # Legal suffixes are presentation-level differences only. Bare aliases are
+    # accepted downstream only when they resolve to one and only one N-PORT symbol.
+    for value in list(values):
+        values.append(re.sub(r'\s+(?:INC|CORP|CO|LTD|PLC|LLC)\s*$', '', value))
+        values.append(re.sub(r'\bCOS\b', 'COMPANIES', value))
+        values.append(re.sub(r'\bCOMPANIES\b', 'COS', value))
+        values.append(re.sub(r'\bBANCORPORATION\b', 'BANCORP', value))
+        values.append(re.sub(r'\bBANCORP\b', 'BANCORPORATION', value))
+
+    out = []
+    for value in values:
+        value = ' '.join(value.split())
+        if value and value not in out:
+            out.append(value)
+    return out
+
+
+def unique_alias_symbol_map(holdings: list[dict]) -> dict[str, str]:
+    alias_to_symbols = defaultdict(set)
+    for h in holdings:
+        symbol = str(h.get('symbol') or '').strip().upper()
+        if not symbol:
+            continue
+        for alias in issuer_aliases(str(h.get('issuerName') or '')):
+            alias_to_symbols[alias].add(symbol)
+    return {alias: next(iter(symbols)) for alias, symbols in alias_to_symbols.items() if len(symbols) == 1}
 
 
 def main() -> None:
@@ -147,14 +205,7 @@ def main() -> None:
                 if gap > 45:
                     continue
 
-                issuer_to_symbols = defaultdict(set)
-                for h in nearest.get('holdings', []):
-                    issuer = ov.norm_issuer(str(h.get('issuerName') or ''))
-                    symbol = str(h.get('symbol') or '').strip().upper()
-                    if issuer and symbol:
-                        issuer_to_symbols[issuer].add(symbol)
-                unique_map = {k: next(iter(v)) for k,v in issuer_to_symbols.items() if len(v) == 1}
-
+                unique_map = unique_alias_symbol_map(nearest.get('holdings', []))
                 legacy_symbol_weights = defaultdict(float)
                 legacy_total = 0.0
                 legacy_mapped = 0.0
@@ -163,8 +214,12 @@ def main() -> None:
                     if w <= 0:
                         continue
                     legacy_total += w
-                    issuer = ov.norm_issuer(str(h.get('description') or ''))
-                    symbol = unique_map.get(issuer)
+                    symbol = None
+                    for alias in issuer_aliases(str(h.get('description') or '')):
+                        candidate_symbol = unique_map.get(alias)
+                        if candidate_symbol:
+                            symbol = candidate_symbol
+                            break
                     if symbol:
                         legacy_symbol_weights[symbol] += w
                         legacy_mapped += w
@@ -214,7 +269,6 @@ def main() -> None:
     all_dates = [f['filingDate'] for f in legacy_filings+nport_filings if f.get('filingDate')]
     as_of = max(all_dates) if all_dates else '2020-12-31'
 
-    # Gate A: parser + issuer identity + universe scoring, holding the SEC series set fixed.
     legacy_ranked = score_universe(legacy_filings, as_of)
     paired_nport_ranked = score_universe(nport_filings, as_of)
     gate_a_cmp = compare_ranked(legacy_ranked, paired_nport_ranked)
@@ -225,11 +279,9 @@ def main() -> None:
         and median_cov is not None and median_cov >= 0.80
         and gate_a_cmp['topOverlapRate'] is not None and gate_a_cmp['topOverlapRate'] >= 0.80
         and gate_a_cmp['commonTopRankCorrelation'] is not None and gate_a_cmp['commonTopRankCorrelation'] >= 0.80
+        and gate_a_cmp['rightTop2RetentionRate'] is not None and gate_a_cmp['rightTop2RetentionRate'] >= 0.90
     )
 
-    # Gate B: source-series coverage only. Both sides use N-PORT holdings, so parser
-    # and issuer mapping error are removed. The only difference is whether an SEC
-    # series was structurally reconstructable/paired by the legacy pipeline.
     reconstructable_series = {x['seriesId'] for x in paired}
     full_nport_filings = latest_public_nport(nport, as_of)
     restricted_nport_filings = latest_public_nport(nport, as_of, reconstructable_series)
@@ -240,16 +292,17 @@ def main() -> None:
         len(full_nport_filings) > 0
         and gate_b_cmp['topOverlapRate'] is not None and gate_b_cmp['topOverlapRate'] >= 0.80
         and gate_b_cmp['commonTopRankCorrelation'] is not None and gate_b_cmp['commonTopRankCorrelation'] >= 0.80
+        and gate_b_cmp['rightTop2RetentionRate'] is not None and gate_b_cmp['rightTop2RetentionRate'] >= 0.90
     )
 
     out = {
         'year': 2020,
         'purpose': 'Two-gate structural reproducibility test for legacy shareholder-report holdings versus Production-style N-PORT universe construction. No prices, returns, trades, or strategy performance are used.',
         'scopeWarning': 'Gate A isolates parser/issuer/scoring fidelity on shared SEC series IDs. Gate B isolates missing-series impact by comparing full N-PORT with N-PORT restricted to legacy-reconstructable series. Neither consumes strategy returns.',
-        'mappingRule': 'Legacy issuer description may map to a symbol only when the nearest same-series N-PORT snapshot has exactly one symbol for the same conservatively normalized issuer name.',
+        'mappingRule': 'Legacy issuer description may map to a symbol only when a conservative legal/display-name alias resolves to exactly one symbol in the nearest same-series N-PORT snapshot.',
         'universeRule': 'Same production rule: etfCount>=2 OR maxWeight>=4; score=3*log1p(etfCount)+0.5*log1p(aggregateWeight)+0.5*log1p(recencyWeight); recency=exp(-ageDays/120).',
         'asOf': as_of,
-        'acceptanceThresholds': {'minimumPairedSeries':10,'minimumMedianLegacySymbolWeightCoverage':0.80,'minimumTopOverlapRate':0.80,'minimumCommonTopRankCorrelation':0.80},
+        'acceptanceThresholds': {'minimumPairedSeries':10,'minimumMedianLegacySymbolWeightCoverage':0.80,'minimumTopOverlapRate':0.80,'minimumCommonTopRankCorrelation':0.80,'minimumNportTop2RetentionRate':0.90},
         'gateA': {
             'pairedSeries': len(paired),
             'medianLegacySymbolWeightCoverage': median_cov,
