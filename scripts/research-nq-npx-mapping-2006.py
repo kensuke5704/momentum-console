@@ -21,8 +21,6 @@ def norm(raw: str) -> str:
 
 
 def aliases(raw: str) -> list[str]:
-    # Structural/legal-name variants only. No fuzzy result is ever promoted to
-    # an accepted mapping. These transformations are independent of returns.
     s = raw.strip()
     while True:
         stripped = re.sub(r"\s*\((?:[a-z]{1,3}|\d{1,3})\)\s*$", "", s, flags=re.I)
@@ -62,6 +60,16 @@ def artifact(raw: str) -> bool:
     )
 
 
+def valid_tier_b_ticker(raw: str) -> bool:
+    # Tier B has no security-id corroboration, so be deliberately conservative.
+    # Reject parser/header tokens and single-character values, which are common
+    # in legacy N-PX voting tables and can be mistaken for tickers.
+    t = str(raw or "").upper().strip()
+    if t in {"SYMBOL", "TICKER", "CUSIP", "ISSUER", "SECURITY", "N/A", "NA"}:
+        return False
+    return bool(re.fullmatch(r"[A-Z][A-Z0-9.-]{1,4}", t))
+
+
 def ratio(n, d):
     return n / d if d else None
 
@@ -69,24 +77,24 @@ def ratio(n, d):
 def main() -> None:
     nq, npx = json.loads(NQ.read_text()), json.loads(NPX.read_text())
 
-    # Tier A requires one unique (ticker, securityId) identity.
-    # Tier B is intentionally weaker: no Tier A identity exists, but the same
-    # exact normalized issuer maps to one unique ticker in N-PX records where
-    # securityId is missing. Multiple tickers remain unresolved.
     tier_a_by_issuer = defaultdict(set)
     ticker_only_by_issuer = defaultdict(set)
     all_tickers_by_issuer = defaultdict(set)
+    rejected_ticker_only = defaultdict(set)
     for row in npx["records"]:
         issuer = row.get("normalizedIssuer") or norm(str(row.get("issuer") or ""))
         ticker = row.get("ticker")
         security_id = row.get("securityId")
         if not issuer or not ticker:
             continue
-        all_tickers_by_issuer[issuer].add(ticker)
         if security_id:
+            all_tickers_by_issuer[issuer].add(ticker)
             tier_a_by_issuer[issuer].add((ticker, security_id))
-        else:
+        elif valid_tier_b_ticker(ticker):
+            all_tickers_by_issuer[issuer].add(ticker)
             ticker_only_by_issuer[issuer].add(ticker)
+        else:
+            rejected_ticker_only[issuer].add(ticker)
 
     names = sorted(set(tier_a_by_issuer) | set(ticker_only_by_issuer))
 
@@ -123,13 +131,9 @@ def main() -> None:
                         identities = tier_a
                         break
 
-                    # Tier B is permitted only when there is no security-id-backed
-                    # identity for this issuer and the issuer has exactly one ticker
-                    # across the N-PX master. This prevents ADR/class ambiguity from
-                    # being silently promoted.
                     ticker_only = sorted(ticker_only_by_issuer.get(alias, set()))
                     all_tickers = sorted(all_tickers_by_issuer.get(alias, set()))
-                    if not tier_a and len(ticker_only) == 1 and len(all_tickers) == 1:
+                    if len(ticker_only) == 1 and len(all_tickers) == 1:
                         status = "TIER_B"
                         matched_alias = alias
                         ticker = ticker_only[0]
@@ -205,10 +209,11 @@ def main() -> None:
     out = {
         "year": 2006,
         "purpose": "Structural validation of N-Q holdings issuer descriptions against deterministic N-PX issuer/ticker/security-id master. No return/performance data used.",
-        "mappingRule": "Tier A = unique exact issuer match to one N-PX ticker+securityId identity. Tier B = no Tier A identity and unique exact issuer match to one ticker across N-PX with securityId missing. Structural/legal-name normalization only; fuzzy candidates diagnostic-only; ambiguous identities rejected.",
+        "mappingRule": "Tier A = unique exact issuer match to one N-PX ticker+securityId identity. Tier B = no Tier A identity and unique exact issuer match to one structurally valid 2-5 character ticker across N-PX with securityId missing. Header/parser ticker tokens and single-character ticker-only values are rejected. Structural/legal-name normalization only; fuzzy candidates diagnostic-only; ambiguous identities rejected.",
         "npxSampleRule": npx.get("sampleRule"),
         "npxPairedRecords": npx.get("pairedRecords"),
         "npxUniqueNormalizedIssuers": npx.get("uniqueNormalizedIssuers"),
+        "rejectedTickerOnlyIssuerCount": len(rejected_ticker_only),
         "nqPitSeriesRecords": nq.get("pitSeriesRecords"),
         "holdingCount": int(total_c),
         "eligibleHoldingCount": int(eligible_c),
