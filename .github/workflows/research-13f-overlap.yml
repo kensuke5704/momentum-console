@@ -1,0 +1,32 @@
+name: Research SEC 13F NPORT Overlap
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-13f-nport-overlap.py"
+      - ".github/workflows/research-13f-overlap.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  overlap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OVERLAP_START_YEAR: "2020"
+      OVERLAP_END_YEAR: "2026"
+      OVERLAP_TOP_N: "80"
+      SEC_USER_AGENT: "momentum-console research contact: kensuke5704@users.noreply.github.com"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run SEC 13F vs N-PORT overlap diagnostic
+        run: python3 scripts/research-13f-nport-overlap.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec13f-nport-overlap
+          path: data/research/sec13f-nport-overlap.json
+          if-no-files-found: warn
