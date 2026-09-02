@@ -21,10 +21,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Extract 2006 N-Q/N-CSR filing index
         run: python3 scripts/research-nq-index-extract.py
-      - name: Test N-Q holdings extraction through Jina
-        run: python3 scripts/research-nq-parser-pilot.py
       - name: Probe N-Q series and ticker metadata
         run: python3 scripts/research-nq-series-metadata-2006.py
+      - name: Test N-Q holdings extraction through Jina
+        run: python3 scripts/research-nq-parser-pilot.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
