@@ -1,0 +1,38 @@
+name: Research BeanCounter 2006 Aggregate
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-beancounter-2006-aggregate.py"
+      - ".github/workflows/research-beancounter-2006-aggregate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download completed 2006 shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: kensuke5704/momentum-console
+          run-id: 33629867281
+          pattern: beancounter-2006-*
+          path: data/research/beancounter-2006-shards
+          merge-multiple: true
+      - name: Rebuild SEC 2006 N-Q/N-CSR master index
+        run: python3 scripts/research-nq-index-extract.py
+      - name: Aggregate and compare filing coverage
+        run: python3 scripts/research-beancounter-2006-aggregate.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beancounter-2006-coverage
+          path: data/research/beancounter-2006-coverage.json
+          if-no-files-found: error
