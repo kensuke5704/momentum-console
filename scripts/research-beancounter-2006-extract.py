@@ -5,7 +5,7 @@ import gzip
 import json
 import re
 import urllib.request
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ UA = {
 }
 
 # Standard CUSIP: 8-character body plus numeric check digit.
-# Candidate tokens are validated with the official CUSIP modulus-10 check-digit algorithm.
+# Candidate tokens are validated with the CUSIP modulus-10 check-digit algorithm.
 CUSIP_RE = re.compile(r"(?<![A-Z0-9])([0-9A-Z]{8}[0-9])(?![A-Z0-9])")
 
 
@@ -34,8 +34,6 @@ def cusip_char_value(ch: str) -> int:
 def valid_cusip(token: str) -> bool:
     if len(token) != 9 or not token[-1].isdigit():
         return False
-    # Reject prose-like tokens only if they are impossible securities identifiers by check digit.
-    # The check digit is computed from the first eight characters: positions 2,4,6,8 are doubled.
     total = 0
     try:
         for i, ch in enumerate(token[:8], start=1):
@@ -49,15 +47,20 @@ def valid_cusip(token: str) -> bool:
     return expected == int(token[8])
 
 
-def cusips_from_text(text: str) -> set[str]:
+def cusip_hits_from_text(text: str) -> list[tuple[str, str]]:
     up = text.upper()
-    out: set[str] = set()
+    hits: list[tuple[str, str]] = []
+    seen: set[str] = set()
     for m in CUSIP_RE.finditer(up):
         token = m.group(1)
-        # Real CUSIPs can be all-numeric or alphanumeric; check-digit validation is the gate.
-        if valid_cusip(token):
-            out.add(token)
-    return out
+        if token in seen or not valid_cusip(token):
+            continue
+        seen.add(token)
+        lo = max(0, m.start() - 140)
+        hi = min(len(text), m.end() + 140)
+        context = re.sub(r"\s+", " ", text[lo:hi]).strip()
+        hits.append((token, context))
+    return hits
 
 
 def shard_url(idx: int) -> str:
@@ -67,6 +70,7 @@ def shard_url(idx: int) -> str:
 def main() -> None:
     by_accession: dict[str, dict] = {}
     attachment_counts = Counter()
+    context_samples: dict[str, list[dict]] = defaultdict(list)
     shard_summaries = []
     malformed = 0
 
@@ -118,7 +122,18 @@ def main() -> None:
                     if filename and len(rec["filenames"]) < 8:
                         rec["filenames"].append(filename)
                     text = str(obj.get("text") or "")
-                    rec["cusips"].update(cusips_from_text(text))
+                    for token, context in cusip_hits_from_text(text):
+                        rec["cusips"].add(token)
+                        if len(context_samples[token]) < 3:
+                            context_samples[token].append(
+                                {
+                                    "accession": accession,
+                                    "date": date,
+                                    "form": form,
+                                    "filename": filename,
+                                    "context": context,
+                                }
+                            )
         shard_summaries.append(
             {
                 "shard": shard,
@@ -161,6 +176,14 @@ def main() -> None:
         {"cusip": cusip, "filingFrequency": count}
         for cusip, count in filing_freq.most_common(500)
     ]
+    top_contexts = [
+        {
+            "cusip": item["cusip"],
+            "filingFrequency": item["filingFrequency"],
+            "samples": context_samples.get(item["cusip"], []),
+        }
+        for item in ranked[:80]
+    ]
     summary = {
         "year": 2006,
         "source": "bradfordlevy/BeanCounter train shards",
@@ -176,6 +199,7 @@ def main() -> None:
         "malformedRows": malformed,
         "shards": shard_summaries,
         "topCusips": ranked,
+        "topCusipContexts": top_contexts,
         "filings": filings,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -183,12 +207,17 @@ def main() -> None:
     print(
         "SUMMARY",
         json.dumps(
-            {k: v for k, v in summary.items() if k not in {"filings", "topCusips", "shards"}},
+            {
+                k: v
+                for k, v in summary.items()
+                if k not in {"filings", "topCusips", "topCusipContexts", "shards"}
+            },
             sort_keys=True,
         ),
         flush=True,
     )
     print("TOP_CUSIPS", json.dumps(ranked[:50]), flush=True)
+    print("CUSIP_CONTEXTS", json.dumps(top_contexts[:20]), flush=True)
 
 
 if __name__ == "__main__":
