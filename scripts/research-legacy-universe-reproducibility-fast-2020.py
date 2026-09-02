@@ -69,6 +69,7 @@ def diagnostic_mapped_modern_series(text: str, series: list[dict]):
     parsed_nonempty = 0
     structural_gate_pass = 0
     examples = []
+    sample_emitted = False
     for start, end in blocks:
         block = text[start:end]
         context = text[max(0, start - 10000):min(end, start + 3000)]
@@ -82,6 +83,12 @@ def diagnostic_mapped_modern_series(text: str, series: list[dict]):
             continue
         unique_name_matches += 1
         s = exact[0]
+        if not sample_emitted:
+            # Fixed-format diagnostic only. Keep the excerpt short and deterministic;
+            # it is used to identify the table serialization emitted by the transport.
+            print('LEGACY_MATCHED_BLOCK_RAW_SAMPLE', json.dumps(block[:5000]), flush=True)
+            print('LEGACY_MATCHED_BLOCK_VISIBLE_SAMPLE', json.dumps(repro.ov.visible(block)[:5000]), flush=True)
+            sample_emitted = True
         method, holdings, total = repro.ov.pit.normalized_holdings(block)
         count = len(holdings)
         top10 = sum(h['weight'] for h in holdings[:10]) if holdings else 0
