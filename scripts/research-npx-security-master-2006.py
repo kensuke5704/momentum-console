@@ -6,10 +6,9 @@ import json
 import re
 import tempfile
 import time
-import urllib.error
 import urllib.request
 import zipfile
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,10 +58,10 @@ def filing_index_2006() -> list[dict]:
 
 def choose_samples(filings: list[dict]) -> list[dict]:
     primary = [x for x in filings if x["form"] == "N-PX"]
-    if len(primary) <= 12:
+    if len(primary) <= 4:
         return primary
-    # Twelve deterministic quantile samples across the filing-year distribution.
-    return [primary[min(len(primary) - 1, (i * len(primary)) // 12)] for i in range(12)]
+    # Fixed quartile samples. This is a structural parser feasibility gate only.
+    return [primary[min(len(primary) - 1, (i * len(primary)) // 4)] for i in range(4)]
 
 
 def sec_url(filename: str) -> str:
@@ -70,21 +69,9 @@ def sec_url(filename: str) -> str:
 
 
 def fetch_text(url: str) -> str:
-    last: Exception | None = None
-    for attempt in range(2):
-        try:
-            req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
-            with urllib.request.urlopen(req, timeout=20) as r:
-                return r.read(2_000_000).decode("utf-8", "replace")
-        except urllib.error.HTTPError as e:
-            last = e
-            if e.code != 429:
-                raise
-        except Exception as e:
-            last = e
-        time.sleep(4 * (attempt + 1))
-    assert last is not None
-    raise last
+    req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
+    with urllib.request.urlopen(req, timeout=12) as r:
+        return r.read(2_000_000).decode("utf-8", "replace")
 
 
 def text_lines(text: str) -> list[str]:
@@ -155,16 +142,16 @@ def main() -> None:
             text = fetch_text(sec_url(x["filename"]))
             records = parse_records(text)
             paired = [r for r in records if r.get("ticker") and r.get("securityId")]
-            r = {**x, "bytes": len(text.encode()), "records": len(records), "pairedRecords": len(paired), "sampleRecords": records[:20]}
+            r = {**x, "bytes": len(text.encode()), "records": len(records), "pairedRecords": len(paired), "sampleRecords": records[:30]}
             print(f"{i}/{len(samples)} {x['dateFiled']} {x['company'][:38]} records={len(records)} paired={len(paired)}", flush=True)
-            for rec in paired[:2]:
+            for rec in paired[:3]:
                 print("  ", json.dumps(rec), flush=True)
         except Exception as e:
             r = {**x, "error": repr(e)}
             print(f"{i}/{len(samples)} FAIL {x['company'][:38]} {e!r}", flush=True)
         results.append(r)
         if i < len(samples):
-            time.sleep(2.0)
+            time.sleep(2.5)
 
     ok = [r for r in results if "error" not in r]
     counts = sorted(r["pairedRecords"] for r in ok)
@@ -178,7 +165,7 @@ def main() -> None:
         "allNpxFilings": len(filings),
         "formCounts": dict(form_counts),
         "monthCounts": dict(month_counts),
-        "sampleRule": "Twelve deterministic quantile N-PX filings across 2006 filing order.",
+        "sampleRule": "Four deterministic quartile N-PX filings across 2006 filing order; structural feasibility only.",
         "sampleCount": len(samples),
         "fetchSuccess": len(ok),
         "fetchRate": len(ok) / len(samples) if samples else None,
