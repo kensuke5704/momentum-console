@@ -92,10 +92,14 @@ def ratio(n: float, d: float):
 
 def main():
     filings = master_2020()
-    chosen=[]; seen=set()
-    for x in sorted(filings,key=lambda r:(r['dateFiled'],r['cik'],r['filename'])):
-        if x['cik'] in seen: continue
-        seen.add(x['cik']); chosen.append(x)
+    # Deterministic overlap sample: the latest 2020 N-CSR/N-CSRS filing for
+    # each target ETF-family CIK. This maximizes literal coexistence with the
+    # repository's 2020+ N-PORT data without selecting on parser success or any
+    # investment/performance outcome.
+    latest_by_cik = {}
+    for x in sorted(filings,key=lambda r:(r['dateFiled'],r['filename'])):
+        latest_by_cik[x['cik']] = x
+    chosen = [latest_by_cik[cik] for cik in sorted(latest_by_cik)]
 
     with gzip.open(BOOTSTRAP,'rt',encoding='utf-8') as f:
         bp=json.load(f)
@@ -171,7 +175,7 @@ def main():
     summary={
         'year':2020,
         'purpose':'Direct structural overlap validation of legacy N-CSR/N-CSRS ETF schedule parsing against N-PORT for the same SEC seriesId. No return or strategy-performance data used.',
-        'sampleRule':'First N-CSR/N-CSRS filing per target ETF-family CIK in 2020 filing order; no parser-success or performance selection.',
+        'sampleRule':'Latest 2020 N-CSR/N-CSRS filing per target ETF-family CIK; deterministic by filing date and CIK; no parser-success or performance selection.',
         'matchingRule':'Same SEC seriesId; nearest N-PORT report date within 45 calendar days; exact conservative normalized issuer-name overlap only.',
         'coverageRule':'N-CSR common issuer weight divided by normalized N-CSR series weight; N-PORT common issuer weight divided by total named N-PORT holding weight. No raw weight sum is treated as a percentage.',
         'targetFilings':len(filings),'sampledRegistrants':len(chosen),'filingsSucceeded':sum('error' not in r for r in filing_results),
