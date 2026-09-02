@@ -11,7 +11,9 @@ UA={'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com
 CUSIP_RE=re.compile(r'(?<![A-Z0-9])([0-9A-Z*@#]{6}[0-9A-Z*@#]{2}[0-9A-Z*@#])(?![A-Z0-9])')
 
 def sec_url(filename:str)->str:
-    return 'https://www.sec.gov/Archives/'+filename.removeprefix('edgar/')
+    # master.idx filenames are already rooted at edgar/, e.g.
+    # edgar/data/1000069/0001000069-06-000006.txt.  Preserve that prefix.
+    return 'https://www.sec.gov/Archives/'+filename.lstrip('/')
 
 def get_text(url:str)->str:
     req=urllib.request.Request('https://r.jina.ai/'+url,headers=UA)
@@ -48,7 +50,6 @@ def main():
         try:
             text=get_text(url); upper=text.upper()
             cusips=sorted(set(CUSIP_RE.findall(upper)))
-            # Restrict a second count to candidate identifiers appearing near portfolio/table vocabulary.
             lines=upper.splitlines(); near=set()
             for j,line in enumerate(lines):
                 if any(k in line for k in ('CUSIP','PORTFOLIO','SECURITIES','SHARES','VALUE')):
