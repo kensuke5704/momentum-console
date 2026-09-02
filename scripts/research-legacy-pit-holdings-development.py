@@ -25,6 +25,9 @@ sspec.loader.exec_module(seg)
 pspec = importlib.util.spec_from_file_location('pit', ROOT / 'scripts' / 'research-nq-pit-holdings-2006.py')
 pit = importlib.util.module_from_spec(pspec)
 pspec.loader.exec_module(pit)
+kspec = importlib.util.spec_from_file_location('issuer_key', ROOT / 'scripts' / 'research-legacy-issuer-key.py')
+issuer_key = importlib.util.module_from_spec(kspec)
+kspec.loader.exec_module(issuer_key)
 
 
 def download(path: Path) -> None:
@@ -68,6 +71,22 @@ def load_samples() -> dict[int, list[dict]]:
                     out[year].append(row)
                     if len(out[year]) >= 8:
                         break
+    return out
+
+
+def issuer_holdings(holdings: list[dict]) -> list[dict]:
+    out = []
+    for h in holdings:
+        key = issuer_key.legacy_issuer_key(str(h.get('description') or ''))
+        if not key:
+            continue
+        out.append({
+            'issuerKey': key,
+            'description': h.get('description'),
+            'weight': h.get('weight'),
+            'marketValue': h.get('marketValue'),
+            'quantityOrPrincipal': h.get('quantityOrPrincipal'),
+        })
     return out
 
 
@@ -118,6 +137,7 @@ def main() -> None:
                         'top10Weight': top10,
                         'parsedMarketValueTotal': total,
                         'structurallyUsable': structurally_usable,
+                        'holdings': issuer_holdings(holdings) if structurally_usable else [],
                     }
                     cur = mapped.get(s['seriesId'])
                     if cur is None or (candidate['holdingCount'], score) > (cur['holdingCount'], cur['mappingScore']):
@@ -135,12 +155,15 @@ def main() -> None:
     for year in YEARS:
         fr = [x for x in filing_results if x['year'] == year]
         rr = [x for x in records if x['year'] == year]
+        usable_rows = [x for x in rr if x['structurallyUsable']]
         by_year[str(year)] = {
             'sampledFilings': len(fr),
             'fetchSucceeded': sum('error' not in x for x in fr),
             'mappedSeries': len(rr),
-            'structurallyUsableSeries': sum(x['structurallyUsable'] for x in rr),
+            'structurallyUsableSeries': len(usable_rows),
             'withTickerMetadata': sum(bool(x.get('fundTickers')) for x in rr),
+            'issuerKeyHoldings': sum(len(x.get('holdings', [])) for x in usable_rows),
+            'uniqueIssuerKeys': len({h['issuerKey'] for x in usable_rows for h in x.get('holdings', [])}),
         }
 
     out = {
@@ -148,6 +171,7 @@ def main() -> None:
         'years': list(YEARS),
         'sampleRule': 'Up to 8 distinct target ETF-family CIKs per sampled year; first N-Q filing in deterministic filing-date/CIK order. No parser-success or performance selection.',
         'structuralRule': 'Production-style series-name exclusion plus 10<=holdings<=120, positive parsed market value, and normalized top10 weight>=25%.',
+        'identityRule': 'Retained holdings receive a conservative legacyIssuerKey derived only from contemporaneous filing description. Ticker/security-id mapping is intentionally deferred and cannot affect Universe membership.',
         'byYear': by_year,
         'filingResults': filing_results,
         'records': records,
