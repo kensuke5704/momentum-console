@@ -11,11 +11,13 @@ repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
 ORIGINAL = repro.ov.master_2020
-TARGET = re.compile(r'^(?:SELECT SECTOR SPDR TRUST|SPDR SERIES TRUST|INVESCO EXCHANGE-TRADED FUND TRUST|INVESCO EXCHANGE-TRADED FUND TRUST II)$', re.I)
+# Bootstrap-first structural sample: First Trust has many 2020 N-PORT series
+# with quarterly reports. No performance/rank information is used here.
+TARGET = re.compile(r'FIRST TRUST', re.I)
 
 
 def filtered_master():
-    return [x for x in ORIGINAL() if TARGET.match(str(x.get('company') or ''))]
+    return [x for x in ORIGINAL() if TARGET.search(str(x.get('company') or ''))]
 
 
 repro.ov.master_2020 = filtered_master
