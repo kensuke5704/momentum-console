@@ -22,6 +22,10 @@ FIXTURE = {
 }
 
 STOP = {'THE', 'FUND', 'ETF', 'TRUST', 'SELECT', 'SECTOR', 'SPDR'}
+SECTOR_TERMS = {
+    'COMMUNICATION', 'CONSUMER', 'DISCRETIONARY', 'STAPLES', 'ENERGY', 'FINANCIAL',
+    'HEALTH', 'INDUSTRIAL', 'MATERIALS', 'REAL', 'ESTATE', 'TECHNOLOGY', 'UTILITIES',
+}
 
 
 def tokens(s: str) -> set[str]:
@@ -39,14 +43,19 @@ def main() -> None:
     transport, submission = repro.ov.fetch_full_filing(repro.ov.seg.meta.sec_url(FIXTURE['filename']))
     text = repro.ov.embedded_csr(submission)
     series = fast.shared_nport_series_contracts('', FIXTURE['company'])
-    spdr = [s for s in series if 'SELECT SECTOR SPDR' in str(s.get('seriesName') or '').upper()]
+    spdr = [s for s in series if 'SPDR' in str(s.get('seriesName') or '').upper()]
+    sector_like = [
+        s for s in series
+        if tokens(str(s.get('seriesName') or '')) & SECTOR_TERMS
+    ]
     blocks = repro.ov.schedule_blocks(text)
     rows = []
     for i, (start, end) in enumerate(blocks):
         raw_context = text[max(0, start - 4000):min(end, start + 1500)]
         visible = ' '.join(repro.ov.visible(raw_context).split())
         normalized = repro.ov.norm_series_text(visible)
-        exact = [s for s in spdr if repro.ov.norm_series_text(s.get('seriesName') or '') in normalized]
+        candidates = spdr or sector_like
+        exact = [s for s in candidates if repro.ov.norm_series_text(s.get('seriesName') or '') in normalized]
         ranked = sorted(
             (
                 {
@@ -54,22 +63,25 @@ def main() -> None:
                     'seriesName': s.get('seriesName'),
                     'tokenJaccard': round(sim(visible, s.get('seriesName') or ''), 4),
                 }
-                for s in spdr
+                for s in candidates
             ),
             key=lambda x: (-x['tokenJaccard'], str(x['seriesName'])),
-        )[:5]
+        )[:8]
         rows.append({
             'block': i,
             'exactMatches': [{'seriesId': s.get('seriesId'), 'seriesName': s.get('seriesName')} for s in exact],
             'topCandidates': ranked,
-            'contextTail': visible[-1800:],
+            'contextTail': visible[-1400:],
         })
     out = {
         'purpose': 'Structural diagnosis of Select Sector SPDR shareholder-report headings versus frozen N-PORT series display names. No prices, returns, ranks, or strategy performance are used.',
         'fixture': FIXTURE,
         'transport': transport,
-        'spdrSeriesCount': len(spdr),
-        'spdrSeries': [{'seriesId': s.get('seriesId'), 'seriesName': s.get('seriesName')} for s in spdr],
+        'allFrozenSeriesCount': len(series),
+        'spdrNameMatchesCount': len(spdr),
+        'spdrNameMatches': [{'seriesId': s.get('seriesId'), 'seriesName': s.get('seriesName')} for s in spdr[:100]],
+        'sectorLikeNameMatchesCount': len(sector_like),
+        'sectorLikeNameMatches': [{'seriesId': s.get('seriesId'), 'seriesName': s.get('seriesName')} for s in sector_like[:100]],
         'scheduleBlocks': len(blocks),
         'rows': rows,
     }
