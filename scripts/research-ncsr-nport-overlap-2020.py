@@ -124,6 +124,17 @@ def visible(raw: str) -> str:
     return ' '.join(s.split())
 
 
+def norm_series_text(raw: str) -> str:
+    """Normalize display-only series-name differences, then require exact containment.
+
+    Registered marks, punctuation, HTML entities and whitespace do not carry series
+    identity. No token dropping, fuzzy matching, holdings overlap or performance data
+    is used here.
+    """
+    s = html.unescape(raw or '').upper().replace('\xa0', ' ')
+    return ' '.join(re.sub(r'[^A-Z0-9]+', ' ', s).split())
+
+
 def schedule_blocks(text: str):
     matches=list(SCHEDULE_HTML.finditer(text))
     if not matches:
@@ -136,10 +147,10 @@ def mapped_modern_series(text: str, series: list[dict]):
     for start,end in schedule_blocks(text):
         block=text[start:end]
         context=text[max(0,start-10000):min(end,start+3000)]
-        v=visible(context).upper()
+        v=norm_series_text(visible(context))
         exact=[]
         for s in series:
-            name=' '.join((s.get('seriesName') or '').upper().split())
+            name=norm_series_text(s.get('seriesName') or '')
             if name and name in v: exact.append(s)
         if len(exact)!=1: continue
         s=exact[0]
