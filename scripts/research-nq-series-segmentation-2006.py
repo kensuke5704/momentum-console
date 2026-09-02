@@ -59,24 +59,34 @@ def series_tokens(name: str) -> set[str]:
     return {t for t in norm(name).split() if len(t) >= 3 and t not in stop}
 
 
-def map_schedule_to_series(block: str, series: list[dict]) -> tuple[dict | None, float]:
-    # A schedule heading is near the beginning of its block. Mapping is based only on filing text.
-    context = visible(block[:5000])
-    c_tokens = set(norm(context).split())
-    best = None
-    best_score = 0.0
+def map_schedule_to_series(context_block: str, series: list[dict]) -> tuple[dict | None, float]:
+    # N-Q series/fund headings frequently appear immediately BEFORE the generic
+    # "Schedule of Investments" heading. The caller therefore supplies a tight
+    # window spanning both sides of that marker. Refuse ties/near-ties rather
+    # than forcing a series assignment.
+    context = visible(context_block)
+    normalized_context = norm(context)
+    c_tokens = set(normalized_context.split())
+    ranked = []
     for s in series:
         name = s.get("seriesName") or ""
         toks = series_tokens(name)
         if not toks:
             continue
+        exact = norm(name) in normalized_context
         overlap = len(toks & c_tokens) / len(toks)
-        # Exact normalized series phrase is strongest; token coverage handles TM/entities/punctuation.
-        exact = norm(name) in norm(context)
-        score = 1.0 if exact else overlap
-        if score > best_score:
-            best, best_score = s, score
-    return (best, best_score) if best_score >= 0.60 else (None, best_score)
+        ranked.append((1.0 if exact else overlap, bool(exact), s))
+    ranked.sort(key=lambda x: (x[0], x[1], x[2].get("seriesName") or ""), reverse=True)
+    if not ranked or ranked[0][0] < 0.60:
+        return None, ranked[0][0] if ranked else 0.0
+    best_score, best_exact, best = ranked[0]
+    if len(ranked) > 1:
+        second_score, second_exact, _ = ranked[1]
+        if best_score == second_score and best_exact == second_exact:
+            return None, best_score
+        if not best_exact and best_score - second_score < 0.15:
+            return None, best_score
+    return best, best_score
 
 
 def parse_segment(text: str) -> tuple[str, int, float]:
@@ -116,7 +126,8 @@ def main() -> None:
                 start = marker.start()
                 end = markers[j + 1].start() if j + 1 < len(markers) else min(len(text), start + 300000)
                 block = text[start:end]
-                s, score = map_schedule_to_series(block, etf)
+                mapping_context = text[max(0, start - 5000):min(end, start + 2500)]
+                s, score = map_schedule_to_series(mapping_context, etf)
                 if not s or not s.get("seriesId"):
                     unmapped_blocks += 1
                     continue
@@ -132,8 +143,6 @@ def main() -> None:
                     "eligibleByName": eligible_name(s.get("seriesName") or ""),
                     "structurallyUsable": bool(10 <= count <= 120 and total_value > 0),
                 }
-                # Duplicate generic/actual schedule markers can map to the same series. Keep the
-                # block with the larger parsed portfolio, then higher mapping score.
                 current = mapped.get(s["seriesId"])
                 if current is None or (count, score) > (current["parsedHoldings"], current["mappingScore"]):
                     mapped[s["seriesId"]] = candidate
@@ -154,11 +163,7 @@ def main() -> None:
                 "structurallyUsableEligibleSeries": len(usable_eligible),
                 "series": rows,
             }
-            print(
-                f"{i}/{len(chosen)} {x['company'][:42]} registered={len(etf)} schedules={len(markers)} "
-                f"reported={len(rows)} eligible={len(eligible_rows)} usableEligible={len(usable_eligible)}",
-                flush=True,
-            )
+            print(f"{i}/{len(chosen)} {x['company'][:42]} registered={len(etf)} schedules={len(markers)} reported={len(rows)} eligible={len(eligible_rows)} usableEligible={len(usable_eligible)}", flush=True)
         except Exception as e:
             r = {"company": x.get("company"), "cik": x.get("cik"), "error": repr(e)}
             print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}", flush=True)
@@ -170,7 +175,7 @@ def main() -> None:
     usable = sum(r["structurallyUsableEligibleSeries"] for r in ok)
     summary = {
         "year": 2006,
-        "sampleRule": "One deterministic N-Q filing per known ETF registrant; schedules mapped to filing-time registered series using heading text only; no return/performance selection.",
+        "sampleRule": "One deterministic N-Q filing per known ETF registrant; schedules mapped to filing-time registered series using tight pre/post-heading context; ambiguous ties rejected; no return/performance selection.",
         "registrants": len(chosen),
         "fetchSuccess": len(ok),
         "reportedSeries": reported,
