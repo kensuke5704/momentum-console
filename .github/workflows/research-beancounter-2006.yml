@@ -1,0 +1,33 @@
+name: Research BeanCounter 2006
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-beancounter-2006-shard.py"
+      - ".github/workflows/research-beancounter-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 22
+      matrix:
+        shard: [143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract 2006 fund filings from BeanCounter shard
+        env:
+          BC_SHARD: ${{ matrix.shard }}
+        run: python3 scripts/research-beancounter-2006-shard.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beancounter-2006-${{ matrix.shard }}
+          path: data/research/beancounter-2006-shard-*.json
+          if-no-files-found: error
