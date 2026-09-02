@@ -41,6 +41,13 @@ export type YahooHistorySnapshot = {
   regularMarketTime?: string;
 };
 
+export function mergeHistoryPoints(primary: PricePoint[], repair: PricePoint[]): PricePoint[] {
+  const byDate = new Map<string, PricePoint>();
+  for (const point of primary) byDate.set(point.date, point);
+  for (const point of repair) byDate.set(point.date, point);
+  return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
+}
+
 const positive = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
@@ -116,14 +123,14 @@ export function validatedRegularCloseFallback(
   };
 }
 
-export async function fetchYahooHistorySnapshot(symbol: string): Promise<YahooHistorySnapshot> {
+export async function fetchYahooHistorySnapshot(symbol: string, startUnix = START_UNIX): Promise<YahooHistorySnapshot> {
   const endUnix = Math.floor(Date.now() / 1000) + 86400;
   const yahooSymbol = encodeURIComponent(symbol.replace(".", "-"));
   let body: YahooChartResponse | null = null;
   let lastStatus = 0;
   for (let attempt = 0; attempt < 4; attempt++) {
     const host = attempt % 2 === 0 ? "query1.finance.yahoo.com" : "query2.finance.yahoo.com";
-    const url = `https://${host}/v8/finance/chart/${yahooSymbol}?period1=${START_UNIX}&period2=${endUnix}&interval=1d&events=history&includeAdjustedClose=true`;
+    const url = `https://${host}/v8/finance/chart/${yahooSymbol}?period1=${startUnix}&period2=${endUnix}&interval=1d&events=history&includeAdjustedClose=true`;
     const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 MomentumConsole/2.0", Accept: "application/json" }, next: { revalidate: 21600 }, signal: AbortSignal.timeout(20000) });
     lastStatus = response.status;
     if (response.ok) { body = (await response.json()) as YahooChartResponse; break; }
@@ -190,6 +197,7 @@ export async function fetchYahooHistory(symbol: string): Promise<PricePoint[]> {
 export async function fetchHistorySnapshots(
   symbols: string[],
   concurrency = 6,
+  startUnix = START_UNIX,
 ): Promise<Record<string, YahooHistorySnapshot>> {
   const output: Record<string, YahooHistorySnapshot> = {};
   let cursor = 0;
@@ -197,7 +205,7 @@ export async function fetchHistorySnapshots(
     while (cursor < symbols.length) {
       const symbol = symbols[cursor++];
       try {
-        output[symbol] = await fetchYahooHistorySnapshot(symbol);
+        output[symbol] = await fetchYahooHistorySnapshot(symbol, startUnix);
       } catch (error) {
         console.warn(error instanceof Error ? error.message : `${symbol}: price fetch failed`);
         output[symbol] = { points: [] };

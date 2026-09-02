@@ -59,6 +59,7 @@ const tabs = [
 
 const pct = (value: number | null | undefined, digits = 1) =>
   value == null ? "—" : `${(value * 100).toFixed(digits)}%`;
+const equityTick = (value: number) => value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
 
 const updatedAt = (value: string) =>
   new Intl.DateTimeFormat("ja-JP", {
@@ -115,6 +116,23 @@ function AllocationBand({ targets, compact = false }: { targets: PortfolioTarget
   </div>;
 }
 
+function EquityChart({ curve }: { curve: EquityPoint[] }) {
+  const chart = useMemo(() => curve.filter((point) => point.equity > 0).map((point) => ({ date: point.date, equity: point.equity })), [curve]);
+  const domain = useMemo<[number, number]>(() => {
+    if (!chart.length) return [0.98, 1.02];
+    const values = chart.map((point) => point.equity);
+    return [Math.min(...values) / 1.02, Math.max(...values) * 1.02];
+  }, [chart]);
+  if (!chart.length) return <p className="page-note">No OOS equity data yet.</p>;
+  return <div className="stage21-equity-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chart}>
+    <CartesianGrid stroke="#dce1da" vertical={false} />
+    <XAxis dataKey="date" minTickGap={40} />
+    <YAxis scale="log" domain={domain} allowDataOverflow tickFormatter={equityTick} />
+    <Tooltip formatter={(value) => [equityTick(Number(value)), "Equity"]} />
+    <Area type="monotone" dataKey="equity" stroke="#246b38" fill="#246b38" fillOpacity={0.12} isAnimationActive={false} />
+  </AreaChart></ResponsiveContainer></div>;
+}
+
 export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardPayload }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [data, setData] = useState(initialDashboard);
@@ -125,15 +143,16 @@ export function MomentumApp({ initialDashboard }: { initialDashboard: DashboardP
     try {
       const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
       const response = await fetch(`${base}/data/dashboard.json?t=${Date.now()}`, { cache: "no-store" });
-      const body = await response.json() as { dashboard: DashboardPayload };
-      setData(body.dashboard);
+      if (!response.ok) throw new Error(`Dashboard refresh failed: ${response.status}`);
+      const body = await response.json() as { dashboard?: DashboardPayload };
+      if (body.dashboard?.portfolioConfig?.strategyId && body.dashboard?.portfolioState?.strategyId) setData(body.dashboard);
     } finally {
       setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    const id = window.setInterval(() => void loadLatest(), 5 * 60 * 1000);
+    const id = window.setInterval(() => void loadLatest(), 60 * 1000);
     return () => window.clearInterval(id);
   }, [loadLatest]);
 
@@ -314,17 +333,16 @@ function Oos({ data }: { data: DashboardPayload }) {
     <Metric label="CAGR" value={pct(data.oos.stats.cagr)} />
     <Metric label="MaxDD" value={pct(data.oos.stats.maxDrawdown)} />
     <Metric label="Gate" value={gate.level} />
-  </div></Section></div>;
+  </div></Section><Section title="OOS Equity · Log Scale"><EquityChart curve={data.oos.equityCurve} /></Section><p className="page-note">Validated OOS data · dashboard refreshes automatically every minute · updated {data.generatedAt ? updatedAt(data.generatedAt) : "—"}</p></div>;
 }
 
 function Backtest({ data }: { data: DashboardPayload }) {
   const reference = data.portfolioConfig.researchReference;
-  const chart = useMemo(() => data.backtest.equityCurve.map((point: EquityPoint) => ({ date: point.date, equity: point.equity })), [data.backtest.equityCurve]);
   return <div className="dynamic-stack">
     <div className="dynamic-metric-grid five">
       <Metric label="Historical CAGR" value={pct(data.backtest.stats.cagr)} /><Metric label="Historical MaxDD" value={pct(data.backtest.stats.maxDrawdown)} /><Metric label="Planning Proxy" value={pct(reference.planningCagrProxy)} /><Metric label="Rolling36 Median" value={pct(reference.rolling36MedianCagr)} /><Metric label="Rolling36 Worst" value={pct(reference.rolling36WorstCagr)} />
     </div>
-    <Section title="Stage21 Equity"><div className="stage21-equity-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chart}><CartesianGrid stroke="#dce1da" vertical={false} /><XAxis dataKey="date" minTickGap={40} /><YAxis /><Tooltip /><Area type="monotone" dataKey="equity" stroke="#246b38" fill="#246b38" fillOpacity={0.12} isAnimationActive={false} /></AreaChart></ResponsiveContainer></div></Section>
+    <Section title="Stage21 Equity · Log Scale"><EquityChart curve={data.backtest.equityCurve} /></Section>
     <p className="page-note">Planning proxy is not a forward forecast.</p>
   </div>;
 }

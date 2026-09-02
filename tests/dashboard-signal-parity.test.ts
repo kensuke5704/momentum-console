@@ -28,3 +28,20 @@ test("dashboard publishes the Fixed60 signal only once the exact signal-date clo
  assert.equal(dashboard.currentSignal?.signalDate,"2026-08-31");
  assert.equal(dashboard.liveState.pendingSignal?.signalDate,"2026-08-31");
 });
+
+test("Stage21 uses a CFTC report as soon as it is PIT-eligible at the portfolio close",()=>{
+ const qqq=[point("2026-08-28",100),point("2026-08-31",101),point("2026-09-01",102)];
+ const gldm=[point("2026-08-28",50),point("2026-08-31",50.3),point("2026-09-01",50.4)];
+ const dashboard=buildDashboardPayload({QQQ:qqq,GLDM:gldm},[universe],cftc);
+ assert.equal(dashboard.portfolioState.asOf,"2026-09-01");
+ assert.equal(dashboard.portfolioState.cftc.reportDate,"2026-08-25");
+});
+
+test("Stage21 carries the last confirmed close across an isolated held-asset data gap",()=>{
+ const qqq=[point("2026-08-27",100),point("2026-08-28",100),point("2026-08-31",100),point("2026-09-01",100)];
+ const gldm=[point("2026-08-27",50),point("2026-08-28",50),point("2026-09-01",50)];
+ const dashboard=buildDashboardPayload({QQQ:qqq,GLDM:gldm},[universe],cftc);
+ const curve=dashboard.backtest.equityCurve;
+ const dailyReturns=curve.slice(1).map((row,index)=>row.equity/curve[index].equity-1);
+ assert.ok(Math.min(...dailyReturns)>-0.01);
+});

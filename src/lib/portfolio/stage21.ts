@@ -51,7 +51,11 @@ function regimeRows(fixed:EquityPoint[],g:EquityPoint[],qqqInput:PricePoint[],cf
  for(const point of shadow){const ci=shadowIndex.get(point.date)!,si=Math.max(0,ci-1);let coreReturn20:number|null=null,qqqReturn20:number|null=null,gap:number|null=null,enter=false,exit=false;
   if(si>=PRODUCTION_PORTFOLIO.m3.lookbackSessions){const signalPoint=shadow[si],qi=qqqIndex.get(signalPoint.date);if(qi!=null&&qi>=PRODUCTION_PORTFOLIO.m3.lookbackSessions){const lookback=PRODUCTION_PORTFOLIO.m3.lookbackSessions;coreReturn20=signalPoint.equity/shadow[si-lookback].equity-1;qqqReturn20=qqq[qi].close/qqq[qi-lookback].close-1;gap=coreReturn20-qqqReturn20;enter=coreReturn20<PRODUCTION_PORTFOLIO.m3.enterCoreReturnBelow&&gap<=PRODUCTION_PORTFOLIO.m3.enterUnderperformanceVsQqq;if(deep){if(gap>PRODUCTION_PORTFOLIO.m3.exitUnderperformanceVsQqq)recoveryConfirm++;else recoveryConfirm=0;exit=recoveryConfirm>=PRODUCTION_PORTFOLIO.m3.exitConfirmationSessions}}}
   if(!deep&&enter){deep=true;recoveryConfirm=0}else if(deep&&exit){deep=false;recoveryConfirm=0}
-  const cftc=cftcStatus(cftcRows,shadow[si]?.date??point.date),regime:PortfolioRegime=deep?"DEEP":cftc.yellow?"YELLOW":"NORMAL";
+  // M3 is intentionally evaluated from the prior completed shadow-core point.
+  // CFTC availability is calendar based, however, so evaluate it at the
+  // portfolio close represented by this row. Reusing the M3 signal date here
+  // delayed a newly eligible weekly report by one additional trading session.
+  const cftc=cftcStatus(cftcRows,point.date),regime:PortfolioRegime=deep?"DEEP":cftc.yellow?"YELLOW":"NORMAL";
   out.push({date:point.date,regime,cftc,m3:{deep,coreReturn20,qqqReturn20,gap,recoveryConfirm}});
  }
  return out;
@@ -68,12 +72,13 @@ function combinedTargets(regime:PortfolioRegime,fixed:FixedTarget):PortfolioTarg
 function simulateNextOpen(histories:Record<string,PricePoint[]>,snaps:FixedSnap[],regimes:RegimeRow[]):BacktestResult{
  const maps=Object.fromEntries(Object.entries(histories).map(([symbol,points])=>[symbol,new Map(points.map(point=>[point.date,point]))]));
  const snapMap=new Map(snaps.map(snap=>[snap.date,snap])),regimeMap=new Map(regimes.map(row=>[row.date,row]));const dates=snaps.map(snap=>snap.date).filter(date=>regimeMap.has(date));
- let cash=1,positions=new Map<string,number>(),pending:{fixed:FixedTarget;regime:PortfolioRegime}|null=null,lastMonth="",lastRegime:PortfolioRegime|null=null,lastFixed="",peak=1;const curve:EquityPoint[]=[];const events:BacktestResult["events"]=[];
+ let cash=1,positions=new Map<string,number>(),pending:{fixed:FixedTarget;regime:PortfolioRegime}|null=null,lastMonth="",lastRegime:PortfolioRegime|null=null,lastFixed="",peak=1;const curve:EquityPoint[]=[];const events:BacktestResult["events"]=[],lastClose=new Map<string,number>();
  const price=(symbol:string,date:string,field:"open"|"close")=>(maps[symbol] as Map<string,PricePoint>|undefined)?.get(date)?.[field];
- const equityAt=(date:string,field:"open"|"close")=>cash+[...positions].reduce((sum,[symbol,shares])=>sum+shares*(price(symbol,date,field)??price(symbol,date,"close")??0),0);
+ const equityAt=(date:string,field:"open"|"close")=>cash+[...positions].reduce((sum,[symbol,shares])=>sum+shares*(price(symbol,date,field)??lastClose.get(symbol)??0),0);
  for(let i=0;i<dates.length;i++){
   const date=dates[i];
   if(pending){const openEquity=equityAt(date,"open"),desired=combinedTargets(pending.regime,pending.fixed).filter(target=>target.symbol!=="CASH"),targetShares=new Map<string,number>();for(const target of desired){const open=price(target.symbol,date,"open");if(!open||open<=0)throw new Error(`Stage21 missing ${target.symbol} open on ${date}`);targetShares.set(target.symbol,openEquity*target.weight/open)}let traded=0;for(const symbol of new Set([...positions.keys(),...targetShares.keys()]))traded+=Math.abs((targetShares.get(symbol)??0)-(positions.get(symbol)??0))*(price(symbol,date,"open")??0);const cost=traded*PRODUCTION_PORTFOLIO.execution.transactionCost,totalTarget=[...targetShares].reduce((sum,[symbol,shares])=>sum+shares*(price(symbol,date,"open")??0),0);if(totalTarget+cost>openEquity){const scale=openEquity/(totalTarget+cost);for(const [symbol,shares] of targetShares)targetShares.set(symbol,shares*scale);const scaledTarget=[...targetShares].reduce((sum,[symbol,shares])=>sum+shares*(price(symbol,date,"open")??0),0);let scaledTrade=0;for(const symbol of new Set([...positions.keys(),...targetShares.keys()]))scaledTrade+=Math.abs((targetShares.get(symbol)??0)-(positions.get(symbol)??0))*(price(symbol,date,"open")??0);cash=openEquity-scaledTarget-scaledTrade*PRODUCTION_PORTFOLIO.execution.transactionCost}else cash=openEquity-totalTarget-cost;positions=targetShares;events.push({date,type:"PORTFOLIO_REBALANCE_OPEN",symbols:[...positions.keys()],reason:`Stage21 ${pending.regime} target executed at next open`});pending=null}
+  for(const symbol of positions.keys()){const close=price(symbol,date,"close");if(close!=null)lastClose.set(symbol,close)}
   const equity=equityAt(date,"close");peak=Math.max(peak,equity);curve.push({date,equity,drawdown:equity/peak-1});
   const snap=snapMap.get(date)!,row=regimeMap.get(date)!,month=date.slice(0,7),fixedKey=targetKey(snap.target),monthly=month!==lastMonth,changed=row.regime!==lastRegime||fixedKey!==lastFixed;
   if(monthly||changed){pending={fixed:snap.target,regime:row.regime};if(lastRegime&&row.regime!==lastRegime)events.push({date,type:"REGIME_CHANGE_CLOSE",symbols:[],reason:`${lastRegime} -> ${row.regime}`});lastMonth=month;lastRegime=row.regime;lastFixed=fixedKey}

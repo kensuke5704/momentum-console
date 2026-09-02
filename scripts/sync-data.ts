@@ -6,7 +6,7 @@ import { fetchNasdaqAssetManagerPositions } from "../src/lib/cftc";
 import { fetchCompanyProfiles, type CompanyProfile } from "../src/lib/company-profile";
 import { previousUsTradingSession } from "../src/lib/trading-calendar";
 import type { BacktestResult, ForwardOosResult, NportOperations, PricePoint, UniverseMonth } from "../src/lib/types";
-import { fetchHistorySnapshots, fetchIntradayHistories, type IntradayPricePoint, validatedRegularCloseFallback } from "../src/lib/yahoo";
+import { fetchHistorySnapshots, fetchIntradayHistories, mergeHistoryPoints, type IntradayPricePoint, validatedRegularCloseFallback } from "../src/lib/yahoo";
 
 type UniverseFile = { history: UniverseMonth[] };
 type MarketDataFile = { histories?: Record<string, PricePoint[]>; intraday?: Record<string, IntradayPricePoint[]> };
@@ -18,6 +18,7 @@ async function existingCompanyProfiles(path: string): Promise<Record<string, Com
 async function optionalJson<T>(path: string): Promise<T | undefined> { try { return JSON.parse(await readFile(path, "utf8")) as T; } catch { return undefined; } }
 function mergeIntraday(existing: Record<string, IntradayPricePoint[]>, fetched: Record<string, IntradayPricePoint[]>, symbols: string[]) { return Object.fromEntries(symbols.map((symbol) => { const fresh=fetched[symbol]??[];if(!fresh.length)return[symbol,existing[symbol]??[]];const byTimestamp=new Map<string,IntradayPricePoint>();for(const point of existing[symbol]??[])byTimestamp.set(point.timestamp,point);for(const point of fresh)byTimestamp.set(point.timestamp,point);return[symbol,[...byTimestamp.values()].sort((a,b)=>a.timestamp.localeCompare(b.timestamp)).slice(-80)]; })); }
 function merge(existing: Record<string, PricePoint[]>, fetched: Record<string, PricePoint[]>, symbols: string[]) { return Object.fromEntries(symbols.map((symbol) => { const byDate=new Map<string,PricePoint>();for(const point of existing[symbol]??[])byDate.set(point.date,point);for(const point of fetched[symbol]??[])byDate.set(point.date,point);return[symbol,[...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date))]; })); }
+const RECENT_REPAIR_DAYS = 45;
 
 async function main() {
   const universeFile = JSON.parse(await readFile(resolve("data/universe-history.json"), "utf8")) as UniverseFile;
@@ -29,11 +30,30 @@ async function main() {
   console.log(`Fetching adjusted OHLC for ${symbols.length} Stage21/Fixed60 symbols`);
   const outputPath = resolve("public/data/market-data.json"), profilePath = resolve("public/data/company-profiles.json");
   const existing = await existingMarketData(outputPath), existingProfiles = await existingCompanyProfiles(profilePath);
-  const [historySnapshots, fetchedIntraday, companyProfiles, cftcRows] = await Promise.all([
-    fetchHistorySnapshots(symbols, 8), fetchIntradayHistories(intradaySymbols, 8), fetchCompanyProfiles(currentSymbols, existingProfiles, 4), fetchNasdaqAssetManagerPositions(),
+  const recentStartUnix = Math.floor((Date.now() - RECENT_REPAIR_DAYS * 86_400_000) / 1000);
+  const [historySnapshots, recentHistorySnapshots, fetchedIntraday, companyProfiles, cftcRows] = await Promise.all([
+    fetchHistorySnapshots(symbols, 8), fetchHistorySnapshots(intradaySymbols, 6, recentStartUnix), fetchIntradayHistories(intradaySymbols, 8), fetchCompanyProfiles(currentSymbols, existingProfiles, 4), fetchNasdaqAssetManagerPositions(),
   ]);
   if (cftcRows.length < 5) throw new Error(`CFTC positioning history is incomplete: ${cftcRows.length} rows`);
-  const fetchedHistories = Object.fromEntries(symbols.map((symbol) => [symbol, historySnapshots[symbol]?.points ?? []]));
+  const fullHistories = Object.fromEntries(symbols.map((symbol) => [symbol, historySnapshots[symbol]?.points ?? []]));
+  const recentHistories = Object.fromEntries(intradaySymbols.map((symbol) => [symbol, recentHistorySnapshots[symbol]?.points ?? []]));
+  // Yahoo's long-range chart response can omit an otherwise valid isolated
+  // daily bar. A separate short-range request reliably returns those rows;
+  // prefer it for the recent window while preserving the full history.
+  let fetchedHistories = Object.fromEntries(symbols.map((symbol) => [symbol, mergeHistoryPoints(fullHistories[symbol] ?? [], recentHistories[symbol] ?? [])]));
+  const recentReferenceDates = (fetchedHistories.QQQ ?? []).filter((point) => point.date >= new Date(recentStartUnix * 1000).toISOString().slice(0,10)).map((point) => point.date);
+  const repairsByStartDate = new Map<string,string[]>();
+  for (const symbol of intradaySymbols.filter((value) => value !== "QQQ")) {
+    const available = new Set((fetchedHistories[symbol] ?? []).map((point) => point.date));
+    const firstMissing = recentReferenceDates.find((date) => !available.has(date));
+    if (firstMissing) repairsByStartDate.set(firstMissing,[...(repairsByStartDate.get(firstMissing) ?? []),symbol]);
+  }
+  for (const [startDate, repairSymbols] of [...repairsByStartDate].sort(([left],[right]) => left.localeCompare(right))) {
+    console.log(`Repairing ${repairSymbols.length} recent histories from missing session ${startDate}`);
+    const startUnix = Math.floor(Date.parse(`${startDate}T00:00:00Z`) / 1000);
+    const targeted = await fetchHistorySnapshots(repairSymbols, 6, startUnix);
+    fetchedHistories = { ...fetchedHistories, ...Object.fromEntries(repairSymbols.map((symbol) => [symbol, mergeHistoryPoints(fetchedHistories[symbol] ?? [], targeted[symbol]?.points ?? [])])) };
+  }
   const confirmedHistories = merge(existing.histories ?? await existingHistories(outputPath), fetchedHistories, symbols);
   const fallbackHistories = Object.fromEntries(intradaySymbols.map((symbol) => { const fallback=validatedRegularCloseFallback(historySnapshots[symbol]??{points:[]},fetchedIntraday[symbol]??[]);return[symbol,fallback?[fallback]:[]]; }));
   let histories = merge(confirmedHistories, fallbackHistories, symbols);
