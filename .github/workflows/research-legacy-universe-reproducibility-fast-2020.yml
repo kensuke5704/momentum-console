@@ -22,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate fast paired-series universe reproducibility
+        # Re-run the frozen structural fixture after the parser-integrity and
+        # source-inventory hardening. No strategy prices or returns are consumed.
         run: python3 scripts/research-legacy-universe-reproducibility-fast-2020.py
       - uses: actions/upload-artifact@v4
         if: always()
