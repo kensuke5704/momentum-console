@@ -5,6 +5,7 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-nq-index-extract.py"
+      - "scripts/research-nq-parser-pilot.py"
       - ".github/workflows/research-nq-index-extract.yml"
   workflow_dispatch:
 
@@ -14,14 +15,18 @@ permissions:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Extract 2006 N-Q/N-CSR filing index
         run: python3 scripts/research-nq-index-extract.py
+      - name: Test N-Q holdings extraction through Jina
+        run: python3 scripts/research-nq-parser-pilot.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nq-index-2006
-          path: data/research/nq-index-2006.json
+          name: nq-2006-research-pilot
+          path: |
+            data/research/nq-index-2006.json
+            data/research/nq-parser-pilot-2006.json
           if-no-files-found: warn
