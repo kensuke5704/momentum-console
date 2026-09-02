@@ -2,13 +2,14 @@ name: Research NQ Series Metadata 2006
 
 on:
   push:
-    branches: ["research/cagr40-new-alpha-20260901"]
+    branches: ["research/cagr40-new-alpha-20260901", "research/nq-npx-mapping-2006-20260903"]
     paths:
       - "scripts/research-nq-series-metadata-2006.py"
       - "scripts/research-nq-series-segmentation-2006.py"
       - "scripts/research-nq-pit-holdings-2006.py"
       - "scripts/research-npx-security-master-2006.py"
       - "scripts/research-npx-security-master-build-2006.py"
+      - "scripts/research-nq-npx-mapping-2006.py"
       - ".github/workflows/research-nq-series-metadata-2006.yml"
   workflow_dispatch:
 
@@ -56,3 +57,23 @@ jobs:
             data/research/nq-series-segmentation-2006.json
             data/research/nq-pit-holdings-2006.json
           if-no-files-found: warn
+
+  mapping:
+    needs: [npx, nq]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: npx-security-master-2006
+          path: data/research
+      - uses: actions/download-artifact@v4
+        with:
+          name: nq-series-metadata-2006
+          path: data/research
+      - name: Validate N-Q holdings against N-PX security master
+        run: python3 scripts/research-nq-npx-mapping-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-npx-mapping-2006
+          path: data/research/nq-npx-mapping-2006.json
