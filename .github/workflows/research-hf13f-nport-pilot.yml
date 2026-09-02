@@ -4,6 +4,7 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-hf13f-nport-pilot.py"
+      - "scripts/research-hf13f-signal-agreement.ts"
       - ".github/workflows/research-hf13f-nport-pilot.yml"
   workflow_dispatch:
 permissions:
@@ -14,8 +15,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: pip install -q pyarrow
       - run: python3 scripts/research-hf13f-nport-pilot.py
+      - name: Measure production Top2 signal retention
+        run: node --import tsx scripts/research-hf13f-signal-agreement.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
