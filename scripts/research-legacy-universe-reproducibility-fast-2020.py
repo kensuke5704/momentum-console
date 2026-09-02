@@ -70,12 +70,19 @@ def normalized_holdings_with_empty_fallback(block: str):
 
 
 repro.ov.pit.normalized_holdings = normalized_holdings_with_empty_fallback
-_original_mapped_modern_series = repro.ov.mapped_modern_series
 
 
-def diagnostic_mapped_modern_series(text: str, series: list[dict]):
+def structural_mapped_modern_series(text: str, series: list[dict]):
+    """Map only unique exact series names and gate on parser integrity, not concentration.
+
+    Top-10 concentration is an economic property of the ETF and therefore cannot be
+    used to decide whether a holdings table parsed correctly. Diversified/equal-weight
+    ETFs are valid inputs. The gate instead requires a unique series identity, a
+    reasonable nontrivial row count, positive value total, and the parser's structural
+    sanity checks. No prices, returns or strategy output are used.
+    """
+    mapped = {}
     blocks = repro.ov.schedule_blocks(text)
-    print('LEGACY_INVESTMENT_HEADING_BLOCKS', len(blocks), flush=True)
     unique_name_matches = 0
     parsed_nonempty = 0
     structural_gate_pass = 0
@@ -98,14 +105,27 @@ def diagnostic_mapped_modern_series(text: str, series: list[dict]):
         top10 = sum(h['weight'] for h in holdings[:10]) if holdings else 0
         if count:
             parsed_nonempty += 1
+        sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
         gate = bool(
             repro.ov.seg.eligible_name(s.get('seriesName') or '')
             and 10 <= count <= 120
             and total > 0
-            and top10 >= 25
+            and sane
         )
         if gate:
             structural_gate_pass += 1
+            candidate = {
+                'seriesId': s['seriesId'],
+                'seriesName': s.get('seriesName'),
+                'fundTickers': s.get('etfTickers', []),
+                'holdings': holdings,
+                'method': method,
+                'total': total,
+                'top10': top10,
+            }
+            cur = mapped.get(s['seriesId'])
+            if cur is None or count > len(cur['holdings']):
+                mapped[s['seriesId']] = candidate
         if len(examples) < 20:
             examples.append({
                 'seriesId': s.get('seriesId'),
@@ -114,17 +134,20 @@ def diagnostic_mapped_modern_series(text: str, series: list[dict]):
                 'holdingCount': count,
                 'total': total,
                 'top10': top10,
+                'structuralSanity': sane,
                 'structuralGate': gate,
             })
+    print('LEGACY_INVESTMENT_HEADING_BLOCKS', len(blocks), flush=True)
     print('LEGACY_UNIQUE_SERIES_NAME_MATCHES', unique_name_matches, flush=True)
     print('LEGACY_PARSED_NONEMPTY_BLOCKS', parsed_nonempty, flush=True)
     print('LEGACY_STRUCTURAL_GATE_BLOCKS', structural_gate_pass, flush=True)
+    print('LEGACY_MAPPED_SERIES', len(mapped), sorted(mapped), flush=True)
     print('LEGACY_BLOCK_DIAGNOSTIC_EXAMPLES', json.dumps(examples, sort_keys=True), flush=True)
-    return _original_mapped_modern_series(text, series)
+    return mapped
 
 
 repro.ov.master_2020 = fixed_fixture_sample
 repro.ov.seg.meta.parse_series_contracts = shared_nport_series_contracts
-repro.ov.mapped_modern_series = diagnostic_mapped_modern_series
+repro.ov.mapped_modern_series = structural_mapped_modern_series
 repro.OUT = ROOT / 'data' / 'research' / 'legacy-universe-reproducibility-fast-2020.json'
 repro.main()
