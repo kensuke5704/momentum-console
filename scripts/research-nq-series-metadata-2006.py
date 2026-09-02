@@ -27,19 +27,36 @@ def sec_url(filename: str) -> str:
 
 
 def fetch_prefix(url: str) -> tuple[str, str]:
+    """Fetch a filing prefix without making Jina availability part of fidelity.
+
+    Jina is preferred for stability, but any Jina failure (including 4xx such as
+    422 on large filings) falls through to the authoritative SEC archive. The
+    returned bytes and parser rules are unchanged; transport success is not an
+    investment or performance selection criterion.
+    """
     last: Exception | None = None
     for attempt in range(3):
         try:
             req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
             with urllib.request.urlopen(req, timeout=30) as r:
                 return "jina", r.read(1_500_000).decode("utf-8", "replace")
-        except urllib.error.HTTPError as e:
-            last = e
-            if e.code != 429:
-                raise
         except Exception as e:
             last = e
-        time.sleep(5 * (attempt + 1))
+            if isinstance(e, urllib.error.HTTPError) and e.code == 429:
+                time.sleep(5 * (attempt + 1))
+                continue
+            break
+
+    # Authoritative fallback. Retry transient transport/rate-limit failures but
+    # never choose filings based on parser quality or downstream overlap.
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return "sec-direct", r.read(1_500_000).decode("utf-8", "replace")
+        except Exception as e:
+            last = e
+            time.sleep(3 * (attempt + 1))
     assert last is not None
     raise last
 
@@ -186,7 +203,7 @@ def main() -> None:
         "structuredSeriesRate": len(with_structured_series) / len(ok) if ok else None,
         "classifiedEtfRegistrantRate": len(with_etf) / len(ok) if ok else None,
         "classifiedEtfTickerRate": len(with_etf_ticker) / len(ok) if ok else None,
-        "classifiedEtfTickers": sorted(set(t for r in ok for t in r["classifiedEtfTickers"])),
+        "classifiedEtfTickers": list(dict.fromkeys(t for r in with_etf_ticker for t in r["classifiedEtfTickers"])),
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
