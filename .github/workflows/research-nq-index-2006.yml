@@ -1,0 +1,27 @@
+name: Research NQ 2006 Index Audit
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-nq-index-2006.py"
+      - ".github/workflows/research-nq-index-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build 2006 N-Q/N-CSR filing index
+        run: python3 scripts/research-nq-index-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-fund-filings-2006
+          path: data/research/legacy-fund-filings-2006.json
+          if-no-files-found: warn
