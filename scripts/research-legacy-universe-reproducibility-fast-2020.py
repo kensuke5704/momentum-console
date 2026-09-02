@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,35 +9,33 @@ spec = importlib.util.spec_from_file_location('repro', ROOT / 'scripts' / 'resea
 repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
-TARGET_CIK = '1424212'  # First Trust Exchange-Traded Fund III; predeclared from the 2016 structural anchor sample.
+# Predeclared high-density ETF families. Selection is structural only; no parser
+# success, prices, returns, ranks, or strategy results enter the sample choice.
+DENSE_FAMILIES = (
+    'SELECT SECTOR SPDR',
+    'SPDR SERIES TRUST',
+    'STREETTRACKS SERIES TRUST',
+    'POWERSHARES EXCHANGE TRADED FUND TRUST',
+    'INVESCO EXCHANGE-TRADED FUND TRUST',
+    'INVESCO EXCHANGE TRADED FUND TRUST',
+    'RYDEX ETF TRUST',
+)
 
 
-def sec_master_for_cik():
-    cik10 = TARGET_CIK.zfill(10)
-    url = f'https://data.sec.gov/submissions/CIK{cik10}.json'
-    req = urllib.request.Request(url, headers={
-        'User-Agent': 'momentum-console research kensuke5704@users.noreply.github.com',
-        'Accept': 'application/json',
-    })
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = json.load(r)
-    recent = data.get('filings', {}).get('recent', {})
-    forms = recent.get('form', [])
-    accs = recent.get('accessionNumber', [])
-    dates = recent.get('filingDate', [])
-    docs = recent.get('primaryDocument', [])
-    company = data.get('name') or 'FIRST TRUST EXCHANGE-TRADED FUND III'
+def dense_index_sample():
+    # Reuse the deterministic SEC master-index inventory already used by the full
+    # overlap validation. This avoids data.sec.gov/submissions rate/access behavior
+    # changing the research result while preserving exactly the same filing universe.
+    filings = repro.ov.master_2020()
     out = []
-    for form, acc, filed, doc in zip(forms, accs, dates, docs):
-        if form not in {'N-CSR', 'N-CSRS'} or not str(filed).startswith('2020'):
-            continue
-        acc_digits = str(acc).replace('-', '')
-        filename = f'edgar/data/{int(TARGET_CIK)}/{acc_digits}/{doc}'
-        out.append({'cik':TARGET_CIK,'company':company,'form':form,'dateFiled':filed,'filename':filename})
-    print('SEC_SUBMISSIONS_FILINGS', len(out), [(x['form'],x['dateFiled'],x['filename']) for x in out], flush=True)
+    for row in filings:
+        company = str(row.get('company') or '').upper()
+        if any(name in company for name in DENSE_FAMILIES):
+            out.append(row)
+    print('INDEXED_DENSE_FILINGS', len(out), sorted({str(x.get('company') or '') for x in out}), flush=True)
     return out
 
 
-repro.ov.master_2020 = sec_master_for_cik
+repro.ov.master_2020 = dense_index_sample
 repro.OUT = ROOT / 'data' / 'research' / 'legacy-universe-reproducibility-fast-2020.json'
 repro.main()
