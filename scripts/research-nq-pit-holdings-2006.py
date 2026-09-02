@@ -81,7 +81,8 @@ def main() -> None:
                 start = marker.start()
                 end = markers[j + 1].start() if j + 1 < len(markers) else min(len(text), start + 300000)
                 block = text[start:end]
-                s, score = seg.map_schedule_to_series(block, etf)
+                mapping_context = text[max(0, start - 5000):min(end, start + 2500)]
+                s, score = seg.map_schedule_to_series(mapping_context, etf)
                 if not s or not s.get("seriesId"):
                     unmapped += 1
                     continue
@@ -130,10 +131,7 @@ def main() -> None:
                 "usableSeries": len(usable),
                 "unmappedScheduleBlocks": unmapped,
             })
-            print(
-                f"{i}/{len(chosen)} {x['company'][:42]} mapped={len(mapped)} usable={len(usable)} recordsTotal={len(records)}",
-                flush=True,
-            )
+            print(f"{i}/{len(chosen)} {x['company'][:42]} mapped={len(mapped)} usable={len(usable)} recordsTotal={len(records)}", flush=True)
         except Exception as e:
             filing_results.append({"company": x.get("company"), "cik": x.get("cik"), "error": repr(e)})
             print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}", flush=True)
@@ -147,6 +145,7 @@ def main() -> None:
         "weightRule": "Positive parsed market values normalized to 100 within each mapped series. These are parser-relative weights, not yet validated against reported net assets.",
         "structuralEligibilityRule": "Production name exclusions plus 10 <= parsed holdings <= 120 and normalized top-10 weight >= 25%. N-Q lacks direct N-PORT US/CORP/EC fields, so country/issuer/asset parity remains unresolved.",
         "tickerMappingStatus": "Holdings issuer descriptions are intentionally left unmapped here; issuer/security-id/ticker mapping is a separate validation stage.",
+        "seriesMappingRule": "Tight pre/post schedule-heading context; exact filing-time series name preferred; ambiguous ties and near-ties rejected.",
         "filingsAttempted": len(chosen),
         "filingsSucceeded": sum(1 for r in filing_results if "error" not in r),
         "pitSeriesRecords": len(records),
