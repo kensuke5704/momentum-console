@@ -5,6 +5,10 @@ on:
     branches: ["research/cagr40-new-alpha-20260901"]
     paths:
       - "scripts/research-legacy-pit-holdings-development.py"
+      - "scripts/research-legacy-issuer-key.py"
+      - "scripts/research-legacy-issuer-universe-development.py"
+      - "scripts/research-legacy-universe-score.py"
+      - "scripts/research-legacy-holdings-parser.py"
       - "scripts/research-nq-series-segmentation-2006.py"
       - "scripts/research-nq-pit-holdings-2006.py"
       - ".github/workflows/research-legacy-pit-holdings-development.yml"
@@ -21,9 +25,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Probe PIT holdings in development years only
         run: python3 scripts/research-legacy-pit-holdings-development.py
+      - name: Build issuer-key Universe breadth without ticker or returns
+        run: python3 scripts/research-legacy-issuer-universe-development.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: legacy-pit-holdings-development
-          path: data/research/legacy-pit-holdings-development.json
+          path: |
+            data/research/legacy-pit-holdings-development.json
+            data/research/legacy-issuer-universe-development.json
           if-no-files-found: warn
