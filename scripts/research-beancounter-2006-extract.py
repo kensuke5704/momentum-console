@@ -20,6 +20,7 @@ UA = {
 
 # Conservative CUSIP-like token. Standard CUSIPs are 9 chars and normally end in a check digit.
 # Requiring at least one letter avoids many dates/account numbers. Validation/mapping is a later stage.
+# 2026-09-02 rerun marker: extraction logic intentionally unchanged.
 CUSIP_RE = re.compile(r"(?<![A-Z0-9])([0-9A-Z]{8}[0-9])(?![A-Z0-9])")
 
 
