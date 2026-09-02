@@ -1,0 +1,39 @@
+name: Research BQ NQ Mirror Probe
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - ".github/workflows/research-bq-nq-mirror-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe known historical N-Q mirror documents
+        shell: bash
+        run: |
+          set -uo pipefail
+          urls=(
+            "https://edgar.businessquant.com/Archives/edgar/data/1551030/000089418918005288/horizons_nq.htm"
+            "https://edgar.businessquant.com/Archives/edgar/data/1444822/000119312517062613/d354202dnq.htm"
+            "https://edgar.businessquant.com/Archives/edgar/data/795259/000110465913086761/a13-23900_1nq.htm"
+          )
+          ok=0
+          for u in "${urls[@]}"; do
+            code=$(curl -L -sS -o /tmp/nq.html -w '%{http_code}' --max-time 60 "$u" || true)
+            bytes=$(wc -c </tmp/nq.html 2>/dev/null || echo 0)
+            echo "$code $bytes $u"
+            if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ]; then
+              grep -Eio 'FORM N-Q|QUARTERLY (SCHEDULE|NOTICE) OF PORTFOLIO HOLDINGS' /tmp/nq.html | head -3 || true
+              ok=$((ok+1))
+            fi
+          done
+          echo "successful=$ok/${#urls[@]}"
+          test "$ok" -ge 1
