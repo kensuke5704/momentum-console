@@ -1,0 +1,21 @@
+name: Research Layline 13F Discovery
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-layline-discovery.py"
+      - ".github/workflows/research-layline-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Harvard Dataverse file inventory
+        run: python3 scripts/research-layline-discovery.py
