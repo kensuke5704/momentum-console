@@ -1,0 +1,28 @@
+name: Research Legacy Series Coverage 2006-2010
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-legacy-series-coverage-2006-2010.py"
+      - "scripts/research-nq-series-metadata-2006.py"
+      - ".github/workflows/research-legacy-series-coverage-2006-2010.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe development-window filing structure only
+        run: python3 scripts/research-legacy-series-coverage-2006-2010.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-series-coverage-2006-2010
+          path: data/research/legacy-series-coverage-2006-2010.json
+          if-no-files-found: warn
