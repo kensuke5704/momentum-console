@@ -14,15 +14,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "research" / "npx-security-master-pilot-2006.json"
 DRIVE = "https://drive.usercontent.google.com/download?id=1yfQxR45DZ_vM5pkFvgyexc10NNqbxpFN&export=download&confirm=t"
-UA = {
-    "User-Agent": "momentum-console research kensuke5704@users.noreply.github.com",
-    "Accept": "text/plain,text/html,*/*",
-}
+UA = {"User-Agent": "momentum-console research kensuke5704@users.noreply.github.com", "Accept": "text/plain,text/html,*/*"}
 TARGET_FORMS = {"N-PX", "N-PX/A"}
-TICKER_RE = re.compile(r"\bTICKER\s*:\s*([A-Z0-9.\-]+)", re.I)
-SECURITY_RE = re.compile(r"\bSECURITY\s+ID\s*:\s*([A-Z0-9]{6,14})", re.I)
-MEETING_RE = re.compile(r"\bMEETING\s+DATE\s*:\s*([^|]{6,30}?)(?=\s+(?:TICKER|SECURITY\s+ID|MEETING\s+STATUS|$))", re.I)
-BAD_ISSUER = re.compile(r"^(?:TICKER|SECURITY ID|MEETING DATE|MEETING STATUS|RECORD DATE|ISSUER|PROPOSAL|VOTE|MGMT|MANAGEMENT|ITEM|PAGE)\b", re.I)
+TICKER_RE = re.compile(r"\bTICKER\s*:?\s*([A-Z0-9.\-]+)", re.I)
+SECURITY_RE = re.compile(r"\bSECURITY\s+ID\s*:?\s*(?:CUSIP9\s+)?([A-Z0-9]{6,14})", re.I)
+MEETING_RE = re.compile(r"\bMEETING\s+DATE\s*:?\s*([^|]{6,30}?)(?=\s+(?:TICKER|SECURITY\s+ID|MEETING\s+TYPE|MEETING\s+STATUS|RECORD\s+DATE|$))", re.I)
+ISSUER_LABEL_RE = re.compile(r"^ISSUER\s+NAME\s*:\s*(.+)$", re.I)
+BAD_ISSUER = re.compile(r"^(?:TICKER|SECURITY ID|MEETING DATE|MEETING STATUS|MEETING TYPE|RECORD DATE|PROPOSAL|VOTE|MGMT|MANAGEMENT|ITEM|PAGE|FORM N-PX)\b", re.I)
 
 
 def download(url: str, path: Path) -> None:
@@ -60,7 +58,6 @@ def choose_samples(filings: list[dict]) -> list[dict]:
     primary = [x for x in filings if x["form"] == "N-PX"]
     if len(primary) <= 4:
         return primary
-    # Fixed quartile samples. This is a structural parser feasibility gate only.
     return [primary[min(len(primary) - 1, (i * len(primary)) // 4)] for i in range(4)]
 
 
@@ -83,7 +80,9 @@ def text_lines(text: str) -> list[str]:
 
 
 def clean_issuer(raw: str) -> str | None:
-    s = raw.strip(" |-:\t")
+    raw = raw.strip(" |-:\t")
+    labelled = ISSUER_LABEL_RE.match(raw)
+    s = labelled.group(1).strip() if labelled else raw
     s = re.sub(r"^[*#>\-]+\s*", "", s)
     if len(s) < 3 or len(s) > 180 or BAD_ISSUER.search(s):
         return None
@@ -94,22 +93,35 @@ def clean_issuer(raw: str) -> str | None:
     return s
 
 
+def issuer_before(lines: list[str], anchor: int) -> str | None:
+    # Fidelity-style reports label the issuer explicitly, sometimes two lines before Ticker.
+    for j in range(anchor - 1, max(-1, anchor - 8), -1):
+        m = ISSUER_LABEL_RE.match(lines[j])
+        if m:
+            return clean_issuer(lines[j])
+    # Broadridge-style reports put the issuer as the closest plain line before Ticker/Security ID.
+    for j in range(anchor - 1, max(-1, anchor - 8), -1):
+        candidate = clean_issuer(lines[j])
+        if candidate:
+            return candidate
+    return None
+
+
 def parse_records(text: str) -> list[dict]:
     lines = text_lines(text)
     records = []
     for i, line in enumerate(lines):
-        if "MEETING DATE" not in line.upper():
+        upper = line.upper()
+        if "TICKER" not in upper and "SECURITY ID" not in upper:
             continue
-        window = " | ".join(lines[i : min(len(lines), i + 5)])
+        lo = max(0, i - 3)
+        hi = min(len(lines), i + 5)
+        window = " | ".join(lines[lo:hi])
         ticker_m = TICKER_RE.search(window)
         security_m = SECURITY_RE.search(window)
         if not ticker_m and not security_m:
             continue
-        issuer = None
-        for j in range(i - 1, max(-1, i - 7), -1):
-            issuer = clean_issuer(lines[j])
-            if issuer:
-                break
+        issuer = issuer_before(lines, i)
         if not issuer:
             continue
         meeting_m = MEETING_RE.search(window)
