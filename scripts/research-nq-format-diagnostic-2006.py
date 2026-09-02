@@ -9,6 +9,9 @@ pspec=importlib.util.spec_from_file_location('pilot',ROOT/'scripts'/'research-nq
 TARGET=re.compile(r'POWERSHARES EXCHANGE TRADED FUND TRUST|PROSHARES TRUST',re.I)
 SCHEDULE=re.compile(r'SCHEDULE OF PORTFOLIO INVESTMENTS|SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS|PORTFOLIO HOLDINGS|STATEMENT OF INVESTMENTS',re.I)
 def clean(s): return ' '.join(re.sub(r'(?is)<[^>]+>',' ',s).split())
+def td_stream(text):
+ parts=re.split(r'(?is)<TD\b[^>]*>',text)[1:]
+ return [pilot.clean_cell(re.split(r'(?is)(?:</?TR\b[^>]*>|</?TABLE\b[^>]*>|<TD\b[^>]*>)',p,maxsplit=1)[0]) for p in parts]
 def main():
  d=json.loads(IDX.read_text()); rows=[]; seen=set()
  for x in d['filings']:
@@ -27,12 +30,9 @@ def main():
      chosen=text[m.start():end]
      break
    if chosen:
-    hr=pilot.html_rows(chosen)
-    print('POWERSHARES_HTML_ROWS',len(hr),flush=True)
-    cells=[pilot.clean_cell(z) for z in re.findall(r'(?is)<TD\b[^>]*>(.*?)</TD>',chosen)]
-    cells=[c for c in cells if c]
-    print('POWERSHARES_TD_CELLS',len(cells),flush=True)
-    for k,c in enumerate(cells[:180]): print('CELL',k,json.dumps(c),flush=True)
+    cells=[c for c in td_stream(chosen) if c]
+    print('POWERSHARES_STREAM_CELLS',len(cells),flush=True)
+    for k,c in enumerate(cells[:220]): print('CELL',k,json.dumps(c),flush=True)
     method,_,_,hold=pilot.parse_holdings(chosen)
     print('POWERSHARES_PARSE',method,len(hold),json.dumps(hold[:5]),flush=True)
   else:
