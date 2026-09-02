@@ -3,9 +3,9 @@ import gzip,json
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 P=ROOT/'data'/'sec-nport'/'bootstrap.json.gz'
-# S000012478 = First Trust NYSE Arca Biotechnology Index Fund (FBT),
-# independently confirmed from SEC N-CEN. Existing SPDR IDs retained as controls.
-IDS=['S000012478','S000062095','S000006409','S000006410','S000006411','S000006412']
+# S000036506 is the fixed First Trust India NIFTY 50 Equal Weight ETF fixture.
+# Other IDs are retained as independent First Trust/SPDR controls.
+IDS=['S000036506','S000012478','S000062095','S000006409','S000006410','S000006411','S000006412']
 with gzip.open(P,'rt',encoding='utf-8') as f:d=json.load(f)
 rows=d.get('snapshots') or d.get('filings') or []
 out={}
