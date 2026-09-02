@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -9,8 +10,6 @@ spec = importlib.util.spec_from_file_location('repro', ROOT / 'scripts' / 'resea
 repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
-# Predeclared high-density ETF families. Selection is structural only; no parser
-# success, prices, returns, ranks, or strategy results enter the sample choice.
 DENSE_FAMILIES = (
     'SELECT SECTOR SPDR',
     'SPDR SERIES TRUST',
@@ -20,22 +19,28 @@ DENSE_FAMILIES = (
     'INVESCO EXCHANGE TRADED FUND TRUST',
     'RYDEX ETF TRUST',
 )
-
-ORIGINAL_MASTER_2020 = repro.ov.master_2020
+UA = {'User-Agent': 'momentum-console research kensuke5704@users.noreply.github.com', 'Accept': 'text/plain,*/*'}
 
 
 def dense_index_sample():
-    # Reuse the deterministic SEC master-index inventory already used by the full
-    # overlap validation. This avoids data.sec.gov/submissions rate/access behavior
-    # changing the research result while preserving exactly the same filing universe.
-    filings = ORIGINAL_MASTER_2020()
-    out = []
-    for row in filings:
-        company = str(row.get('company') or '').upper()
-        if any(name in company for name in DENSE_FAMILIES):
-            out.append(row)
-    print('INDEXED_DENSE_FILINGS', len(out), sorted({str(x.get('company') or '') for x in out}), flush=True)
-    return out
+    rows = []
+    for q in range(1, 5):
+        url = f'https://www.sec.gov/Archives/edgar/full-index/2020/QTR{q}/master.idx'
+        req = urllib.request.Request(url, headers=UA)
+        with urllib.request.urlopen(req, timeout=60) as r:
+            text = r.read().decode('latin-1', 'replace')
+        for line in text.splitlines():
+            p = line.split('|')
+            if len(p) < 5:
+                continue
+            cik, company, form, date_filed, filename = [x.strip() for x in p[:5]]
+            if form.upper() not in {'N-CSR', 'N-CSRS'}:
+                continue
+            company_u = company.upper()
+            if any(name in company_u for name in DENSE_FAMILIES):
+                rows.append({'cik': cik, 'company': company, 'form': form.upper(), 'dateFiled': date_filed, 'filename': filename})
+    print('SEC_DENSE_FILINGS', len(rows), sorted({str(x.get('company') or '') for x in rows}), flush=True)
+    return rows
 
 
 repro.ov.master_2020 = dense_index_sample
