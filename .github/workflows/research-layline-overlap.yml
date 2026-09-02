@@ -31,5 +31,7 @@ jobs:
         if: always()
         with:
           name: layline13f-nport-overlap-2020
-          path: data/research/layline13f-nport-overlap-2020.json
+          path: |
+            data/research/layline13f-nport-overlap-2020.json
+            data/research/layline13f-signal-agreement-2020.json
           if-no-files-found: warn
