@@ -4,6 +4,17 @@
   word-break: break-word;
 }
 
+.next-action-stage21 {
+  display: grid;
+  padding: 0 !important;
+}
+
+.next-action-stage21 > div { min-width: 0; }
+.next-action-stage21 strong {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
 /* Stage21 operational rows use flex rather than minmax track lists so CSS
    minification cannot collapse adjacent grid functions. */
 .allocation-list {
@@ -37,6 +48,23 @@
 }
 .simple-table > div:last-child { border-bottom: 0; }
 .simple-table > div > * { min-width: 0; overflow-wrap: anywhere; }
+
+.compact-table { min-width: 560px; }
+.compact-table th:first-child,
+.compact-table td:first-child { width: 76px; }
+.compact-table th:nth-child(2),
+.compact-table td:nth-child(2) { width: 22%; }
+
+.stage21-equity-chart {
+  height: 360px;
+  padding: 14px 12px 8px !important;
+}
+
+.page-note {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: -8px 2px 0;
+}
 
 @media (min-width: 901px) {
   .next-action.next-action-stage21 {
@@ -166,6 +194,16 @@
   .dynamic-metric-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .dynamic-metric { min-width: 0; padding: 14px 12px !important; }
   .dynamic-metric strong { font-size: 16px !important; overflow-wrap: anywhere; }
+
+  .dynamic-metric-grid.five > .dynamic-metric:last-child {
+    border-right: 0;
+    grid-column: 1 / -1;
+  }
+
+  .stage21-equity-chart {
+    height: 300px;
+    padding: 10px 4px 4px !important;
+  }
 
   .table-scroll > .empty-state {
     border-width: 0;
