@@ -1,0 +1,38 @@
+name: Research Legacy Filing Inventory 2006-2018
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-legacy-filing-inventory-2006-2018.py"
+      - "scripts/research-legacy-history-periods.py"
+      - "docs/research/legacy-history-evaluation-protocol.md"
+      - ".github/workflows/research-legacy-filing-inventory-2006-2018.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify default performance guard permits only Phase 1
+        run: |
+          python3 scripts/research-legacy-history-periods.py --start 2006-01-01 --end 2010-12-31
+          if python3 scripts/research-legacy-history-periods.py --start 2011-01-01 --end 2014-12-31; then
+            echo "Validation phase unexpectedly open" >&2
+            exit 1
+          fi
+          if python3 scripts/research-legacy-history-periods.py --start 2015-01-01 --end 2018-12-31; then
+            echo "Sealed holdout unexpectedly open" >&2
+            exit 1
+          fi
+      - name: Build structural filing inventory without prices or returns
+        run: python3 scripts/research-legacy-filing-inventory-2006-2018.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-filing-inventory-2006-2018
+          path: data/research/legacy-filing-inventory-2006-2018.json
