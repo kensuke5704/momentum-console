@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/research-nq-index-extract.py"
       - "scripts/research-nq-parser-pilot.py"
+      - "scripts/research-nq-series-metadata-2006.py"
       - ".github/workflows/research-nq-index-extract.yml"
   workflow_dispatch:
 
@@ -22,6 +23,8 @@ jobs:
         run: python3 scripts/research-nq-index-extract.py
       - name: Test N-Q holdings extraction through Jina
         run: python3 scripts/research-nq-parser-pilot.py
+      - name: Probe N-Q series and ticker metadata
+        run: python3 scripts/research-nq-series-metadata-2006.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -29,4 +32,5 @@ jobs:
           path: |
             data/research/nq-index-2006.json
             data/research/nq-parser-pilot-2006.json
+            data/research/nq-series-metadata-2006.json
           if-no-files-found: warn
