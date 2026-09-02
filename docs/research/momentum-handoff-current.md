@@ -131,6 +131,8 @@ Eligibility filter includes:
 - top-10 weight >= 25
 - excludes structured/income/broad-benchmark funds by series-name rules
 
+Production N-PORT parsing also restricts holdings to US corporate equities using the N-PORT fields `ASSET_CAT=EC`, `INVESTMENT_COUNTRY=US`, and `ISSUER_TYPE=CORP`.
+
 N-PORT itself cannot be extended far enough backward, so the research is testing legacy SEC fund filings as a historical bridge.
 
 ## 6. Free-source alternatives tested
@@ -250,33 +252,68 @@ CUSIP extraction from generic text was not reliable:
 
 Conclusion: do not use BeanCounter CUSIP-frequency counting as the historical universe source.
 
-## 10. Current active gate: N-Q series-to-holdings segmentation
+## 10. N-Q series-to-holdings and PIT representation — confirmed but coverage-limited
 
-Current unresolved technical question:
+The original segmentation feasibility probe in run `33638519487` reported 94 / 99 ETF series as segmentable. That was a coarse heading/series assignment feasibility measure and should not be interpreted as 94 usable holdings records.
 
-> When one N-Q filing contains many ETF series, can each `Schedule of Investments` / holdings section be assigned reliably to the correct series?
+A stricter end-to-end rerun was completed after the handoff was created:
+- workflow run: `33644227262`
+- commit: `cb74de04e3f0184e34b2b038bf0ec12459df7e82`
+- 6 deterministic ETF registrant filings fetched successfully
+- 34 series actually mapped to parsed schedule blocks
+- 30 mapped series passed the production-style name exclusions
+- 18 passed the preliminary structural rule of 10–120 parsed holdings and positive market value
 
-This matters because current N-PORT logic treats each ETF series separately. A filing-level aggregate would distort `etfCount`, weights, and breadth.
+A point-in-time holdings representation script was then added:
+- `scripts/research-nq-pit-holdings-2006.py`
+- stores accession, CIK, filing date, report date, series ID/name, fund ticker metadata, mapping score, parser method, holdings descriptions, market values, and parser-relative series weights
+- weights are normalized from positive parsed market values within each series; they are not yet validated against reported net assets
+- no return/performance data is used
 
-A dedicated series segmentation pilot has been added to the research workflow.
+The production top-10 concentration rule was then added and rerun:
+- workflow run: `33644613585`
+- commit: `1531b8caf5d5d6bfac7c060f6f99c67023d6cf41`
+- filings attempted/succeeded: 6 / 6
+- final PIT series records passing production-style name exclusions, 10–120 holdings, and normalized top-10 weight >=25%: **9**
+- median holdings per retained record: **49**
+- weight normalization error: **0.0**
 
-Current workflow run at handoff creation:
-- workflow run: `33638519487`
-- N-Q job id: `100275381257`
-- commit: `a07e44f92dbd7b632255feeb6f80c55108b73745`
-- status at handoff creation: N-Q job still in progress; metadata probe ahead of segmentation step
+Examples of retained PIT records:
+- XLE — report date 2005-12-31, filing date 2006-02-28, 30 holdings, top-10 weight ~63.75%
+- XLG — report date 2006-01-31, filing date 2006-03-27, 52 holdings, top-10 weight ~43.24%
+- MTK — report date 2006-03-31, filing date 2006-05-24, 49 holdings, top-10 weight ~38.37%
+- XBI — report date 2006-03-31, filing date 2006-05-24, 14 holdings, top-10 weight ~97.54%
+- XHB — report date 2006-03-31, filing date 2006-05-24, 41 holdings, top-10 weight ~26.72%
 
-The next chat should first fetch this run/job result and inspect the segmentation summary.
+Interpretation:
+- series-level PIT holdings reconstruction is technically feasible for legacy N-Q filings
+- current coverage is not yet sufficient for a historical universe backtest
+- the earlier 94/99 segmentation number was optimistic if treated as end-to-end usable coverage
+- parser/mapping coverage, issuer ticker mapping, and the lack of direct legacy equivalents for N-PORT `US/CORP/EC` fields remain active limitations
 
-## 11. Planned validation sequence
+## 11. Current active gate: historical security mapping and coverage improvement
+
+Do not run 2006–2018 Stage21 performance yet.
+
+The next technical gate is to turn the retained legacy holdings descriptions into stable point-in-time security identities and determine whether coverage can become sufficient for N-PORT-like breadth ranking without performance-driven tuning.
+
+Proceed next with:
+1. Expand the N-PX security master beyond the four-file feasibility pilot using a deterministic, non-performance-based sampling/build rule.
+2. Normalize legacy N-Q issuer descriptions and join them to N-PX issuer ↔ ticker ↔ security-id records.
+3. Measure mapping coverage by holdings count and by holdings weight for the retained N-Q PIT series.
+4. Diagnose currently unmapped N-Q series/schedule blocks using parser/structure evidence only.
+5. Investigate structural proxies for the missing N-PORT `US/CORP/EC` fields; do not choose rules based on strategy returns.
+6. Only after mapping/coverage quality is acceptable, construct the legacy universe scoring inputs.
+
+## 12. Planned validation sequence
 
 Do not jump directly to a 2006–2026 performance backtest.
 
 Proceed in this order:
 
-1. Finish N-Q series-to-holdings segmentation feasibility test.
-2. Build a point-in-time historical ETF-series holdings representation.
-3. Build/extend historical issuer ↔ ticker/security-id mapping, using N-PX where needed.
+1. N-Q series-to-holdings segmentation feasibility test. **Completed; feasible but coverage-limited.**
+2. Point-in-time historical ETF-series holdings representation. **Pilot completed; 9 retained records under production-style structural constraints in the current six-filing sample.**
+3. Build/extend historical issuer ↔ ticker/security-id mapping, using N-PX where needed. **Current step.**
 4. Construct a legacy-N-Q universe using the same economic scoring inputs as the N-PORT universe where possible:
    - ETF count
    - aggregate weight
@@ -290,7 +327,7 @@ Proceed in this order:
 7. If the bridge is sufficiently faithful, extend the universe backward and run frozen Stage21 research backtests.
 8. Report the extended test separately from the frozen 2020–2026 production backtest.
 
-## 12. Interpretation rules / anti-overfitting constraints
+## 13. Interpretation rules / anti-overfitting constraints
 
 - Do not change Stage21 production parameters based on extended-history results.
 - Do not tune legacy parser/universe rules against CAGR, MaxDD, Calmar, or trade outcomes.
@@ -299,13 +336,13 @@ Proceed in this order:
 - Label any proxy period clearly; do not call it true OOS.
 - Keep True Forward OOS from 2026-09-02 conceptually separate from all historical reconstruction work.
 
-## 13. Known research-code caveat
+## 14. Known research-code caveat
 
 `stage21-spa.ts` has/had a GLDM→Cash spread-order issue in the research script. The relevant workflow patched it at runtime. Frozen production strategy is unaffected.
 
 If touching SPA research code again, cleanly verify/fix source parity before using new results.
 
-## 14. Important files
+## 15. Important files
 
 Production/universe logic:
 - `src/lib/universe/universe.ts`
@@ -318,8 +355,9 @@ Long-history research:
 - `scripts/research-nq-parser-pilot.py`
 - `scripts/research-nq-bridge-2019.py`
 - `scripts/research-nq-series-metadata-2006.py`
+- `scripts/research-nq-series-segmentation-2006.py`
+- `scripts/research-nq-pit-holdings-2006.py`
 - `scripts/research-npx-security-master-2006.py`
-- N-Q series segmentation script added in the current research line
 - `.github/workflows/research-nq-index-extract.yml`
 - `.github/workflows/research-nq-series-metadata-2006.yml`
 
@@ -328,7 +366,7 @@ Robustness research:
 - `scripts/architecture-spa-analyze.mjs`
 - `scripts/architecture-calmar-bootstrap.mjs`
 
-## 15. Handoff protocol
+## 16. Handoff protocol
 
 At the start of a new chat/session:
 
