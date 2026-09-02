@@ -46,16 +46,23 @@
   outline: 0;
 }
 
-.next-action-cell strong {
+.next-action-cell > span {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.next-action-cell > strong {
   font-family: "Roboto Mono", monospace;
   font-size: 23px;
+  font-weight: 700;
   line-height: 1.15;
   overflow-wrap: anywhere;
   word-break: normal;
 }
 
-.execution-cell strong {
-  font-size: clamp(15px, 1.7vw, 22px);
+.execution-cell > strong {
+  font-size: 23px;
   white-space: nowrap;
 }
 
@@ -111,6 +118,8 @@
 .allocation-segment-2 { background: #89a797; color: #10140f; }
 .allocation-segment-3 { background: #c8cec5; color: #10140f; }
 .allocation-segment-4 { background: #68776b; color: #f8faf6; }
+.allocation-segment:not(.allocation-segment-cash) { color: #f8faf6; }
+.allocation-segment-cash { color: #10140f; }
 
 .metric-section > .dynamic-metric-grid {
   border: 0;
@@ -165,6 +174,44 @@
 .action-detail-body { padding: 24px !important; }
 .action-detail-body > p { color: var(--text-soft); margin: 14px 0 0; }
 .action-detail-body .detail-secondary { color: var(--text-muted); font-size: 12px; }
+.detail-definitions {
+  border: 1px solid var(--line-strong);
+}
+.detail-definition {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+}
+.detail-definition:last-child { border-bottom: 0; }
+.detail-definition.current {
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent-strong);
+}
+.detail-definition > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+.detail-definition strong {
+  font-family: "Roboto Mono", monospace;
+  font-size: 17px;
+  line-height: 1.2;
+}
+.detail-definition span {
+  color: var(--accent-strong);
+  font-family: "Roboto Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.detail-definition p {
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
 .action-detail-value {
   display: block;
   font-family: "Roboto Mono", monospace;
@@ -305,8 +352,9 @@
     padding: 12px 9px;
   }
   .next-action-cell.target-cell { min-height: 104px; padding: 11px 10px 13px; }
-  .next-action-cell > strong { font-size: 17px; line-height: 1.2; }
-  .next-action-cell.execution-cell > strong { font-size: 10.5px; white-space: nowrap; }
+  .next-action-cell > span { font-size: 9px; line-height: 1.2; }
+  .next-action-cell > strong,
+  .next-action-cell.execution-cell > strong { font-size: 17px; line-height: 1.2; white-space: nowrap; }
 
   .allocation-band { min-height: 108px; }
   .allocation-band.compact { min-height: 64px; }
