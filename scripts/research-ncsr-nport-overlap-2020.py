@@ -28,8 +28,11 @@ DOCUMENT_BLOCK = re.compile(r'(?is)<DOCUMENT>(.*?)</DOCUMENT>')
 TYPE_CSR = re.compile(r'(?im)^\s*<TYPE>\s*N-(?:CSR|CSRS)\b')
 TEXT_BLOCK = re.compile(r'(?is)<TEXT>(.*)</TEXT>')
 REPORT_DATE = re.compile(r'(?im)^\s*CONFORMED PERIOD OF REPORT:\s*(\d{8})\s*$')
+# Shareholder reports use both labels. Treat them as equivalent structural section
+# delimiters; this broadens document-format coverage only and does not depend on
+# holdings, returns, ranks, or strategy results.
 SCHEDULE_HTML = re.compile(
-    r'SCHEDULE(?:\s|&nbsp;|&#160;|<[^>]+>)+OF(?:\s|&nbsp;|&#160;|<[^>]+>)+INVESTMENTS', re.I
+    r'(?:SCHEDULE|PORTFOLIO)(?:\s|&nbsp;|&#160;|<[^>]+>)+OF(?:\s|&nbsp;|&#160;|<[^>]+>)+INVESTMENTS', re.I
 )
 
 sspec = importlib.util.spec_from_file_location('seg', ROOT / 'scripts' / 'research-nq-series-segmentation-2006.py')
