@@ -12,10 +12,6 @@ spec = importlib.util.spec_from_file_location('repro', ROOT / 'scripts' / 'resea
 repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
-# Frozen structural fixture. This accession was selected because the registrant is a
-# multi-series ETF trust with a June 30, 2020 shareholder report and therefore gives
-# the legacy parser enough same-date series to exercise the reproducibility gates.
-# Selection uses no prices, returns, ranks, parser-success feedback, or strategy output.
 FIXTURE_FILINGS = (
     {
         'cik': '1510337',
@@ -74,25 +70,21 @@ repro.ov.pit.normalized_holdings = normalized_holdings_with_empty_fallback
 
 
 def _block_fingerprint(holdings: list[dict], total: float) -> tuple:
-    """Deduplicate exact repeated rendered blocks without using economic outcomes."""
     names = tuple(sorted(str(h.get('description') or '').strip().upper() for h in holdings))
     return names, round(float(total or 0), 6)
 
 
 def structural_mapped_modern_series(text: str, series: list[dict]):
-    """Map exact series headings and merge all structurally valid blocks per series.
+    """Exact-heading mapping plus raw-value merge of all valid blocks per series.
 
-    Modern shareholder reports can repeat "Portfolio of Investments" for sectors or
-    continuation tables within the same ETF. Selecting only the largest block truncates
-    the fund. Each block is therefore converted back from normalized weight to its raw
-    market-value contribution, deduplicated structurally, summed by issuer description,
-    and normalized once at the series level. No prices, returns, concentration targets,
-    ranks, or strategy outputs are used.
+    Shareholder reports can split one ETF across repeated Portfolio/Schedule headings.
+    Every source block must pass structural sanity independently. Valid blocks are
+    converted from normalized weights back to raw market value, deduplicated, merged,
+    then normalized once at series level. No prices, returns, concentration targets,
+    strategy ranks, or backtest output are used.
     """
     blocks = repro.ov.schedule_blocks(text)
-    unique_name_matches = 0
-    parsed_nonempty = 0
-    structural_block_pass = 0
+    unique_name_matches = parsed_nonempty = structural_block_pass = 0
     examples = []
     grouped: dict[str, dict] = {}
 
@@ -114,32 +106,19 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
         if count:
             parsed_nonempty += 1
         sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
-        block_gate = bool(
-            repro.ov.seg.eligible_name(s.get('seriesName') or '')
-            and count >= 2
-            and total > 0
-            and sane
-        )
+        block_gate = bool(repro.ov.seg.eligible_name(s.get('seriesName') or '') and count >= 2 and total > 0 and sane)
         if block_gate:
             structural_block_pass += 1
-            g = grouped.setdefault(s['seriesId'], {
-                'series': s,
-                'blocks': [],
-                'fingerprints': set(),
-            })
+            g = grouped.setdefault(s['seriesId'], {'series': s, 'blocks': [], 'fingerprints': set()})
             fp = _block_fingerprint(holdings, total)
             if fp not in g['fingerprints']:
                 g['fingerprints'].add(fp)
                 g['blocks'].append({'method': method, 'holdings': holdings, 'total': float(total)})
         if len(examples) < 30:
             examples.append({
-                'seriesId': s.get('seriesId'),
-                'seriesName': s.get('seriesName'),
-                'method': method,
-                'holdingCount': count,
-                'total': total,
-                'structuralSanity': sane,
-                'structuralBlockGate': block_gate,
+                'seriesId': s.get('seriesId'), 'seriesName': s.get('seriesName'),
+                'method': method, 'holdingCount': count, 'total': total,
+                'structuralSanity': sane, 'structuralBlockGate': block_gate,
             })
 
     mapped = {}
@@ -157,7 +136,11 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
                     raw_by_desc[desc] += total * weight / 100.0
         merged_total = sum(raw_by_desc.values())
         holdings = [
-            {'description': desc, 'weight': 100.0 * value / merged_total}
+            {
+                'description': desc,
+                'marketValue': value,
+                'weight': 100.0 * value / merged_total,
+            }
             for desc, value in raw_by_desc.items()
             if value > 0 and merged_total > 0
         ]
@@ -165,13 +148,9 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
         final_sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
         final_gate = bool(10 <= len(holdings) <= 3000 and merged_total > 0 and final_sane)
         merge_diag.append({
-            'seriesId': sid,
-            'seriesName': g['series'].get('seriesName'),
-            'mergedBlockCount': len(g['blocks']),
-            'mergedHoldingCount': len(holdings),
-            'mergedTotal': merged_total,
-            'structuralSanity': final_sane,
-            'finalGate': final_gate,
+            'seriesId': sid, 'seriesName': g['series'].get('seriesName'),
+            'mergedBlockCount': len(g['blocks']), 'mergedHoldingCount': len(holdings),
+            'mergedTotal': merged_total, 'structuralSanity': final_sane, 'finalGate': final_gate,
         })
         if final_gate:
             mapped[sid] = {
