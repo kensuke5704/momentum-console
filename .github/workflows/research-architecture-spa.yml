@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/research-architecture-spa.yml"
       - "scripts/architecture-spa-analyze.mjs"
+      - "scripts/architecture-calmar-bootstrap.mjs"
   workflow_dispatch:
 
 permissions:
@@ -66,3 +67,6 @@ jobs:
       - name: Run architecture-level SPA
         run: |
           node scripts/architecture-spa-analyze.mjs captures/*.jsonl
+      - name: Run architecture-level Calmar bootstrap
+        run: |
+          node scripts/architecture-calmar-bootstrap.mjs captures/*.jsonl
