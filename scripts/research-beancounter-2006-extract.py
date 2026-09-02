@@ -5,7 +5,7 @@ import gzip
 import json
 import re
 import urllib.request
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,10 +18,35 @@ UA = {
     "Accept": "application/gzip",
 }
 
-# Conservative CUSIP-like token. Standard CUSIPs are 9 chars and normally end in a check digit.
-# Requiring at least one letter avoids many dates/account numbers. Validation/mapping is a later stage.
-# 2026-09-02 rerun marker: extraction logic intentionally unchanged.
+# Standard CUSIP: 8-character body plus numeric check digit.
+# Candidate tokens are validated with the official CUSIP modulus-10 check-digit algorithm.
 CUSIP_RE = re.compile(r"(?<![A-Z0-9])([0-9A-Z]{8}[0-9])(?![A-Z0-9])")
+
+
+def cusip_char_value(ch: str) -> int:
+    if ch.isdigit():
+        return int(ch)
+    if "A" <= ch <= "Z":
+        return ord(ch) - ord("A") + 10
+    raise ValueError(ch)
+
+
+def valid_cusip(token: str) -> bool:
+    if len(token) != 9 or not token[-1].isdigit():
+        return False
+    # Reject prose-like tokens only if they are impossible securities identifiers by check digit.
+    # The check digit is computed from the first eight characters: positions 2,4,6,8 are doubled.
+    total = 0
+    try:
+        for i, ch in enumerate(token[:8], start=1):
+            value = cusip_char_value(ch)
+            if i % 2 == 0:
+                value *= 2
+            total += value // 10 + value % 10
+    except ValueError:
+        return False
+    expected = (10 - (total % 10)) % 10
+    return expected == int(token[8])
 
 
 def cusips_from_text(text: str) -> set[str]:
@@ -29,7 +54,8 @@ def cusips_from_text(text: str) -> set[str]:
     out: set[str] = set()
     for m in CUSIP_RE.finditer(up):
         token = m.group(1)
-        if any(c.isalpha() for c in token):
+        # Real CUSIPs can be all-numeric or alphanumeric; check-digit validation is the gate.
+        if valid_cusip(token):
             out.add(token)
     return out
 
@@ -140,12 +166,13 @@ def main() -> None:
         "source": "bradfordlevy/BeanCounter train shards",
         "targetShards": list(TARGET_SHARDS),
         "targetForms": sorted(TARGET_FORMS),
+        "targetCusipRule": "9-char token + CUSIP modulus-10 check digit",
         "uniqueFilings": len(filings),
         "formCounts": dict(form_counts),
         "attachmentCounts": dict(attachment_counts),
-        "filingsWithCusipLike": with_cusip,
+        "filingsWithValidCusip": with_cusip,
         "filingCusipCoverage": with_cusip / len(filings) if filings else None,
-        "uniqueCusipLike": len(filing_freq),
+        "uniqueValidCusip": len(filing_freq),
         "malformedRows": malformed,
         "shards": shard_summaries,
         "topCusips": ranked,
