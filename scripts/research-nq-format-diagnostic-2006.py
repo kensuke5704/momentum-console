@@ -18,11 +18,7 @@ def main():
   _,text=meta.fetch_prefix(meta.sec_url(x['filename'])); series=[s for s in meta.parse_series_contracts(text,x['company']) if s['isEtf']]
   markers=list(SCHEDULE.finditer(text))
   print('FILE',x['company'],x['dateFiled'],x['filename'],'bytes',len(text),'series',len(series),'markers',len(markers),flush=True)
-  for i,m in enumerate(markers[:20],1):
-   lo=max(0,m.start()-800); hi=min(len(text),m.start()+1300)
-   print('SCHEDULE_CONTEXT',i,clean(text[lo:hi])[:1800],flush=True)
   if x['company'].upper().startswith('POWERSHARES'):
-   # Inspect the first actual portfolio schedule, not the form-level headings.
    chosen=None
    for j,m in enumerate(markers):
     ctx=clean(text[m.start():min(len(text),m.start()+1800)])
@@ -33,16 +29,14 @@ def main():
    if chosen:
     hr=pilot.html_rows(chosen)
     print('POWERSHARES_HTML_ROWS',len(hr),flush=True)
-    for k,row in enumerate(hr[:45],1): print('ROW',k,json.dumps(row),flush=True)
+    cells=[pilot.clean_cell(z) for z in re.findall(r'(?is)<TD\b[^>]*>(.*?)</TD>',chosen)]
+    cells=[c for c in cells if c]
+    print('POWERSHARES_TD_CELLS',len(cells),flush=True)
+    for k,c in enumerate(cells[:180]): print('CELL',k,json.dumps(c),flush=True)
     method,_,_,hold=pilot.parse_holdings(chosen)
     print('POWERSHARES_PARSE',method,len(hold),json.dumps(hold[:5]),flush=True)
-  print('SERIES_BODY_HITS',flush=True)
-  for s in series:
-   name=s.get('seriesName') or ''
-   toks=[re.escape(t) for t in re.sub(r'[^A-Z0-9]+',' ',name.upper()).split() if len(t)>1]
-   if not toks: continue
-   pat=re.compile(r'\b'+r'\W+'.join(toks)+r'\b',re.I); hits=list(pat.finditer(text))
-   snippets=[]
-   for h in hits[-2:]: snippets.append(clean(text[max(0,h.start()-180):min(len(text),h.end()+500)])[:650])
-   print(json.dumps({'name':name,'ticker':s.get('etfTickers',[]),'hits':len(hits),'tailContexts':snippets}),flush=True)
+  else:
+   for i,m in enumerate(markers[:8],1):
+    lo=max(0,m.start()-500); hi=min(len(text),m.start()+1000)
+    print('SCHEDULE_CONTEXT',i,clean(text[lo:hi])[:1300],flush=True)
 if __name__=='__main__': main()
