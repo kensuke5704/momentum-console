@@ -43,22 +43,23 @@ def samples(filings):
         if x['form']=='N-Q':by[x['dateFiled'][:7]].append(x)
     out=[]
     for month,rows in sorted(by.items()):
-        # deterministic tercile sample; fixed independently of parser success or investment performance
         idxs=sorted(set([len(rows)//4,len(rows)//2,(3*len(rows))//4]))
         out.extend(rows[i] for i in idxs)
     return out
 
 def main():
-    filings=index_2019(); forms=defaultdict(int)
-    for x in filings:forms[x['form']]+=1
+    filings=index_2019(); forms=defaultdict(int); months=defaultdict(int); nq_months=defaultdict(int)
+    for x in filings:
+        forms[x['form']]+=1
+        months[x['dateFiled'][:7]]+=1
+        if x['form']=='N-Q':nq_months[x['dateFiled'][:7]]+=1
     samp=samples(filings)
-    print('2019 filings',len(filings),'forms',dict(forms),'samples',len(samp),flush=True)
+    print('2019 filings',len(filings),'forms',dict(forms),'nqMonths',dict(sorted(nq_months.items())),'samples',len(samp),flush=True)
     results=[]
     for i,x in enumerate(samp,1):
         try:
             text=mod.get_text(mod.sec_url(x['filename']))
             method,hrows,plines,holdings=mod.parse_holdings(text)
-            # quality screen uses structure only, never returns/performance
             obvious_noise=sum(1 for h in holdings if h['description'].upper().startswith(('DATE:','JANUARY ','FEBRUARY ','MARCH ','APRIL ','MAY ','JUNE ','JULY ','AUGUST ','SEPTEMBER ','OCTOBER ','NOVEMBER ','DECEMBER ','OTHER ASSETS')))
             r={'month':x['dateFiled'][:7],'company':x['company'],'cik':x['cik'],'dateFiled':x['dateFiled'],'filename':x['filename'],'method':method,'parsedHoldings':len(holdings),'obviousNoiseRows':obvious_noise,'noiseRate':obvious_noise/len(holdings) if holdings else 0,'positiveValues':sum(h['marketValue']>0 for h in holdings),'sampleHoldings':holdings[:8]}
             print(f"{i}/{len(samp)} {r['month']} {x['company'][:34]} {method} holdings={len(holdings)} noise={r['noiseRate']:.3f}",flush=True)
@@ -68,7 +69,7 @@ def main():
     ok=[r for r in results if 'error' not in r]
     def rate(fn):return sum(1 for r in ok if fn(r))/len(ok) if ok else None
     counts=sorted(r['parsedHoldings'] for r in ok)
-    summary={'year':2019,'allTargetFilings':len(filings),'formCounts':dict(forms),'sampleRule':'Three deterministic N-Q filings per filing month at 25/50/75 percent index positions.','sampleCount':len(samp),'fetchSuccess':len(ok),'fetchRate':len(ok)/len(samp) if samp else None,'atLeast10HoldingsRate':rate(lambda r:r['parsedHoldings']>=10),'atLeast20HoldingsRate':rate(lambda r:r['parsedHoldings']>=20),'atLeast50HoldingsRate':rate(lambda r:r['parsedHoldings']>=50),'lowNoiseAnd20Rate':rate(lambda r:r['parsedHoldings']>=20 and r['noiseRate']<=.05),'medianParsedHoldings':counts[len(counts)//2] if counts else None,'results':results}
+    summary={'year':2019,'allTargetFilings':len(filings),'formCounts':dict(forms),'monthCounts':dict(sorted(months.items())),'nqMonthCounts':dict(sorted(nq_months.items())),'sampleRule':'Three deterministic N-Q filings per filing month at 25/50/75 percent index positions.','sampleCount':len(samp),'fetchSuccess':len(ok),'fetchRate':len(ok)/len(samp) if samp else None,'atLeast10HoldingsRate':rate(lambda r:r['parsedHoldings']>=10),'atLeast20HoldingsRate':rate(lambda r:r['parsedHoldings']>=20),'atLeast50HoldingsRate':rate(lambda r:r['parsedHoldings']>=50),'lowNoiseAnd20Rate':rate(lambda r:r['parsedHoldings']>=20 and r['noiseRate']<=.05),'medianParsedHoldings':counts[len(counts)//2] if counts else None,'results':results}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(summary,indent=2)+'\n')
     print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k!='results'}),flush=True)
 
