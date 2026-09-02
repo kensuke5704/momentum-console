@@ -32,16 +32,21 @@ def main():
                 parse_block=text[start:end]; context=text[max(0,start-5000):min(end,start+2500)]
                 s,score=full.seg.map_schedule_to_series(context,series)
                 pm,holdings,total=full.pit.normalized_holdings(parse_block)
-                blocks.append({'index':j,'mappedSeriesId':s.get('seriesId') if s else None,'mappedSeriesName':s.get('seriesName') if s else None,
+                rowb={'index':j,'mappedSeriesId':s.get('seriesId') if s else None,'mappedSeriesName':s.get('seriesName') if s else None,
                     'mappingScore':score,'parseMethod':pm,'holdingCount':len(holdings),'top10Weight':sum(h['weight'] for h in holdings[:10]) if holdings else 0,
-                    'parsedMarketValueTotal':total,'sampleDescriptions':[h.get('description') for h in holdings[:8]]})
-            row={'company':x['company'],'cik':x['cik'],'filingDate':x['dateFiled'],'reportDate':report,'transport':method,
+                    'parsedMarketValueTotal':total,'sampleDescriptions':[h.get('description') for h in holdings[:8]]}
+                # Preserve a bounded structural sample for the first two schedules
+                # of each filing. This is parser evidence only; no price/return data.
+                if j < 2:
+                    rowb['rawSchedulePrefix']=parse_block[:16000]
+                blocks.append(rowb)
+            row={'company':x['company'],'cik':x['cik'],'filingDate':x['dateFiled'],'filename':x['filename'],'reportDate':report,'transport':method,
                  'registeredEtfSeries':len(series),'scheduleMarkers':len(markers),'blocks':blocks}
             print(f"{i}/{len(chosen)} {x['company'][:45]} transport={method} series={len(series)} schedules={len(markers)}",flush=True)
             for b in blocks[:30]:
-                print(' BLOCK',json.dumps({k:v for k,v in b.items() if k!='sampleDescriptions'}),flush=True)
+                print(' BLOCK',json.dumps({k:v for k,v in b.items() if k not in {'sampleDescriptions','rawSchedulePrefix'}}),flush=True)
         except Exception as e:
-            row={'company':x.get('company'),'cik':x.get('cik'),'filingDate':x.get('dateFiled'),'error':repr(e)}
+            row={'company':x.get('company'),'cik':x.get('cik'),'filingDate':x.get('dateFiled'),'filename':x.get('filename'),'error':repr(e)}
             print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}",flush=True)
         out_rows.append(row)
     out={'year':2020,'purpose':'Structural diagnosis of N-CSR schedule detection, series mapping and holdings parsing. No returns/performance used.',
