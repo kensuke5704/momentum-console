@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import time
+import urllib.request
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,9 +14,31 @@ repro = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(repro)
 
 ORIGINAL = repro.ov.master_2020
-# Bootstrap-first structural sample: First Trust has many 2020 N-PORT series
-# with quarterly reports. No performance/rank information is used here.
 TARGET = re.compile(r'FIRST TRUST', re.I)
+
+
+def robust_download(path: Path) -> None:
+    last = None
+    for attempt in range(4):
+        try:
+            url = repro.ov.DRIVE + f'&attempt={attempt}'
+            req = urllib.request.Request(url, headers=repro.ov.UA)
+            with urllib.request.urlopen(req, timeout=600) as r, open(path, 'wb') as f:
+                while True:
+                    b = r.read(1024 * 1024)
+                    if not b:
+                        break
+                    f.write(b)
+            if path.stat().st_size > 1_000_000 and zipfile.is_zipfile(path):
+                return
+            last = RuntimeError(f'invalid archive bytes={path.stat().st_size}')
+        except Exception as e:
+            last = e
+        time.sleep(3 * (attempt + 1))
+    raise last or RuntimeError('master archive download failed')
+
+
+repro.ov.download = robust_download
 
 
 def filtered_master():
