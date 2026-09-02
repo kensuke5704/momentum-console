@@ -13,7 +13,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Probe known historical N-Q mirror documents
@@ -34,18 +34,18 @@ jobs:
           done
           echo "documents_successful=$ok/${#urls[@]}"
           test "$ok" -eq 3
-      - name: Probe historical EDGAR master indexes on mirror
+      - name: Inspect free HF EDGAR master-index dataset
         shell: bash
         run: |
-          set -uo pipefail
-          ok=0
-          for yq in 2004/QTR1 2008/QTR4 2013/QTR4 2019/QTR4; do
-            u="https://edgar.businessquant.com/Archives/edgar/full-index/${yq}/master.idx"
-            code=$(curl -L -sS -o /tmp/master.idx -w '%{http_code}' --max-time 60 "$u" || true)
-            bytes=$(wc -c </tmp/master.idx 2>/dev/null || echo 0)
-            nq=$(grep -c '|N-Q|' /tmp/master.idx 2>/dev/null || true)
-            echo "$yq code=$code bytes=$bytes nq_rows=$nq"
-            if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ] && [ "$nq" -gt 0 ]; then ok=$((ok+1)); fi
-          done
-          echo "indexes_successful=$ok/4"
-          test "$ok" -eq 4
+          python3 - <<'PY'
+          import json, urllib.request
+          base='https://huggingface.co/api/datasets/arthrod/SEC_filings_1994_2024/tree/main?recursive=true&expand=false'
+          req=urllib.request.Request(base,headers={'User-Agent':'momentum-console research'})
+          with urllib.request.urlopen(req,timeout=90) as r: rows=json.load(r)
+          print('entries',len(rows))
+          for x in rows[:100]:
+              print(x.get('type'),x.get('path'),x.get('size'))
+          files=[x for x in rows if x.get('type')=='file']
+          print('files',len(files),'bytes',sum((x.get('size') or 0) for x in files))
+          assert files
+          PY
