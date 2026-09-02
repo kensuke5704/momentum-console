@@ -20,8 +20,6 @@ ss=importlib.util.spec_from_file_location('seg',ROOT/'scripts'/'research-nq-seri
 seg=importlib.util.module_from_spec(ss);ss.loader.exec_module(seg)
 ps=importlib.util.spec_from_file_location('pit',ROOT/'scripts'/'research-nq-pit-holdings-2006.py')
 pit=importlib.util.module_from_spec(ps);ps.loader.exec_module(pit)
-ls=importlib.util.spec_from_file_location('legacy',ROOT/'scripts'/'research-legacy-holdings-parser.py')
-legacy=importlib.util.module_from_spec(ls);ls.loader.exec_module(legacy)
 
 
 def download(path:Path):
@@ -55,13 +53,9 @@ def choose():
     return result
 
 
-def normalized(hs):
-    positive=[h for h in hs if float(h.get('marketValue') or 0)>0 and h.get('description')]
-    total=sum(float(h['marketValue']) for h in positive)
-    if total:
-        for h in positive:h['weight']=100*float(h['marketValue'])/total
-        positive.sort(key=lambda h:h['weight'],reverse=True)
-    return positive,total
+def usable(series_name:str, holdings:list[dict], total:float)->bool:
+    top10=sum(float(h.get('weight') or 0) for h in holdings[:10]) if holdings else 0
+    return bool(seg.eligible_name(series_name or '') and 10<=len(holdings)<=120 and total>0 and top10>=25)
 
 
 def main():
@@ -76,27 +70,46 @@ def main():
                 block=text[start:end];context=text[max(0,start-5000):min(end,start+2500)]
                 s,score=seg.map_schedule_to_series(context,series)
                 if not s:continue
-                old_method,old_h,old_total=pit.normalized_holdings(block)
-                new_h,new_total=normalized(legacy.parse_html_table(block))
-                top10=sum(h['weight'] for h in new_h[:10]) if new_h else 0
-                new_usable=bool(seg.eligible_name(s.get('seriesName') or '') and 10<=len(new_h)<=120 and new_total>0 and top10>=25 and legacy.structural_sanity(new_h))
-                old_suspicious=bool(len(old_h)==1 and float(old_total) in {2005,2006,2007,2008,2009,2010})
+
+                # Raw established parser only, to diagnose whether the fallback was needed.
+                raw_method,_,_,raw_parsed=seg.nqpilot.parse_holdings(block)
+                raw_h,raw_total=pit._normalize(raw_parsed)
+                raw_artifact=pit._year_header_artifact(raw_h,raw_total)
+
+                # Composite production candidate: established parser first, HTML fallback
+                # only for the explicitly recognized year-header artifact.
+                method,holdings,total=pit.normalized_holdings(block)
+                top10=sum(float(h.get('weight') or 0) for h in holdings[:10]) if holdings else 0
+                composite_usable=usable(s.get('seriesName') or '',holdings,total)
                 rec={**x,'seriesId':s.get('seriesId'),'seriesName':s.get('seriesName'),'tickers':s.get('etfTickers',[]),'mappingScore':score,
-                     'oldMethod':old_method,'oldCount':len(old_h),'oldTotal':old_total,'oldSuspiciousYearValue':old_suspicious,
-                     'newCount':len(new_h),'newTotal':new_total,'newTop10Weight':top10,'newStructurallyUsable':new_usable,
-                     'newSample':[{'description':h['description'],'quantity':h.get('quantityOrPrincipal'),'marketValue':h['marketValue']} for h in new_h[:5]]}
+                     'rawMethod':raw_method,'rawCount':len(raw_h),'rawTotal':raw_total,'rawYearHeaderArtifact':raw_artifact,
+                     'compositeMethod':method,'compositeCount':len(holdings),'compositeTotal':total,'compositeTop10Weight':top10,
+                     'compositeUsable':composite_usable,
+                     'sample':[{'description':h['description'],'quantity':h.get('quantityOrPrincipal'),'marketValue':h['marketValue']} for h in holdings[:5]]}
                 records.append(rec)
             print(x['year'],x['company'],'mapped',sum(r['year']==x['year'] and r['cik']==x['cik'] for r in records),flush=True)
         except Exception as e:
             records.append({**x,'error':repr(e)});print('FAIL',x['year'],x['company'],repr(e),flush=True)
+
     valid=[r for r in records if 'seriesId' in r]
     ishares=[r for r in valid if 'ISHARES' in r['company'].upper()]
     spdr=[r for r in valid if 'SELECT SECTOR' in r['company'].upper()]
-    out={'purpose':'Structural before/after validation of a legacy HTML holdings fallback. No prices/returns/performance used.',
-         'acceptanceRules':{'rejectYearHeaderArtifact':True,'requireStructuralSanity':True,'usableRule':'production name exclusion + 10..120 holdings + top10>=25'},
-         'mappedSeries':len(valid),'isharesMappedSeries':len(ishares),'isharesOldSuspicious':sum(r['oldSuspiciousYearValue'] for r in ishares),
-         'isharesNewAtLeast10':sum(r['newCount']>=10 for r in ishares),'isharesNewUsable':sum(r['newStructurallyUsable'] for r in ishares),
-         'spdrMappedSeries':len(spdr),'spdrNewUsable':sum(r['newStructurallyUsable'] for r in spdr),'records':records}
+    by_year={}
+    for year in YEARS:
+        rows=[r for r in valid if r['year']==year]
+        by_year[str(year)]={
+            'mappedSeries':len(rows),
+            'compositeUsable':sum(r['compositeUsable'] for r in rows),
+            'fallbackUsed':sum(r['compositeMethod']=='html-year-artifact-fallback' for r in rows),
+        }
+    out={'purpose':'Structural validation of the composite legacy holdings parser. Established parser is preserved; HTML fallback is used only for the proven one-row year-header artifact. No prices/returns/performance used.',
+         'acceptanceRules':{'establishedParserFirst':True,'fallbackOnlyForYearHeaderArtifact':True,'usableRule':'production name exclusion + 10..120 holdings + top10>=25'},
+         'mappedSeries':len(valid),
+         'compositeUsable':sum(r['compositeUsable'] for r in valid),
+         'fallbackUsed':sum(r['compositeMethod']=='html-year-artifact-fallback' for r in valid),
+         'isharesMappedSeries':len(ishares),'isharesCompositeUsable':sum(r['compositeUsable'] for r in ishares),'isharesFallbackUsed':sum(r['compositeMethod']=='html-year-artifact-fallback' for r in ishares),
+         'spdrMappedSeries':len(spdr),'spdrCompositeUsable':sum(r['compositeUsable'] for r in spdr),'spdrFallbackUsed':sum(r['compositeMethod']=='html-year-artifact-fallback' for r in spdr),
+         'byYear':by_year,'records':records}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
     print('SUMMARY',json.dumps({k:v for k,v in out.items() if k!='records'}),flush=True)
 
