@@ -35,15 +35,7 @@ def fixed_fixture_sample():
 
 
 def shared_nport_series_contracts(_submission: str, _company: str):
-    """Supply only series identity metadata from the frozen N-PORT side.
-
-    Gate A is explicitly a same-series parser/issuer/scoring test. The legacy filing
-    transport used by the fast harness does not reliably preserve the EDGAR SGML
-    SERIES-AND-CLASSES header, so discovering seriesId from that transport would mix
-    a metadata-transport failure into the holdings-parser gate. We therefore freeze
-    the shared seriesId/name identity from the already-frozen N-PORT bootstrap while
-    keeping all holdings, weights and schedule parsing on the legacy report side.
-    """
+    """Supply only series identity metadata from the frozen N-PORT side."""
     with gzip.open(repro.BOOTSTRAP, 'rt', encoding='utf-8') as f:
         bp = json.load(f)
     rows = bp.get('snapshots') or bp.get('filings') or []
@@ -59,6 +51,25 @@ def shared_nport_series_contracts(_submission: str, _company: str):
     return out
 
 
+_original_normalized_holdings = repro.ov.pit.normalized_holdings
+
+
+def normalized_holdings_with_empty_fallback(block: str):
+    """Preserve valid primary parses; fallback only for empty/year-artifact parses."""
+    method, holdings, total = _original_normalized_holdings(block)
+    needs_fallback = not holdings or repro.ov.pit._year_header_artifact(holdings, total)
+    if not needs_fallback:
+        return method, holdings, total
+
+    fallback_raw = repro.ov.pit.legacy_holdings.parse_html_table(block)
+    fallback, fallback_total = repro.ov.pit._normalize(fallback_raw)
+    if len(fallback) >= 2 and fallback_total > 0 and repro.ov.pit.legacy_holdings.structural_sanity(fallback):
+        reason = 'empty-primary' if not holdings else 'year-artifact'
+        return f'html-{reason}-fallback', fallback, fallback_total
+    return method, holdings, total
+
+
+repro.ov.pit.normalized_holdings = normalized_holdings_with_empty_fallback
 _original_mapped_modern_series = repro.ov.mapped_modern_series
 
 
@@ -69,7 +80,6 @@ def diagnostic_mapped_modern_series(text: str, series: list[dict]):
     parsed_nonempty = 0
     structural_gate_pass = 0
     examples = []
-    sample_emitted = False
     for start, end in blocks:
         block = text[start:end]
         context = text[max(0, start - 10000):min(end, start + 3000)]
@@ -83,12 +93,6 @@ def diagnostic_mapped_modern_series(text: str, series: list[dict]):
             continue
         unique_name_matches += 1
         s = exact[0]
-        if not sample_emitted:
-            # Fixed-format diagnostic only. Keep the excerpt short and deterministic;
-            # it is used to identify the table serialization emitted by the transport.
-            print('LEGACY_MATCHED_BLOCK_RAW_SAMPLE', json.dumps(block[:5000]), flush=True)
-            print('LEGACY_MATCHED_BLOCK_VISIBLE_SAMPLE', json.dumps(repro.ov.visible(block)[:5000]), flush=True)
-            sample_emitted = True
         method, holdings, total = repro.ov.pit.normalized_holdings(block)
         count = len(holdings)
         top10 = sum(h['weight'] for h in holdings[:10]) if holdings else 0
