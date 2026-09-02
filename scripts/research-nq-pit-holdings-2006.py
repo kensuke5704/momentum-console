@@ -48,6 +48,7 @@ def normalized_holdings(block: str) -> tuple[str, list[dict], float]:
     if total > 0:
         for h in positive:
             h["weight"] = 100.0 * h["marketValue"] / total
+        positive.sort(key=lambda h: h["weight"], reverse=True)
     return method, positive, total
 
 
@@ -86,6 +87,7 @@ def main() -> None:
                     continue
                 method, holdings, total = normalized_holdings(block)
                 count = len(holdings)
+                top10_weight = sum(h["weight"] for h in holdings[:10]) if holdings else 0.0
                 candidate = {
                     "accession": accession_from_filename(x["filename"]),
                     "cik": x["cik"],
@@ -102,10 +104,14 @@ def main() -> None:
                     "parseMethod": method,
                     "eligibleByName": seg.eligible_name(s.get("seriesName") or ""),
                     "parsedMarketValueTotal": total,
+                    "top10Weight": top10_weight,
                     "holdings": holdings,
                 }
                 candidate["structurallyUsable"] = bool(
-                    candidate["eligibleByName"] and 10 <= count <= 120 and total > 0
+                    candidate["eligibleByName"]
+                    and 10 <= count <= 120
+                    and total > 0
+                    and top10_weight >= 25.0
                 )
                 current = mapped.get(s["seriesId"])
                 if current is None or (count, score) > (len(current["holdings"]), current["mappingScore"]):
@@ -139,6 +145,7 @@ def main() -> None:
         "purpose": "Point-in-time legacy N-Q ETF-series holdings representation pilot. No return/performance data used.",
         "sampleRule": "One deterministic N-Q filing per known ETF registrant, identical registrant sample to the segmentation pilot.",
         "weightRule": "Positive parsed market values normalized to 100 within each mapped series. These are parser-relative weights, not yet validated against reported net assets.",
+        "structuralEligibilityRule": "Production name exclusions plus 10 <= parsed holdings <= 120 and normalized top-10 weight >= 25%. N-Q lacks direct N-PORT US/CORP/EC fields, so country/issuer/asset parity remains unresolved.",
         "tickerMappingStatus": "Holdings issuer descriptions are intentionally left unmapped here; issuer/security-id/ticker mapping is a separate validation stage.",
         "filingsAttempted": len(chosen),
         "filingsSucceeded": sum(1 for r in filing_results if "error" not in r),
