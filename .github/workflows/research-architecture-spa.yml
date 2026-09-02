@@ -1,0 +1,68 @@
+name: Research Architecture SPA
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - ".github/workflows/research-architecture-spa.yml"
+      - "scripts/architecture-spa-analyze.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  architecture-spa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Add temporary performance capture hook
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/lib/backtest.ts')
+          s=p.read_text()
+          s='import { appendFileSync } from "node:fs";\n'+s
+          needle='  return { cagr, maxDrawdown, annualizedVolatility: stdev(returns) * Math.sqrt(252), calmar: maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : null, finalEquity: last.equity };'
+          repl='''  const captureFile = process.env.ARCH_CAPTURE_FILE;\n  if (captureFile) {\n    const stack = new Error().stack?.split("\\n") ?? [];\n    const caller = stack[2] ?? "";\n    if (caller.includes("/scripts/")) appendFileSync(captureFile, JSON.stringify({script: process.env.ARCH_CAPTURE_SCRIPT ?? "", caller, curve}) + "\\n");\n  }\n'''+needle
+          if needle not in s: raise SystemExit('performanceStats return pattern not found')
+          p.write_text(s.replace(needle,repl,1))
+          PY
+          mkdir -p captures logs
+      - name: Execute historical architecture scripts
+        shell: bash
+        run: |
+          set +e
+          find scripts -maxdepth 1 -type f -name 'cagr40-*.ts' ! -name '*diagnostic*' -print0 | sort -z | xargs -0 -n1 -P4 bash -c '
+            f="$0"; b=$(basename "$f" .ts); out="captures/$b.jsonl"; log="logs/$b.log";
+            echo "START $b";
+            ARCH_CAPTURE_FILE="$out" ARCH_CAPTURE_SCRIPT="$b" timeout 120s node --import tsx "$f" >"$log" 2>&1;
+            rc=$?; echo "$b,$rc" >> logs/status.csv; echo "END $b rc=$rc";
+          '
+          ARCH_CAPTURE_FILE="captures/stage21-spa.jsonl" ARCH_CAPTURE_SCRIPT="stage21-spa" timeout 180s node --import tsx scripts/stage21-spa.ts >logs/stage21-spa.log 2>&1
+          echo "stage21-spa,$?" >> logs/status.csv
+          true
+      - name: Summarize execution coverage
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          rows=[]
+          p=Path('logs/status.csv')
+          if p.exists():
+            for line in p.read_text().splitlines():
+              if ',' in line:
+                n,r=line.rsplit(',',1); rows.append((n,int(r)))
+          ok=[n for n,r in rows if r==0]; bad=[(n,r) for n,r in rows if r!=0]
+          print(f'EXECUTION total={len(rows)} success={len(ok)} failed={len(bad)}')
+          print('SUCCESS', ','.join(ok))
+          print('FAILED', ','.join(f'{n}:{r}' for n,r in bad))
+          PY
+      - name: Run architecture-level SPA
+        run: |
+          node scripts/architecture-spa-analyze.mjs captures/*.jsonl
