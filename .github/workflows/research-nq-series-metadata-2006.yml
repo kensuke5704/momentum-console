@@ -13,13 +13,25 @@ permissions:
   contents: read
 
 jobs:
-  probe:
+  npx:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Probe N-PX issuer ticker security-id mapping
         run: python3 scripts/research-npx-security-master-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npx-security-master-2006
+          path: data/research/npx-security-master-pilot-2006.json
+          if-no-files-found: warn
+
+  nq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
       - name: Extract 2006 filing index
         run: python3 scripts/research-nq-index-extract.py
       - name: Probe N-Q series and ticker metadata
@@ -27,8 +39,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: legacy-fund-metadata-2006
-          path: |
-            data/research/nq-series-metadata-2006.json
-            data/research/npx-security-master-pilot-2006.json
+          name: nq-series-metadata-2006
+          path: data/research/nq-series-metadata-2006.json
           if-no-files-found: warn
