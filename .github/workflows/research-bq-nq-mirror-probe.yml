@@ -32,33 +32,39 @@ jobs:
             echo "$code $bytes $u"
             if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ]; then ok=$((ok+1)); fi
           done
-          echo "documents_successful=$ok/${#urls[@]}"
           test "$ok" -eq 3
-      - name: Download Notre Dame SEC master-index archive
+      - name: Verify Notre Dame index and complete submission mirror URL
         shell: bash
         run: |
           set -euo pipefail
           file_id="1yfQxR45DZ_vM5pkFvgyexc10NNqbxpFN"
-          url="https://drive.usercontent.google.com/download?id=${file_id}&export=download&confirm=t"
-          curl -L --fail --retry 3 --max-time 180 -o /tmp/master.zip "$url"
-          unzip -tq /tmp/master.zip
+          curl -L --fail --retry 3 --max-time 180 -o /tmp/master.zip "https://drive.usercontent.google.com/download?id=${file_id}&export=download&confirm=t"
           prefix="MasterIndex_20260318"
-          total=0
-          for f in master_2004_QTR1.idx master_2008_QTR4.idx master_2013_QTR4.idx master_2019_QTR4.idx; do
-            unzip -p /tmp/master.zip "${prefix}/${f}" > /tmp/q.idx
-            nq=$(grep -c '|N-Q|' /tmp/q.idx || true)
-            echo "$f N-Q rows=$nq"
-            total=$((total+nq))
-          done
-          echo "sample_NQ_rows=$total"
-          test "$total" -gt 0
-          # Establish actual filing-index coverage by year, including amendments.
-          for y in 2003 2004 2006 2008 2010 2013 2016 2018 2019 2020; do
+          for y in 2004 2006 2008 2010 2013 2016 2018 2019 2020; do
             n=0
             for q in 1 2 3 4; do
-              p="${prefix}/master_${y}_QTR${q}.idx"
-              c=$(unzip -p /tmp/master.zip "$p" 2>/dev/null | grep -Ec '\|N-Q(/A)?\|' || true)
+              c=$(unzip -p /tmp/master.zip "${prefix}/master_${y}_QTR${q}.idx" 2>/dev/null | grep -Ec '\|N-Q(/A)?\|' || true)
               n=$((n+c))
             done
             echo "YEAR_NQ $y $n"
           done
+          # The master index provides the complete-submission filename. Confirm the mirror can serve
+          # that exact submission via the canonical EDGAR accession directory for known filings.
+          tests=(
+            "1551030|0000894189-18-005288.txt"
+            "1444822|0001193125-17-062613.txt"
+            "795259|0001104659-13-086761.txt"
+          )
+          ok=0
+          for t in "${tests[@]}"; do
+            IFS='|' read -r cik fn <<< "$t"
+            nodash="${fn%.txt}"; nodash="${nodash//-/}"
+            u="https://edgar.businessquant.com/Archives/edgar/data/${cik}/${nodash}/${fn}"
+            code=$(curl -L -sS -o /tmp/sub.txt -w '%{http_code}' --max-time 90 "$u" || true)
+            bytes=$(wc -c </tmp/sub.txt 2>/dev/null || echo 0)
+            form=$(grep -Eic '<TYPE>N-Q|CONFORMED SUBMISSION TYPE:[[:space:]]*N-Q' /tmp/sub.txt 2>/dev/null || true)
+            echo "COMPLETE code=$code bytes=$bytes form=$form $u"
+            if [ "$code" = "200" ] && [ "$bytes" -gt 10000 ] && [ "$form" -gt 0 ]; then ok=$((ok+1)); fi
+          done
+          echo "complete_submission_success=$ok/3"
+          test "$ok" -eq 3
