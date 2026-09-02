@@ -6,6 +6,7 @@ import re
 import time
 import urllib.request
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,15 +24,11 @@ def sec_url(filename: str) -> str:
 
 
 def fetch_prefix(url: str) -> tuple[str, str]:
-    # The SEC SGML header is at the front of the filing and is the only part needed here.
-    req = urllib.request.Request(url, headers=UA)
-    try:
-        with urllib.request.urlopen(req, timeout=90) as r:
-            return "sec-direct", r.read(1_500_000).decode("utf-8", "replace")
-    except Exception:
-        req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
-        with urllib.request.urlopen(req, timeout=120) as r:
-            return "jina", r.read(1_500_000).decode("utf-8", "replace")
+    # GitHub-hosted runners are blocked by SEC Archives in this environment.
+    # Jina is only a transport bridge; the underlying URL remains the SEC filing.
+    req = urllib.request.Request("https://r.jina.ai/" + url, headers=UA)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return "jina", r.read(1_500_000).decode("utf-8", "replace")
 
 
 def values(text: str, tag: str) -> list[str]:
@@ -66,57 +63,66 @@ def choose_samples(filings: list[dict]) -> list[dict]:
     return chosen
 
 
+def inspect_one(i: int, total: int, x: dict) -> dict:
+    url = sec_url(x["filename"])
+    try:
+        method, text = fetch_prefix(url)
+        series_names = values(text, "SERIES-NAME")
+        series_ids = values(text, "SERIES-ID")
+        class_names = values(text, "CLASS-CONTRACT-NAME")
+        tickers = values(text, "CLASS-CONTRACT-TICKER-SYMBOL")
+        etf_series = [s for s in series_names if re.search(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", s, re.I)]
+        return {
+            "index": i,
+            "cik": x["cik"],
+            "company": x["company"],
+            "dateFiled": x["dateFiled"],
+            "filename": x["filename"],
+            "method": method,
+            "seriesNames": series_names[:80],
+            "seriesIds": series_ids[:80],
+            "classNames": class_names[:80],
+            "tickers": tickers[:80],
+            "etfSeriesNames": etf_series[:80],
+            "containsEtfText": bool(re.search(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", text, re.I)),
+        }
+    except Exception as e:
+        return {
+            "index": i,
+            "cik": x.get("cik"),
+            "company": x.get("company"),
+            "dateFiled": x.get("dateFiled"),
+            "filename": x.get("filename"),
+            "error": repr(e),
+        }
+
+
 def main() -> None:
     idx = json.loads(IDX.read_text())
     samples = choose_samples(idx["filings"])
     print(f"samples={len(samples)}", flush=True)
     results = []
-    methods = Counter()
-    for i, x in enumerate(samples, 1):
-        url = sec_url(x["filename"])
-        try:
-            method, text = fetch_prefix(url)
-            methods[method] += 1
-            series_names = values(text, "SERIES-NAME")
-            series_ids = values(text, "SERIES-ID")
-            class_names = values(text, "CLASS-CONTRACT-NAME")
-            tickers = values(text, "CLASS-CONTRACT-TICKER-SYMBOL")
-            etf_series = [s for s in series_names if re.search(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", s, re.I)]
-            r = {
-                "cik": x["cik"],
-                "company": x["company"],
-                "dateFiled": x["dateFiled"],
-                "filename": x["filename"],
-                "method": method,
-                "seriesNames": series_names[:80],
-                "seriesIds": series_ids[:80],
-                "classNames": class_names[:80],
-                "tickers": tickers[:80],
-                "etfSeriesNames": etf_series[:80],
-                "containsEtfText": bool(re.search(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", text, re.I)),
-            }
-            print(
-                f"{i}/{len(samples)} {x['dateFiled']} {x['company'][:36]} method={method} "
-                f"series={len(series_names)} tickers={len(tickers)} etfSeries={len(etf_series)}",
-                flush=True,
-            )
-            if series_names:
-                print("  SERIES", json.dumps(series_names[:6]), flush=True)
-            if tickers:
-                print("  TICKERS", json.dumps(tickers[:12]), flush=True)
-        except Exception as e:
-            r = {
-                "cik": x.get("cik"),
-                "company": x.get("company"),
-                "dateFiled": x.get("dateFiled"),
-                "filename": x.get("filename"),
-                "error": repr(e),
-            }
-            print(f"{i}/{len(samples)} FAIL {x.get('company')} {e!r}", flush=True)
-        results.append(r)
-        time.sleep(0.12)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(inspect_one, i, len(samples), x) for i, x in enumerate(samples, 1)]
+        for future in as_completed(futures):
+            r = future.result()
+            results.append(r)
+            if "error" in r:
+                print(f"{r['index']}/{len(samples)} FAIL {r.get('company')} {r['error']}", flush=True)
+            else:
+                print(
+                    f"{r['index']}/{len(samples)} {r['dateFiled']} {r['company'][:36]} method={r['method']} "
+                    f"series={len(r['seriesNames'])} tickers={len(r['tickers'])} etfSeries={len(r['etfSeriesNames'])}",
+                    flush=True,
+                )
+                if r["seriesNames"]:
+                    print("  SERIES", json.dumps(r["seriesNames"][:6]), flush=True)
+                if r["tickers"]:
+                    print("  TICKERS", json.dumps(r["tickers"][:12]), flush=True)
+    results.sort(key=lambda r: r["index"])
 
     ok = [r for r in results if "error" not in r]
+    methods = Counter(r["method"] for r in ok)
     with_series = [r for r in ok if r["seriesNames"]]
     with_ticker = [r for r in ok if r["tickers"]]
     with_etf_series = [r for r in ok if r["etfSeriesNames"]]
