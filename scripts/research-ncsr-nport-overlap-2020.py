@@ -72,9 +72,9 @@ def iso8(raw: str | None):
 
 def norm_issuer(raw: str) -> str:
     s = html.unescape(raw or '').upper().replace('&',' AND ')
-    s = re.sub(r'\b(THE)\b',' ',s)
+    s = re.sub(r'\bTHE\b',' ',s)
     s = re.sub(r'\b(INCORPORATED|INCORPORATION)\b','INC',s)
-    s = re.sub(r'\b(CORPORATION|CORPORATION)\b','CORP',s)
+    s = re.sub(r'\bCORPORATION\b','CORP',s)
     s = re.sub(r'\bCOMPANY\b','CO',s)
     s = re.sub(r'\bLIMITED\b','LTD',s)
     s = re.sub(r'\s+(?:ADR|GDR)\s*$','',s)
@@ -86,9 +86,12 @@ def days(a: str, b: str):
     return abs((date.fromisoformat(a)-date.fromisoformat(b)).days)
 
 
+def ratio(n: float, d: float):
+    return n / d if d else None
+
+
 def main():
     filings = master_2020()
-    # Deterministic structural sample: first N-CSR/N-CSRS filing per target CIK in filing order.
     chosen=[]; seen=set()
     for x in sorted(filings,key=lambda r:(r['dateFiled'],r['cik'],r['filename'])):
         if x['cik'] in seen: continue
@@ -113,10 +116,11 @@ def main():
             mapped={}
             for j,m in enumerate(markers):
                 start=m.start(); end=markers[j+1].start() if j+1<len(markers) else min(len(text),start+300000)
-                pre_start=max(0,start-5000); block=text[pre_start:end]
-                s,score=seg.map_schedule_to_series(block,series)
+                parse_block=text[start:end]
+                mapping_context=text[max(0,start-5000):min(end,start+2500)]
+                s,score=seg.map_schedule_to_series(mapping_context,series)
                 if not s or not s.get('seriesId'): continue
-                method,holdings,total=pit.normalized_holdings(block)
+                method,holdings,total=pit.normalized_holdings(parse_block)
                 if not holdings or total<=0: continue
                 top10=sum(h['weight'] for h in holdings[:10])
                 if not (10<=len(holdings)<=120 and top10>=25): continue
@@ -132,17 +136,28 @@ def main():
                 gap=days(report,nearest['reportDate'])
                 if gap>45: continue
                 matched_series+=1
-                ncsr_names={norm_issuer(h.get('description','')):float(h.get('weight') or 0) for h in row['holdings'] if norm_issuer(h.get('description',''))}
-                nport_named=[h for h in nearest.get('holdings',[]) if h.get('issuerName')]
-                nport_names={norm_issuer(h.get('issuerName','')):float(h.get('weight') or 0) for h in nport_named if norm_issuer(h.get('issuerName',''))}
+                ncsr_names=defaultdict(float)
+                for h in row['holdings']:
+                    k=norm_issuer(h.get('description',''))
+                    if k: ncsr_names[k]+=float(h.get('weight') or 0)
+                nport_names=defaultdict(float)
+                for h in nearest.get('holdings',[]):
+                    k=norm_issuer(h.get('issuerName','')) if h.get('issuerName') else ''
+                    if k: nport_names[k]+=float(h.get('weight') or 0)
                 common=set(ncsr_names)&set(nport_names)
+                ncsr_total=sum(ncsr_names.values())
+                nport_total=sum(nport_names.values())
+                ncsr_common=sum(ncsr_names[k] for k in common)
+                nport_common=sum(nport_names[k] for k in common)
                 comparisons.append({
                     'seriesId':sid,'seriesName':row.get('seriesName'),'tickers':row.get('tickers',[]),
                     'ncsrReportDate':report,'nportReportDate':nearest.get('reportDate'),'reportDateGapDays':gap,
                     'ncsrHoldingCount':len(ncsr_names),'nportHoldingCount':len(nearest.get('holdings',[])),'nportNamedHoldingCount':len(nport_names),
                     'issuerOverlapCount':len(common),
-                    'ncsrWeightCoveredByNportIssuerNames':sum(ncsr_names[k] for k in common),
-                    'nportWeightCoveredByNcsrIssuerNames':sum(nport_names[k] for k in common),
+                    'ncsrTotalWeight':ncsr_total,'nportNamedTotalWeight':nport_total,
+                    'ncsrCommonWeight':ncsr_common,'nportCommonWeight':nport_common,
+                    'ncsrWeightCoverageRate':ratio(ncsr_common,ncsr_total),
+                    'nportNamedWeightCoverageRate':ratio(nport_common,nport_total),
                 })
             filing_results.append({'company':x['company'],'cik':x['cik'],'filingDate':x['dateFiled'],'reportDate':report,'registeredEtfSeries':len(series),'usableMappedSeries':len(mapped),'matchedToNportSeries':matched_series})
             print(f"{i}/{len(chosen)} {x['company'][:40]} etf={len(series)} usable={len(mapped)} nport={matched_series}",flush=True)
@@ -150,15 +165,19 @@ def main():
             filing_results.append({'company':x.get('company'),'cik':x.get('cik'),'error':repr(e)})
             print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}",flush=True)
 
-    usable_named=[c for c in comparisons if c['nportNamedHoldingCount']>0]
+    usable_named=[c for c in comparisons if c['nportNamedHoldingCount']>0 and c['ncsrWeightCoverageRate'] is not None and c['nportNamedWeightCoverageRate'] is not None]
+    left=sorted(c['ncsrWeightCoverageRate'] for c in usable_named)
+    right=sorted(c['nportNamedWeightCoverageRate'] for c in usable_named)
     summary={
         'year':2020,
         'purpose':'Direct structural overlap validation of legacy N-CSR/N-CSRS ETF schedule parsing against N-PORT for the same SEC seriesId. No return or strategy-performance data used.',
         'sampleRule':'First N-CSR/N-CSRS filing per target ETF-family CIK in 2020 filing order; no parser-success or performance selection.',
+        'matchingRule':'Same SEC seriesId; nearest N-PORT report date within 45 calendar days; exact conservative normalized issuer-name overlap only.',
+        'coverageRule':'N-CSR common issuer weight divided by normalized N-CSR series weight; N-PORT common issuer weight divided by total named N-PORT holding weight. No raw weight sum is treated as a percentage.',
         'targetFilings':len(filings),'sampledRegistrants':len(chosen),'filingsSucceeded':sum('error' not in r for r in filing_results),
         'seriesComparisons':len(comparisons),'seriesWithNportIssuerNames':len(usable_named),
-        'medianNcsrWeightCovered':sorted(c['ncsrWeightCoveredByNportIssuerNames'] for c in usable_named)[len(usable_named)//2] if usable_named else None,
-        'medianNportWeightCovered':sorted(c['nportWeightCoveredByNcsrIssuerNames'] for c in usable_named)[len(usable_named)//2] if usable_named else None,
+        'medianNcsrWeightCoverageRate':left[len(left)//2] if left else None,
+        'medianNportNamedWeightCoverageRate':right[len(right)//2] if right else None,
         'comparisons':comparisons,'filingResults':filing_results,
     }
     OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(summary,indent=2)+'\n')
