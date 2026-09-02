@@ -1,0 +1,25 @@
+name: Research Legacy Anchor Sample Plan
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-legacy-anchor-sample-plan.py"
+      - ".github/workflows/research-legacy-anchor-sample-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deterministic anchor-year structural sample plan
+        run: python3 scripts/research-legacy-anchor-sample-plan.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-anchor-sample-plan
+          path: data/research/legacy-anchor-sample-plan.json
