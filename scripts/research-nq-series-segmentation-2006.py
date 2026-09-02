@@ -20,7 +20,10 @@ pspec.loader.exec_module(nqpilot)
 
 TARGET = re.compile(r"SELECT SECTOR SPDR|STREETTRACKS|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
 SCHEDULE = re.compile(r"SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS|PORTFOLIO HOLDINGS|STATEMENT OF INVESTMENTS", re.I)
-PRIMARY_NQ = re.compile(r"(?is)<DOCUMENT>.*?<TYPE>\s*N-Q\b.*?<FILENAME>\s*([^\s<]+)")
+DOCUMENT_BLOCK = re.compile(r"(?is)<DOCUMENT>(.*?)</DOCUMENT>")
+TYPE_NQ = re.compile(r"(?im)^\s*<TYPE>\s*N-Q\b")
+FILENAME = re.compile(r"(?im)^\s*<FILENAME>\s*([^\s<]+)")
+TEXT_BLOCK = re.compile(r"(?is)<TEXT>(.*)</TEXT>")
 
 
 def norm(s: str) -> str:
@@ -38,14 +41,16 @@ def occurrences(text: str, series_name: str) -> list[int]:
     return [m.start() for m in pat.finditer(text)]
 
 
-def primary_nq_text(filing: dict, submission_text: str) -> tuple[str, str]:
-    m = PRIMARY_NQ.search(submission_text)
-    if not m:
-        return "submission", submission_text
-    primary = m.group(1).strip()
-    folder = filing["filename"].rsplit("/", 1)[0]
-    _, text = meta.fetch_prefix(meta.sec_url(folder + "/" + primary))
-    return primary, text
+def embedded_primary_nq(submission_text: str) -> tuple[str, str]:
+    for dm in DOCUMENT_BLOCK.finditer(submission_text):
+        block = dm.group(1)
+        if not TYPE_NQ.search(block):
+            continue
+        filename_m = FILENAME.search(block)
+        text_m = TEXT_BLOCK.search(block)
+        name = filename_m.group(1).strip() if filename_m else "embedded-nq"
+        return name, text_m.group(1) if text_m else block
+    return "submission", submission_text
 
 
 def best_anchor(hits: list[int], schedules: list[int]) -> tuple[int | None, int | None]:
@@ -82,7 +87,7 @@ def main() -> None:
             _, submission = meta.fetch_prefix(meta.sec_url(x["filename"]))
             series = meta.parse_series_contracts(submission, x["company"])
             etf = [s for s in series if s["isEtf"]]
-            primary_name, text = primary_nq_text(x, submission)
+            primary_name, text = embedded_primary_nq(submission)
             sched = [m.start() for m in SCHEDULE.finditer(text)]
 
             anchors = []
@@ -139,7 +144,7 @@ def main() -> None:
                 "series": rows,
             }
             print(
-                f"{i}/{len(chosen)} {x['company'][:42]} primary={primary_name} ETFseries={len(etf)} schedules={len(sched)} "
+                f"{i}/{len(chosen)} {x['company'][:42]} embedded={primary_name} ETFseries={len(etf)} schedules={len(sched)} "
                 f"segmentable={segmentable} parsed={parsed} usable10to120={structurally_usable}",
                 flush=True,
             )
@@ -166,7 +171,7 @@ def main() -> None:
         "structurallyUsableSeries": total_usable,
         "structurallyUsableRate": total_usable / total_series if total_series else None,
         "structuralEligibilityRule": "10 <= parsed holdings <= 120 and positive parsed market value; no returns used.",
-        "documentPolicy": "Parse series metadata from the complete submission SGML, but portfolio rows from the primary N-Q HTML document when discoverable.",
+        "documentPolicy": "Use complete submission for filing-time series metadata and isolate its embedded N-Q DOCUMENT/TEXT block locally for portfolio parsing.",
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
