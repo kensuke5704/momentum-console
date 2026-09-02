@@ -11,13 +11,13 @@ UA={'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com
 CATEGORY_RE=re.compile(r'\s[-–—]\s*\(?\d+(?:\.\d+)?%|TOTAL INVESTMENTS|NET ASSETS|TOTAL LONG|TOTAL SHORT',re.I)
 NUM_RE=re.compile(r'^\(?\$?\s*[-+]?\d[\d,]*(?:\.\d+)?\s*\)?$')
 TAIL_RE=re.compile(r'^(.*?)(\d[\d,]*(?:\.\d+)?)\s+(?:([A-Z]{3})\s+)?\$?\s*(\d[\d,]*(?:\.\d+)?)\s*$')
+FLAT_SKIP=re.compile(r'^(?:SECURITY DESCRIPTION|SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS|STATEMENT OF INVESTMENTS|COMMON STOCKS?|TOTAL INVESTMENTS|SHORT-TERM INVESTMENTS|AFFILIATE TABLE|TABLE OF CONTENTS|SEE ACCOMPANYING|SOURCE:|FUND PERFORMANCE|FUND INCEPTION|FOR THE (?:YEAR|PERIOD)|ITEM\s+\d+|NOTES? TO|SHARES?|VALUE)$',re.I)
 
 
 def sec_url(filename:str)->str:return 'https://www.sec.gov/Archives/'+filename.lstrip('/')
 def get_text(url:str)->str:
     req=urllib.request.Request('https://r.jina.ai/'+url,headers=UA)
     with urllib.request.urlopen(req,timeout=180) as r:return r.read(4_000_000).decode('utf-8','replace')
-
 def sample_filings(filings):
     by=defaultdict(list)
     for x in filings:
@@ -98,31 +98,92 @@ def parse_plain_holdings(text:str):
             if len(holdings)>=5:ended=True
         if ended:break
         if re.fullmatch(r'[-_= .]+',line):continue
-        if re.fullmatch(r'[\d,()$ .]+',line):continue # subtotal/total only
+        if re.fullmatch(r'[\d,()$ .]+',line):continue
         m=TAIL_RE.match(line)
         if m:
             prefix,qty,currency,value=m.groups();desc=clean_desc(prefix)
             q=parse_number(qty);v=parse_number(value)
             if v is None or v<=0 or q is None or q<=0:continue
-            # Require a security-like prefix; dot leaders are common but not mandatory.
             if not re.search(r'[A-Za-z]{2}',desc):continue
-            # If the line starts with coupon/tranche terms, inherit the preceding issuer parent.
             child=bool(re.match(r'^(?:\(?[a-z](?:,[a-z])*\)?\s*)?(?:REG\s+S|FRN|SERIES|SECURED|ZERO|\d+(?:\.\d+)?%)',desc,re.I))
             full=(' '.join(x for x in ((pending if child else ''),desc) if x)).strip()
             if len(full)<6:continue
             holdings.append({'description':full,'quantityOrPrincipal':q,'marketValue':v,'currency':currency});continue
-        # Parent issuer lines usually end with comma and are followed by one or more tranche rows.
         if '%' not in line and len(line)>=5 and len(line)<=220 and re.search(r'[A-Za-z]{3}',line) and line.rstrip().endswith(','):
             pending=clean_desc(line)
         elif re.search(r'\b(?:LONG TERM INVESTMENTS|SHORT TERM INVESTMENTS|COMMON STOCKS?|CORPORATE BONDS?|COUNTRY|TOTAL)\b',up):
             pending=''
     return lines,dedupe(holdings)
 
+
+def flat_lines(text:str):
+    # Jina/flattened SEC HTML keeps security descriptions on their own line and
+    # emits the numeric table row a few lines later using pipe separators.
+    s=html.unescape(text).replace('\xa0',' ')
+    return [' '.join(x.split()) for x in s.splitlines()]
+
+
+def flat_numeric_row(line:str):
+    if '|' not in line:return []
+    vals=[]
+    for cell in line.split('|'):
+        cell=' '.join(cell.split()).replace('—','').replace('–','').strip()
+        if not cell:continue
+        v=parse_number(cell)
+        if v is not None:vals.append(v)
+    return vals
+
+
+def flat_description(line:str)->bool:
+    if not line or '|' in line or len(line)>220:return False
+    s=clean_desc(line);u=s.upper()
+    if len(s)<3 or not re.search(r'[A-Za-z]{2}',s):return False
+    if FLAT_SKIP.match(u):return False
+    if CATEGORY_RE.search(s) or '%' in s:return False
+    if re.match(r'^(?:MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JANUARY|FEBRUARY)\b',u):return False
+    if re.match(r'^\(?[A-Z0-9]{1,2}\)?\s*\|',u):return False
+    if u.startswith(('THE ACCOMPANYING','THE FOLLOWING TABLE','AMOUNTS RELATED','INVESTMENT OF CASH','THE RATE SHOWN','NOT APPLICABLE')):return False
+    return True
+
+
+def parse_flat_holdings(text:str):
+    lines=flat_lines(text);holdings=[];started=False;in_equity=True
+    for i,line in enumerate(lines):
+        u=line.upper()
+        if 'SCHEDULE OF INVESTMENTS' in u:
+            started=True;in_equity=True;continue
+        if not started:continue
+        if 'SHORT-TERM INVESTMENTS' in u or 'MONEY MARKET' in u:
+            in_equity=False;continue
+        if 'COMMON STOCK' in u or 'COMMON SHARES' in u:
+            in_equity=True;continue
+        if not in_equity or not flat_description(line):continue
+        # Security description is followed by decoration/blank lines and then a
+        # Shares/Value numeric row. Require two positive numerics to avoid dates,
+        # page numbers and narrative statistics.
+        found=None
+        for j in range(i+1,min(len(lines),i+8)):
+            nxt=lines[j]
+            if nxt and flat_description(nxt):
+                break
+            vals=flat_numeric_row(nxt)
+            pos=[v for v in vals if v>0]
+            if len(pos)>=2:
+                found=(pos[0],pos[-1]);break
+        if not found:continue
+        q,v=found
+        desc=clean_desc(line)
+        if q<=0 or v<=0:continue
+        holdings.append({'description':desc,'quantityOrPrincipal':q,'marketValue':v})
+    return lines,dedupe(holdings)
+
+
 def parse_holdings(text:str):
-    hrows,h=parse_html_holdings(text);plines,p=parse_plain_holdings(text)
+    hrows,h=parse_html_holdings(text);plines,p=parse_plain_holdings(text);flines,f=parse_flat_holdings(text)
     # Format choice is parser-yield based only; never based on investment performance.
-    if len(p)>len(h):return 'plain',len(hrows),len(plines),p
-    return 'html',len(hrows),len(plines),h
+    choices=[('html',len(hrows),h),('plain',len(plines),p),('flat',len(flines),f)]
+    method,nrows,holdings=max(choices,key=lambda x:len(x[2]))
+    return method,len(hrows),max(len(plines),len(flines)),holdings
 
 def main():
     idx=json.loads(IDX.read_text());samples=sample_filings(idx['filings']);print('sample filings=',len(samples),flush=True);results=[]
