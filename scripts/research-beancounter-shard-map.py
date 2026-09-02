@@ -1,31 +1,41 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import gzip, io, json, urllib.request, zlib
+import json, urllib.parse, urllib.request, zlib
 
-UA={'User-Agent':'momentum-console research','Accept':'application/octet-stream'}
-BASE='https://huggingface.co/datasets/bradfordlevy/BeanCounter/resolve/main/train'
-PROBES=[1,20,40,60,80,100,120,140,160,180,200,220]
+UA={'User-Agent':'momentum-console research','Accept':'application/json'}
+API='https://huggingface.co/api/datasets/bradfordlevy/BeanCounter/tree/main/train?recursive=false&expand=false&limit=1000'
+BASE='https://huggingface.co/datasets/bradfordlevy/BeanCounter/resolve/main/'
 
-def first_json(idx:int):
-    name=f'bc-{idx:03d}-of-220.jsonl.gz'
-    url=f'{BASE}/{name}'
-    req=urllib.request.Request(url,headers={**UA,'Range':'bytes=0-2097151'})
-    with urllib.request.urlopen(req,timeout=120) as r:
-        data=r.read(2_097_152); status=getattr(r,'status',None); final=r.geturl()
+def get_json(url:str):
+    req=urllib.request.Request(url,headers=UA)
+    with urllib.request.urlopen(req,timeout=120) as r:return json.load(r)
+
+def first_json(path:str):
+    url=BASE+urllib.parse.quote(path,safe='/')
+    req=urllib.request.Request(url,headers={'User-Agent':'momentum-console research','Range':'bytes=0-4194303'})
+    with urllib.request.urlopen(req,timeout=180) as r:
+        data=r.read(4_194_304); status=getattr(r,'status',None); final=r.geturl()
     dec=zlib.decompressobj(16+zlib.MAX_WBITS)
     txt=dec.decompress(data).decode('utf-8','replace')
     lines=[x for x in txt.splitlines() if x.strip()]
     obj=json.loads(lines[0]) if lines else None
-    return {'idx':idx,'name':name,'status':status,'finalUrl':final,'rangeBytes':len(data),'first':obj}
+    return {'path':path,'status':status,'finalUrl':final,'rangeBytes':len(data),'first':obj}
 
 def main():
-    out=[]
-    for i in PROBES:
+    tree=get_json(API)
+    files=[x for x in tree if x.get('type')=='file']
+    print('train files=',len(files),flush=True)
+    print('FIRST_NAMES',json.dumps([{k:x.get(k) for k in ('path','size','oid')} for x in files[:30]],indent=2),flush=True)
+    if not files:return
+    n=len(files)
+    positions=sorted(set([0,n//10,n//5,3*n//10,2*n//5,n//2,3*n//5,7*n//10,4*n//5,9*n//10,n-1]))
+    results=[]
+    for pos in positions:
+        x=files[pos]
         try:
-            r=first_json(i); out.append(r)
-            x=r['first'] or {}
-            print(i,'date=',x.get('date'),'type=',x.get('type_filing'),'accession=',x.get('accession'),'bytes=',r['rangeBytes'],flush=True)
-        except Exception as e: print(i,'FAIL',repr(e),flush=True)
-    print('RESULT',json.dumps(out)[:20000])
+            r=first_json(x['path']); results.append(r); o=r['first'] or {}
+            print(pos,x['path'],'date=',o.get('date'),'type=',o.get('type_filing'),'ts=',o.get('ts_accept'),'accession=',o.get('accession'),flush=True)
+        except Exception as e: print(pos,x['path'],'FAIL',repr(e),flush=True)
+    print('RESULT',json.dumps(results)[:30000])
 
 if __name__=='__main__':main()
