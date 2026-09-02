@@ -1,0 +1,18 @@
+name: Research HF 13F Shard Range
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-hf13f-shard-range.py"
+      - ".github/workflows/research-hf13f-shard-range.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q pyarrow
+      - run: python3 scripts/research-hf13f-shard-range.py
