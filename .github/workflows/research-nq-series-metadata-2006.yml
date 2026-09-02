@@ -7,6 +7,7 @@ on:
       - "scripts/research-nq-series-metadata-2006.py"
       - "scripts/research-nq-series-segmentation-2006.py"
       - "scripts/research-nq-pit-holdings-2006.py"
+      - "scripts/research-nq-series-semantic-audit-2006.py"
       - "scripts/research-npx-security-master-2006.py"
       - "scripts/research-npx-security-master-build-2006.py"
       - "scripts/research-nq-npx-mapping-2006.py"
@@ -49,6 +50,8 @@ jobs:
         run: python3 scripts/research-nq-series-segmentation-2006.py
       - name: Build N-Q PIT holdings representation
         run: python3 scripts/research-nq-pit-holdings-2006.py
+      - name: Audit N-Q schedule-to-series assignment
+        run: python3 scripts/research-nq-series-semantic-audit-2006.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -57,6 +60,7 @@ jobs:
             data/research/nq-series-metadata-2006.json
             data/research/nq-series-segmentation-2006.json
             data/research/nq-pit-holdings-2006.json
+            data/research/nq-series-semantic-audit-2006.json
           if-no-files-found: warn
 
   mapping:
