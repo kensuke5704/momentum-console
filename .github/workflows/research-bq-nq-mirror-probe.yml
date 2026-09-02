@@ -34,18 +34,27 @@ jobs:
           done
           echo "documents_successful=$ok/${#urls[@]}"
           test "$ok" -eq 3
-      - name: Inspect free HF EDGAR master-index dataset
+      - name: Probe SEC EFTS historical N-Q index
         shell: bash
         run: |
           python3 - <<'PY'
-          import json, urllib.request
-          base='https://huggingface.co/api/datasets/arthrod/SEC_filings_1994_2024/tree/main?recursive=true&expand=false'
-          req=urllib.request.Request(base,headers={'User-Agent':'momentum-console research'})
-          with urllib.request.urlopen(req,timeout=90) as r: rows=json.load(r)
-          print('entries',len(rows))
-          for x in rows[:100]:
-              print(x.get('type'),x.get('path'),x.get('size'))
-          files=[x for x in rows if x.get('type')=='file']
-          print('files',len(files),'bytes',sum((x.get('size') or 0) for x in files))
-          assert files
+          import json, urllib.parse, urllib.request
+          params={
+            'forms':'N-Q',
+            'startdt':'2018-01-01',
+            'enddt':'2018-12-31',
+            'from':'0',
+            'size':'100'
+          }
+          url='https://efts.sec.gov/LATEST/search-index?'+urllib.parse.urlencode(params)
+          req=urllib.request.Request(url,headers={'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com','Accept':'application/json'})
+          with urllib.request.urlopen(req,timeout=90) as r:
+            print('status',r.status)
+            obj=json.load(r)
+          hits=obj.get('hits',{}).get('hits',[])
+          total=obj.get('hits',{}).get('total')
+          print('total',total,'returned',len(hits))
+          for h in hits[:5]:
+            print(h.get('_id'),h.get('_source',{}).get('ciks'),h.get('_source',{}).get('file_date'),h.get('_source',{}).get('root_forms'))
+          assert hits
           PY
