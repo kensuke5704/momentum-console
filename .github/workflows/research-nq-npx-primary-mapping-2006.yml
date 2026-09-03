@@ -1,0 +1,34 @@
+name: Research NQ N-PX Primary Mapping 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-npx-primary-mapping-2006.py"
+      - ".github/workflows/research-nq-npx-primary-mapping-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download baseline, structural mapping, and suffix audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/base /tmp/struct /tmp/audit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/base.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899299058/zip > /tmp/struct.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899425593/zip > /tmp/audit.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          unzip -q /tmp/audit.zip -d /tmp/audit
+          cp /tmp/base/nq-npx-mapping-2006.json data/research/
+          cp /tmp/struct/nq-npx-structural-mapping-2006.json data/research/
+          cp /tmp/audit/nq-npx-suffix-match-audit-2006.json data/research/
+      - run: python3 scripts/research-nq-npx-primary-mapping-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-npx-primary-mapping-2006
+          path: data/research/nq-npx-primary-mapping-2006.json
