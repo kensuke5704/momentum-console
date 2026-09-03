@@ -17,7 +17,7 @@ MARKUP=re.compile(r'[*_]+')
 MONTHS={'JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'}
 
 def clean(s):return re.sub(r'\s+',' ',s or '').strip()
-def plain(s):return clean(MARKUP.sub('',s or ''))
+def plain(s):return clean(MARKUP.sub('',s or '').replace('\xa0',' '))
 def norm(s):
  s=FOOT.sub('',s or '').upper().replace('&',' AND ')
  s=re.sub(r'/[A-Z]{2}\b',' ',s)
@@ -26,7 +26,6 @@ def norm(s):
  s=re.sub(r'\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC)\b',' ',s)
  s=re.sub(r'[^A-Z0-9]+',' ',s)
  s=' '.join(s.split())
- # Normalize dotted initialisms such as W.W. -> WW without collapsing ordinary words.
  parts=s.split();out=[];i=0
  while i<len(parts):
   if len(parts[i])==1 and i+1<len(parts) and len(parts[i+1])==1:
@@ -94,6 +93,21 @@ def parse_four_line(seg):
   i+=1
  return rows
 
+def parse_nearby_vertical(seg):
+ """Rendered SEC vertical tables: issuer text has a shares integer shortly before and market value shortly after."""
+ rows=[];in_common=False
+ cleaned=[plain(x) for x in seg]
+ for i,line in enumerate(cleaned):
+  if re.search(r'\bCOMMON STOCKS?\b',line,re.I):in_common=True;continue
+  if in_common and STOP.search(line):break
+  if not in_common or not line or not re.search(r'[A-Za-z]',line):continue
+  if (re.search(r'\d+(?:\.\d+)?\s*%$',line) or re.match(r'^(TOTAL|COMMON STOCK|SHARES|SECURITY DESCRIPTION|VALUE|SCHEDULE OF INVESTMENTS)',line,re.I)):
+   continue
+  prev=' '.join(x for x in cleaned[max(0,i-4):i] if x)
+  foll=' '.join(x for x in cleaned[i+1:min(len(cleaned),i+5)] if x)
+  if re.search(r'\b\d[\d,]*\b',prev) and re.search(r'\b\d[\d,]*\b',foll):rows.append(line)
+ return rows
+
 def parse_spaced(seg):
  rows=[];in_common=False
  for raw in seg:
@@ -112,13 +126,14 @@ def parse_spaced(seg):
 
 def parse_rows(text,series):
  seg=schedule_segment(text,series)
- candidates=[('compact_inline',parse_compact_inline(seg)),('four_line',parse_four_line(seg)),('spaced',parse_spaced(seg))]
+ candidates=[('compact_inline',parse_compact_inline(seg)),('four_line',parse_four_line(seg)),('nearby_vertical',parse_nearby_vertical(seg)),('spaced',parse_spaced(seg))]
  scored=[]
  for grammar,rows in candidates:
   unique=list(dict.fromkeys(x for x in rows if norm(x)))
   alpha=sum(bool(re.search(r'[A-Za-z]',x)) for x in unique)
-  quality=alpha/len(unique) if unique else 0
-  plausible=5<=len(unique)<=250 and quality>=.95
+  bad=sum(bool(re.search(r'\d+(?:\.\d+)?\s*%$|^(TOTAL|COMMON STOCK|SHARES|SECURITY DESCRIPTION|VALUE)',x,re.I)) for x in unique)
+  quality=(alpha-bad)/len(unique) if unique else 0
+  plausible=5<=len(unique)<=250 and quality>=.90
   scored.append((plausible,len(unique),quality,grammar,unique))
  plausible=[x for x in scored if x[0]]
  _,_,_,grammar,rows=max(plausible or scored,key=lambda x:(x[0],x[1],x[2]))
