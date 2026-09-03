@@ -1,0 +1,18 @@
+name: Research Gate B Aggregate Shadow 2020
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - 'scripts/research-gate-b-aggregate-shadow-2020.py'
+      - '.github/workflows/research-gate-b-aggregate-shadow-2020.yml'
+  workflow_dispatch:
+jobs:
+  aggregate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-gate-b-aggregate-shadow-2020.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gate-b-aggregate-shadow-2020
+          path: data/research/gate-b-aggregate-shadow-2020.json
