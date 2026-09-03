@@ -168,6 +168,8 @@ export type DashboardPayload = {
   liveState: LiveStrategyState;
   qqq: { close: number | null; monthlyMa: number | null; dailySma: number | null; momentum20d: number | null };
   oos: ForwardOosResult;
+  /** Current daily simulation used only to extend Forward OOS; the displayed backtest remains frozen. */
+  oosBacktest: BacktestResult;
   backtest: BacktestResult;
   expectedCagr?: ExpectedCagrModel;
   nportOperations?: NportOperations;

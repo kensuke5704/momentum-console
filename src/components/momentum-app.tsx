@@ -227,12 +227,15 @@ const asOfLabel = (value: string) => {
 };
 
 function Portfolio({ data }: { data: DashboardPayload }) {
-  const positions = data.liveState.currentPositions.map((position) => {
-    const latest = data.latestPrices?.[position.symbol];
-    const currentPrice = latest?.price ?? position.currentPrice;
-    return { ...position, currentPrice, pnl: currentPrice == null ? null : currentPrice / position.entryPrice - 1, priceAsOf: latest?.asOf ?? data.liveState.asOf };
-  });
-  const latestAsOf = positions.map((position) => position.priceAsOf).filter(Boolean).sort().at(-1) ?? data.liveState.asOf;
+  const positions = [...data.portfolioState.holdings, ...data.portfolioState.targets
+    .filter((target) => target.symbol !== "CASH" && !data.portfolioState.holdings.some((holding) => holding.symbol === target.symbol))
+    .map((target) => ({ symbol: target.symbol, entryPrice: null, currentPrice: null, targetWeight: target.weight, role: target.role }))]
+    .map((holding) => {
+      const latest = data.latestPrices?.[holding.symbol];
+      const currentPrice = latest?.price ?? holding.currentPrice;
+      return { ...holding, currentPrice, pnl: holding.entryPrice == null || currentPrice == null ? null : currentPrice / holding.entryPrice - 1, priceAsOf: latest?.asOf ?? data.portfolioState.asOf };
+    });
+  const latestAsOf = positions.map((position) => position.priceAsOf).filter(Boolean).sort().at(-1) ?? data.portfolioState.asOf;
 
   return <div className="dynamic-stack"><Section title="Current Positions" asOf={asOfLabel(latestAsOf)}>
     <div className="table-scroll portfolio-table">

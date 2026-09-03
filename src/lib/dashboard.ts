@@ -39,6 +39,7 @@ export function buildDashboardPayload(histories: Record<string, PricePoint[]>, u
     liveState: stage21.innerState,
     qqq: { close, monthlyMa: currentSignal?.qqqMonthlyMa ?? null, dailySma: sma, momentum20d: close && prior ? close / prior - 1 : null },
     oos: displayedOos,
+    oosBacktest: stage21.backtest,
     backtest: displayedBacktest,
     nportOperations: persisted?.nportOperations,
   };
