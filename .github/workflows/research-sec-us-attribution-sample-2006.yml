@@ -1,0 +1,32 @@
+name: Research SEC US Attribution Sample 2006
+
+on:
+  push:
+    paths:
+      - 'scripts/research-sec-us-attribution-sample-2006.py'
+      - '.github/workflows/research-sec-us-attribution-sample-2006.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download EC-filtered mapping artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/map
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/map.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/map/nq-npx-mapping-2006.json data/research/
+      - name: Run deterministic US attribution sample
+        run: python3 scripts/research-sec-us-attribution-sample-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-us-attribution-sample-2006
+          path: data/research/sec-us-attribution-sample-2006.json
