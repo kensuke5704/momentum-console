@@ -1,0 +1,31 @@
+name: Research NQ CORP Materiality 2006
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-nq-corp-materiality-2006.py
+      - .github/workflows/research-nq-corp-materiality-2006.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download EC-filtered 2006 holdings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/ec
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/ec.zip
+          unzip -q /tmp/ec.zip -d /tmp/ec
+          cp /tmp/ec/nq-pit-holdings-2006-ec-filtered.json data/research/
+      - run: python3 scripts/research-nq-corp-materiality-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-corp-materiality-2006
+          path: data/research/nq-corp-materiality-2006.json
+          if-no-files-found: warn
