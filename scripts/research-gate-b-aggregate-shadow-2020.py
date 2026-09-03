@@ -88,8 +88,23 @@ def resolve(master,sid,raw):
   if len(c)>1:return ''
  return ''
 
-def extract_clearbridge(text):
- lines=text.splitlines();inside=False;rows=[];net=None
+def schedule_segment(text,series):
+ # Reuse the verified source-fidelity structural rule: exact series title + nearby real schedule header.
+ lines=text.splitlines();title_positions=[i for i,x in enumerate(lines) if series.lower() in x.lower()]
+ for t in title_positions:
+  for i in range(max(0,t-12),min(len(lines),t+20)):
+   if not re.search(r'^\s*Schedule of Investments|^\s*Portfolio of Investments',plain(lines[i]),re.I):continue
+   window='\n'.join(plain(x) for x in lines[min(t,i):min(len(lines),max(t,i)+40)])
+   if re.search(r'COMMON STOCK',window,re.I) and re.search(r'\b(?:Security|Description)\b.*\b(?:Shares|Value)\b|\bShares\b.*\b(?:Security Description|Description)\b.*\bValue\b',window,re.I):
+    return lines[min(t,i):min(len(lines),min(t,i)+5000)]
+ for i,x in enumerate(lines):
+  if not re.search(r'SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS',x,re.I):continue
+  window='\n'.join(lines[i:min(len(lines),i+25)])
+  if series.lower() in window.lower() and re.search(r'COMMON STOCK',window,re.I):return lines[i:min(len(lines),i+5000)]
+ st=title_positions[-1] if title_positions else 0;return lines[st:min(len(lines),st+5000)]
+
+def extract_clearbridge(text,series):
+ lines=schedule_segment(text,series);inside=False;rows=[];net=None
  pat=re.compile(r'^(.*?\D)(\d[\d,]*)\s*\$?\s*(\d[\d,]*)(?:\s*\*)?$')
  for raw in lines:
   line=plain(raw)
@@ -104,52 +119,46 @@ def extract_clearbridge(text):
    if re.search(r'[A-Za-z]',desc) and v>0:rows.append((desc,v))
  return rows,net
 
-def extract_ppty(text):
- lines=text.splitlines();inside=False;rows=[];net=None;i=0
- while i<len(lines):
-  line=plain(lines[i])
-  if re.search(r'^COMMON STOCKS\s*-\s*100\.0%',line,re.I):inside=True;i+=1;continue
+def extract_ppty(text,series):
+ lines=schedule_segment(text,series);cleaned=[plain(x) for x in lines];inside=False;rows=[];net=None
+ for i,line in enumerate(cleaned):
+  if re.search(r'^COMMON STOCKS\s*-\s*100\.0%',line,re.I):inside=True;continue
   if inside and re.search(r'^TOTAL COMMON STOCKS',line,re.I):inside=False
   if re.search(r'^NET ASSETS\s*-\s*100\.0%',line,re.I):
-   # In vertical rendering value may be on following lines.
-   scan=' '.join(plain(x) for x in lines[i:min(len(lines),i+6)]);nums=re.findall(r'\b\d[\d,]*\b',scan);net=float(nums[-1].replace(',','')) if nums else net
-  if inside and re.fullmatch(r'\d[\d,]*',line):
-   j=i+1;vals=[]
-   while j<len(lines) and len(vals)<6:
-    q=plain(lines[j]);j+=1
-    if q:vals.append(q)
-   if vals:
-    desc=vals[0];numbers=[q for q in vals[1:] if re.fullmatch(r'\$?\d[\d,]*',q) and q!='$']
-    if re.search(r'[A-Za-z]',desc) and numbers:
-     rows.append((desc,float(numbers[0].replace('$','').replace(',',''))));i=j;continue
-  i+=1
+   scan=' '.join(x for x in cleaned[i:min(len(cleaned),i+8)] if x);nums=re.findall(r'\b\d[\d,]*\b',scan);net=float(nums[-1].replace(',','')) if nums else net
+  if not inside or not line or not re.search(r'[A-Za-z]',line):continue
+  if re.search(r'\d+(?:\.\d+)?\s*%$',line) or re.match(r'^(TOTAL|COMMON STOCK|SHARES|SECURITY DESCRIPTION|VALUE|SCHEDULE OF INVESTMENTS)',line,re.I):continue
+  # PPTY rendering: shares occurs shortly before issuer; value occurs shortly after issuer, with optional standalone '$'.
+  prev=[x for x in cleaned[max(0,i-5):i] if x];foll=[x for x in cleaned[i+1:min(len(cleaned),i+6)] if x]
+  if not any(re.fullmatch(r'\d[\d,]*',x) for x in prev):continue
+  value=None
+  for x in foll:
+   if re.search(r'[A-Za-z]',x):break
+   if x=='$':continue
+   if re.fullmatch(r'\$?\d[\d,]*',x):value=float(x.replace('$','').replace(',',''));break
+  if value and value>0:rows.append((line,value))
  return rows,net
 
-def extract_gfin(text):
- lines=text.splitlines();rows=[];net=None;inside=False;target=False
- # Start only at the actual GFIN schedule title neighborhood.
+def extract_gfin(text,series):
+ lines=schedule_segment(text,series);rows=[];net=None;inside=False;started=False
  for i,raw in enumerate(lines):
   line=plain(raw)
-  if re.search(r'Goldman Sachs (?:Motif )?Finance Reimagined ETF',line,re.I):
-   near=' '.join(plain(x) for x in lines[i:min(len(lines),i+15)])
-   if re.search(r'Schedule of Investments',near,re.I) and re.search(r'August 31, 2019',near,re.I):target=True
-  if not target:continue
-  if re.search(r'\bCommon Stocks?\b',line,re.I):inside=True;continue
-  if inside and re.search(r'Short-Term|Total Investments|NET ASSETS',line,re.I):inside=False
-  # one-line shares / description / value
+  if re.search(r'^Common Stocks?\s*[–—-]',line,re.I):inside=True;started=True;continue
+  if inside and re.search(r'^(?:Repurchase Agreements?|Short-Term Investments?|Securities Lending|Total Investments)',line,re.I):inside=False
   if inside:
    m=re.match(r'^([\d,]+)\s+(.+?)\s+(?:\$\s*)?([\d,]+)\s*$',line)
    if m:
     desc=re.sub(r'\s*\([a-z]\)\s*$','',m.group(2),flags=re.I).strip();v=float(m.group(3).replace(',',''))
     if re.search(r'[A-Za-z]',desc) and not re.match(r'^(Total|Common Stocks)',desc,re.I):rows.append((desc,v))
-  if target and re.search(r'Net Assets\s*[—-]?\s*100\.0%',line,re.I):
-   scan=' '.join(plain(x) for x in lines[i:min(len(lines),i+5)]);nums=re.findall(r'\b\d[\d,]*\b',scan);net=float(nums[-1].replace(',','')) if nums else net
-  # stop when next fund begins after target schedule is done
-  if target and rows and not inside and i>0 and re.search(r'^Goldman Sachs .* ETF$',line,re.I) and not re.search(r'Finance Reimagined',line,re.I):break
+  if started and re.search(r'^NET ASSETS\s*[–—-]\s*100\.0%\s*\$?\s*[\d,]+',line,re.I):
+   nums=re.findall(r'\d[\d,]*',line);net=float(nums[-1].replace(',','')) if nums else net;break
+  if started and re.search(r'^Total Investments\s*[–—-]\s*(\d+(?:\.\d+)?)%',line,re.I) and net is None:
+   pct=float(re.search(r'(\d+(?:\.\d+)?)%',line).group(1));scan=' '.join(plain(x) for x in lines[i:min(len(lines),i+5)] if plain(x));vals=re.findall(r'\$\s*([\d,]+)',scan)
+   if vals and pct>0:net=float(vals[-1].replace(',',''))/(pct/100.0)
  return rows,net
 
 def source_from_legacy(src,text,master,asof):
- parser={'S000057700':extract_clearbridge,'S000063326':extract_gfin,'S000061208':extract_ppty}[src['seriesId']];rows,net=parser(text)
+ parser={'S000057700':extract_clearbridge,'S000063326':extract_gfin,'S000061208':extract_ppty}[src['seriesId']];rows,net=parser(text,src['seriesName'])
  if not net or len(rows)<10:raise RuntimeError(f"{src['seriesId']}: invalid extraction rows={len(rows)} net={net}")
  raw=[{'description':d,'value':v,'weight':100*v/net,'country':explicit_country(d)} for d,v in rows]
  total=sum(x['weight'] for x in raw);top10=sum(sorted((x['weight'] for x in raw),reverse=True)[:10]);eligible=10<=len(raw)<=120 and total>=50 and top10>=25
@@ -162,7 +171,7 @@ def source_from_legacy(src,text,master,asof):
  merged={}
  for h in mapped:
   r=merged.setdefault(h['symbol'],{'symbol':h['symbol'],'issuerName':h['issuerName'],'weight':0.0});r['weight']+=h['weight']
- return {'seriesId':src['seriesId'],'seriesName':src['seriesName'],'filingDate':src['filingDate'],'reportDate':src['sourceReportDate'],'holdings':list(merged.values())},{'seriesId':src['seriesId'],'rawCommonEquityCount':len(raw),'rawWeightTotal':total,'top10Weight':top10,'structuralEligible':eligible,'mappedCount':mc,'mappedCountRate':mc/len(raw) if raw else None,'mappedWeight':mw,'mappedWeightRate':mw/total if total else None,'mappedUniqueSymbols':len(merged),'explicitNonUsCount':sum(h['country'] in NONUS for h in raw)}
+ return {'seriesId':src['seriesId'],'seriesName':src['seriesName'],'filingDate':src['filingDate'],'reportDate':src['sourceReportDate'],'holdings':list(merged.values())},{'seriesId':src['seriesId'],'rawCommonEquityCount':len(raw),'rawWeightTotal':total,'top10Weight':top10,'structuralEligible':eligible,'mappedCount':mc,'mappedCountRate':mc/len(raw) if raw else None,'mappedWeight':mw,'mappedWeightRate':mw/total if total else None,'mappedUniqueSymbols':len(merged),'explicitNonUsCount':sum(h['country'] in NONUS for h in raw),'derivedNetAssets':net}
 
 def score(sources,asof):
  rows={}
