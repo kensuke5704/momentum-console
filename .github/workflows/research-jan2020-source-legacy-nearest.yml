@@ -5,6 +5,8 @@ on:
     branches: ["research/nq-npx-mapping-2006-20260903"]
     paths:
       - "scripts/research-jan2020-source-legacy-nearest.py"
+      - "scripts/research-jan2020-source-legacy-fidelity.py"
+      - "scripts/research-transition-nearest-fidelity-2019.py"
       - ".github/workflows/research-jan2020-source-legacy-nearest.yml"
   workflow_dispatch:
 
@@ -14,13 +16,18 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/research-jan2020-source-legacy-nearest.py
+      - name: Discover nearest pre-NPORT reports
+        run: python3 scripts/research-jan2020-source-legacy-nearest.py
+      - name: Parse and compare source holdings
+        run: python3 scripts/research-jan2020-source-legacy-fidelity.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: jan2020-source-legacy-nearest
-          path: data/research/jan2020-source-legacy-nearest.json
+          name: jan2020-source-legacy-gateb
+          path: |
+            data/research/jan2020-source-legacy-nearest.json
+            data/research/jan2020-source-legacy-fidelity.json
           if-no-files-found: warn
