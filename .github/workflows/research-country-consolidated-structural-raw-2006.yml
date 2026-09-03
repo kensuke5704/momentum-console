@@ -1,0 +1,32 @@
+name: Research Country Consolidated Structural Raw 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-consolidated-structural-raw-2006.py"
+      - ".github/workflows/research-country-consolidated-structural-raw-2006.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download raw-header and structural country artifacts
+        run: |
+          mkdir -p data/research /tmp/raw /tmp/struct
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9917570078/zip > /tmp/raw.zip
+          unzip -q /tmp/raw.zip -d /tmp/raw
+          cp /tmp/raw/country-full-coverage-raw-header-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903255442/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-country-2006.json data/research/
+      - run: python3 scripts/research-country-consolidated-structural-raw-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-consolidated-structural-raw-2006
+          path: data/research/country-consolidated-structural-raw-2006.json
