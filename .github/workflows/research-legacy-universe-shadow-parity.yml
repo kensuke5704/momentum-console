@@ -1,0 +1,27 @@
+name: Research Legacy Universe Shadow Parity
+
+on:
+  push:
+    branches:
+      - research/nq-npx-mapping-2006-20260903
+    paths:
+      - scripts/research-legacy-universe-shadow-parity.py
+      - .github/workflows/research-legacy-universe-shadow-parity.yml
+      - docs/research/legacy-universe-reproduction-gate.md
+  workflow_dispatch:
+
+jobs:
+  gate-a:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Gate A shadow parity
+        run: python3 scripts/research-legacy-universe-shadow-parity.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-universe-shadow-parity
+          path: data/research/legacy-universe-shadow-parity.json
+          if-no-files-found: warn
