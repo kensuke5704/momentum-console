@@ -1,0 +1,24 @@
+name: Research Gate B Verified Source Fidelity 2020
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-gate-b-verified-source-fidelity-2020.py"
+      - ".github/workflows/research-gate-b-verified-source-fidelity-2020.yml"
+      - "data/research/gate-b-production-source-manifest-2020.json"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fidelity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-gate-b-verified-source-fidelity-2020.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate-b-verified-source-fidelity-2020
+          path: data/research/gate-b-verified-source-fidelity-2020.json
+          if-no-files-found: warn
