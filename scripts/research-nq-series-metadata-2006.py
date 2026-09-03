@@ -18,8 +18,16 @@ UA = {
 }
 STRONG_ETF_REGISTRANT = re.compile(r"ISHARES|STREETTRACKS|SELECT SECTOR SPDR|SPDR TRUST|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
 VANGUARD_ETF_CANDIDATE = re.compile(r"VANGUARD.*(?:INDEX|WORLD|WHITEHALL|MALVERN)", re.I)
+# Keep this regex semantically identical to src/lib/universe/nport-quarterly.ts.
+# Production accepts a fund only when SERIES_NAME itself contains ETF or
+# EXCHANGE-TRADED. Registrant names and class names are NOT substitutes in the
+# Production-parity path.
 ETF_TEXT = re.compile(r"(^|\W)ETF($|\W)|EXCHANGE[ -]TRADED", re.I)
 ETF_CLASS = re.compile(r"ETF\s+SHARES?|VIPER(?:\s+SHARES?)?|EXCHANGE[ -]TRADED", re.I)
+
+
+def production_series_name_eligible(series_name: str | None) -> bool:
+    return bool(series_name and ETF_TEXT.search(series_name))
 
 
 def sec_url(filename: str) -> str:
@@ -47,8 +55,6 @@ def fetch_prefix(url: str) -> tuple[str, str]:
                 continue
             break
 
-    # Authoritative fallback. Retry transient transport/rate-limit failures but
-    # never choose filings based on parser quality or downstream overlap.
     for attempt in range(3):
         try:
             req = urllib.request.Request(url, headers=UA)
@@ -87,9 +93,11 @@ def parse_series_contracts(text: str, company: str) -> list[dict]:
                 "name": tag_value(cb, "CLASS-CONTRACT-NAME"),
                 "ticker": tag_value(cb, "CLASS-CONTRACT-TICKER-SYMBOL"),
             })
-        explicit_series = bool(series_name and ETF_TEXT.search(series_name))
+        production_eligible = production_series_name_eligible(series_name)
+        explicit_series = production_eligible
         strong_registrant = bool(STRONG_ETF_REGISTRANT.search(company))
         etf_classes = [c for c in classes if c.get("name") and ETF_CLASS.search(c["name"])]
+        # Broad discovery classification retained for legacy diagnostics only.
         is_etf = explicit_series or strong_registrant or bool(etf_classes)
         etf_tickers = []
         for c in classes:
@@ -102,6 +110,7 @@ def parse_series_contracts(text: str, company: str) -> list[dict]:
             "seriesName": series_name,
             "classes": classes,
             "explicitSeriesEtf": explicit_series,
+            "productionSeriesNameEligible": production_eligible,
             "strongEtfRegistrant": strong_registrant,
             "isEtf": is_etf,
             "etfTickers": list(dict.fromkeys(etf_tickers)),
@@ -137,6 +146,7 @@ def inspect_one(i: int, x: dict) -> dict:
         method, text = fetch_prefix(url)
         series = parse_series_contracts(text, str(x.get("company") or ""))
         etf_series = [s for s in series if s["isEtf"]]
+        production_series = [s for s in series if s["productionSeriesNameEligible"]]
         etf_tickers = list(dict.fromkeys(t for s in etf_series for t in s["etfTickers"]))
         return {
             "index": i,
@@ -149,6 +159,7 @@ def inspect_one(i: int, x: dict) -> dict:
             "seriesNames": values(text, "SERIES-NAME")[:120],
             "tickers": values(text, "CLASS-CONTRACT-TICKER-SYMBOL")[:160],
             "classifiedEtfSeries": etf_series[:120],
+            "productionSeriesNameEligible": production_series[:120],
             "classifiedEtfTickers": etf_tickers[:160],
         }
     except Exception as e:
@@ -176,7 +187,8 @@ def main() -> None:
             print(
                 f"{i}/{len(samples)} {r['company'][:42]} blocks={r['seriesBlockCount']} "
                 f"series={len(r['seriesNames'])} tickers={len(r['tickers'])} "
-                f"etfSeries={len(r['classifiedEtfSeries'])} etfTickers={len(r['classifiedEtfTickers'])}",
+                f"etfSeries={len(r['classifiedEtfSeries'])} prodSeries={len(r['productionSeriesNameEligible'])} "
+                f"etfTickers={len(r['classifiedEtfTickers'])}",
                 flush=True,
             )
             if r["classifiedEtfTickers"]:
@@ -190,6 +202,7 @@ def main() -> None:
     with_ticker = [r for r in ok if r["tickers"]]
     with_structured_series = [r for r in ok if r["seriesBlockCount"] > 0]
     with_etf = [r for r in ok if r["classifiedEtfSeries"]]
+    with_production_series = [r for r in ok if r["productionSeriesNameEligible"]]
     with_etf_ticker = [r for r in ok if r["classifiedEtfTickers"]]
     summary = {
         "year": 2006,
@@ -202,6 +215,7 @@ def main() -> None:
         "tickerMetadataRate": len(with_ticker) / len(ok) if ok else None,
         "structuredSeriesRate": len(with_structured_series) / len(ok) if ok else None,
         "classifiedEtfRegistrantRate": len(with_etf) / len(ok) if ok else None,
+        "productionSeriesNameEligibleRegistrantRate": len(with_production_series) / len(ok) if ok else None,
         "classifiedEtfTickerRate": len(with_etf_ticker) / len(ok) if ok else None,
         "classifiedEtfTickers": list(dict.fromkeys(t for r in with_etf_ticker for t in r["classifiedEtfTickers"])),
         "results": results,
