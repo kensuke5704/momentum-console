@@ -8,104 +8,101 @@ Current detailed research handoff:
 - Branch: `research/nq-npx-mapping-2006-20260903`
 - Path: `docs/research/momentum-handoff-current.md`
 
-Latest same-branch research delta:
+Latest same-branch delta:
 - Path: `docs/research/nq-npx-mapping-2006-20260903.md`
 
-Read the detailed handoff first, then the latest delta note above before continuing. The detailed handoff remains the canonical long-form source; the delta records work completed after its last full refresh.
+The detailed handoff is canonical. Read it first, then the delta.
 
-## Current research objective
+## Objective
 
-Reconstruct a point-in-time historical ETF-holdings universe for 2006 onward that is economically as close as possible to the frozen Production N-PORT universe, without modifying the frozen Production strategy.
+Reconstruct a point-in-time historical ETF-holdings universe for 2006 onward that is economically as close as possible to frozen Production N-PORT, without changing Production strategy `momentum-stage21-sbi-2026-09-v1`.
 
-Frozen strategy ID: `momentum-stage21-sbi-2026-09-v1`.
+Do **not** run a broad 2006–2018 Stage21 performance test yet.
 
-## Critical current state
+## Critical correction
 
-The prior nine-series N-Q PIT sample is superseded. An audit found that `SCHEDULE OF INVESTMENTS (CONTINUED)` pages had been treated as independent portfolios and sometimes assigned to the wrong ETF using holdings-word similarity.
+The old nine-series N-Q PIT sample is invalidated. `SCHEDULE OF INVESTMENTS (CONTINUED)` pages had been treated as independent portfolios and could be assigned to the wrong ETF by holdings-word similarity.
 
-The corrected segmentation now:
-- assigns schedule pages only from exact filing-time registered series titles;
-- groups continuation pages with the same explicit series;
-- never uses holdings/industry words to determine series identity;
-- trims the final schedule at an explicit `NET ASSETS ... 100%` boundary before parsing later filing tables.
+Corrected segmentation now uses only exact filing-time series titles, groups continuation pages, and trims the final series at `NET ASSETS ... 100%`.
 
-Corrected fixed-source PIT holdings:
-- workflow run: `33714482859`
-- artifact: `9878011119`
-- retained PIT series: **20**
-- median holdings: **41**
+Corrected PIT:
+- run `33714482859`
+- artifact `9878011119`
+- 20 retained series
+- median holdings 41.
 
-The old **43.53% count / 60.67% weight** mapping result is retained only as mapping-engine history and is not valid evidence of historical-universe quality.
+The old 43.53% / 60.67% mapping number is mapping-engine history only.
+
+## Accepted legacy EC bridge
+
+Per-holding EC diagnostic:
+- run `33714785802`
+- artifact `9878123068`
+- 964 holdings
+- explicit asset-section attribution: **99.79% by count / 99.97% by weight**
+- explicit `COMMON_EQUITY`: **936 holdings / 99.63% of weight**.
+
+Accepted rule: a legacy holding is `EC` only when it inherits an explicit `COMMON STOCK(S/SHARES)` section. SHORT_TERM, DEBT, PREFERRED and UNKNOWN do not pass. Unknown is never coerced.
+
+EC-filtered PIT:
+- run `33715016882`
+- artifact `9878189715`
+- all 20 corrected series still pass structural eligibility
+- original portfolio-relative weights are preserved; no post-EC renormalization.
 
 ## Active security-mapping baseline
 
-Use the same frozen merged N-PX master artifact `9876020712` for apples-to-apples evaluation.
+Frozen merged N-PX master: artifact `9876020712`.
 
-Corrected mapping workflow:
-- run: `33714515426`
-- artifact: `9878021112`
-- corrected PIT series: 20
-- eligible holdings: **944**
-- unique matches: **654**
-- mapping coverage by count: **69.28%**
-- mapping coverage by eligible holding weight: **78.92%**
-- ambiguous holdings: 14
-- unmapped holdings: 276
-- fuzzy matching remains diagnostic only
-- no strategy-return data used.
+EC-filtered mapping:
+- run `33715050446`
+- artifact `9878201336`
+- 20 series
+- 935 mapping-eligible EC holdings
+- 654 unique matches
+- count coverage **69.95%**
+- weight coverage **78.98%**
+- ambiguous 14
+- unmapped 267
+- fuzzy mapping remains diagnostic only.
 
-## Legacy N-PORT field bridge
+This supersedes the pre-EC 69.28% / 78.92% mapping result as the active baseline.
 
-Corrected structural diagnostic:
-- workflow run: `33714585732`
-- artifact: `9878045597`
+## US / CORP gates
 
-`ASSET_CAT=EC`:
-- 28 / 30 examined corrected schedules explicitly print `COMMON STOCK(S/SHARES) -- xx%`;
-- most are approximately 99.5–100.0% common stocks;
-- this is strong schedule-level EC evidence but is not yet a validated per-holding EC replacement.
+`INVESTMENT_COUNTRY=US` remains unresolved. SEC Form N-PORT defines the primary country field as the country where the issuer is organized. Therefore US listing venue, numeric CUSIP, or absence of ADR/GDR is not enough. Explicit country sections are usable where present; otherwise unknown remains unknown until a scalable issuer-country source is established.
 
-`INVESTMENT_COUNTRY=US`:
-- do not default missing country headings to US;
-- DGT explicitly reports United States 62.7% plus multiple foreign-country allocations;
-- ADR/GDR references identify useful foreign-security flags but do not by themselves reproduce N-PORT country classification.
-
-`ISSUER_TYPE=CORP` remains a separate unresolved structural gate.
+`ISSUER_TYPE=CORP` remains unresolved. A bootstrap-based redundancy test is rejected because Production bootstrap data has already been filtered on `EC+US+CORP` and no longer retains the raw issuer-type field.
 
 ## 64-CIK master transport
 
-The frozen 64-CIK design remains:
-- one deterministic primary N-PX representative per unique CIK;
-- sort by CIK;
-- sample 64 equal-quantile positions;
-- no N-Q target names, universe outcomes, momentum, or returns in selection.
+Frozen design remains:
+- one deterministic primary N-PX representative per unique CIK
+- sort by CIK
+- 64 equal-quantile CIK positions
+- no target-name, universe, momentum, or return selection.
 
-Direct SEC `master.idx` and `master.zip` access from GitHub-hosted runners returns HTTP 403; the tested proxy index route returned HTTP 422. This is a source-transport issue, not a strategy-performance result.
-
-Do not block the EC/US/CORP structural work on this transport issue.
+GitHub-hosted runner transport currently gets SEC `master.idx` 403, `master.zip` 403, tested proxy 422. Continue this path in parallel but do not block US/CORP work on it.
 
 ## Current gate
 
-Do **not** run the 2006–2018 Stage21 performance backtest yet.
-
 Proceed in this order:
-1. use corrected PIT artifact `9878011119` as the active N-Q holdings baseline;
-2. validate per-holding legacy `EC` attribution from explicit schedule section state;
-3. construct a conservative `US` attribution hierarchy; unknown remains unknown;
-4. investigate `CORP` parity separately;
-5. continue the reproducible 64-CIK source-index path in parallel;
-6. only then construct legacy universe scoring inputs;
-7. perform overlap-period universe validation before any long-history strategy-return test.
+1. use EC-filtered PIT artifact `9878189715` as active 2006 holdings input;
+2. use EC-filtered mapping artifact `9878201336` as active security-mapping baseline;
+3. construct a scalable issuer-organization-country (`US`) bridge, keeping unresolved holdings UNKNOWN;
+4. investigate `CORP` independently;
+5. continue deterministic 64-CIK source-index/master work in parallel;
+6. only then build legacy ETF-count / aggregate-weight / max-weight / recency-weight scoring inputs;
+7. validate Top80 overlap, rank correlation, and Production Top2 retention in an overlap period;
+8. freeze the bridge before opening older returns;
+9. expose older history only in small staged windows, not 2006–2018 at once.
 
 ## New-session protocol
 
 When only the repository URL is provided:
-1. Read this file first.
-2. Read `docs/research/momentum-handoff-current.md` from the branch listed above.
-3. Read `docs/research/nq-npx-mapping-2006-20260903.md` from the same branch for the latest delta.
-4. Treat the corrected 20-series PIT sample as active; do not revive the old nine-series sample.
-5. Use frozen artifacts for apples-to-apples mapping-rule comparisons.
-6. Do not re-run rejected approaches without new evidence.
-7. Do not change frozen Production parameters or use 2006–2018 returns to tune historical reconstruction rules.
-
-Whenever the active research branch, canonical handoff location, or latest delta changes, update this root entry point on `main` in the same workstream.
+1. read this file;
+2. read the canonical research handoff on the branch above;
+3. read the same-branch delta;
+4. do not revive the old nine-series sample;
+5. preserve frozen artifact inputs for apples-to-apples structural comparisons;
+6. do not change Production parameters or tune reconstruction rules against older strategy returns.
