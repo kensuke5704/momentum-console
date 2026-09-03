@@ -45,3 +45,12 @@ test("Stage21 carries the last confirmed close across an isolated held-asset dat
  const dailyReturns=curve.slice(1).map((row,index)=>row.equity/curve[index].equity-1);
  assert.ok(Math.min(...dailyReturns)>-0.01);
 });
+
+test("OOS keeps the current daily simulation when the displayed backtest is frozen",()=>{
+ const qqq=[point("2026-08-28",100),point("2026-08-31",101),point("2026-09-01",102)],gldm=[point("2026-08-28",50),point("2026-08-31",50.3),point("2026-09-01",50.4)];
+ const live=buildDashboardPayload({QQQ:qqq,GLDM:gldm},[universe],cftc);
+ const frozen={...live.backtest,equityCurve:live.backtest.equityCurve.slice(0,1)};
+ const dashboard=buildDashboardPayload({QQQ:qqq,GLDM:gldm},[universe],cftc,"live",{frozenBacktest:frozen});
+ assert.equal(dashboard.backtest.equityCurve.length,1);
+ assert.ok(dashboard.oosBacktest.equityCurve.length>dashboard.backtest.equityCurve.length);
+});

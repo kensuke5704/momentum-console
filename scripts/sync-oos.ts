@@ -33,7 +33,7 @@ async function main() {
     portfolioState: dashboard.portfolioState.regime,
     portfolioTargets: fundedTargets,
     cftc: dashboard.portfolioState.cftc,
-    entryPrices: Object.fromEntries(dashboard.liveState.currentPositions.map((position) => [position.symbol, position.entryPrice])),
+    entryPrices: Object.fromEntries(dashboard.portfolioState.holdings.map((position) => [position.symbol, position.entryPrice])),
     exitPrices: {}, return: null, equity: null,
     triggerHistory: dashboard.backtest.events.filter((event) => event.date >= OOS_START_DATE),
   };
@@ -41,7 +41,9 @@ async function main() {
     ? [...oos.records.filter((row) => (row.recordDate ?? row.signalDate) !== recordDate), record].sort((a, b) => (a.recordDate ?? a.signalDate).localeCompare(b.recordDate ?? b.signalDate))
     : oos.records;
   const provisionalDates = [...new Set(Object.values(market.histories).flatMap((points) => points.filter((point) => point.provisional).map((point) => point.date)))];
-  const updated = { ...updateForwardOos(dashboard.backtest, oos, provisionalDates), records };
+  // Keep the Backtest tab frozen at the OOS boundary, while extending OOS
+  // from the current daily simulation (including a validated provisional close).
+  const updated = { ...updateForwardOos(dashboard.oosBacktest, oos, provisionalDates), records };
   await mkdir(resolve("public/data"), { recursive: true });
   await writeFile(path, `${JSON.stringify(updated)}\n`);
   const patchedDashboard = { ...dashboard, oos: updated };

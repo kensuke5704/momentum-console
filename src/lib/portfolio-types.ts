@@ -1,5 +1,6 @@
 export type PortfolioRegime = "NORMAL"|"YELLOW"|"DEEP";
 export type PortfolioTarget = { symbol:string; weight:number; role:"FIXED60"|"DIVERSIFIER"|"CASH" };
+export type PortfolioHolding = { symbol:string; entryPrice:number; currentPrice:number|null; targetWeight:number; role:"FIXED60"|"DIVERSIFIER" };
 export type PortfolioNextAction = {
   type:"REBALANCE_NEXT_OPEN"|"HOLD";
   executionDate:string|null;
@@ -14,6 +15,7 @@ export type PortfolioLiveState = {
   m3:{ deep:boolean; coreReturn20:number|null; qqqReturn20:number|null; gap:number|null; recoveryConfirm:number };
   fixed60:{ strategyId:string; riskState:string; symbols:string[]; innerWeights:number[] };
   targets:PortfolioTarget[];
+  holdings:PortfolioHolding[];
   nextAction:PortfolioNextAction;
 };
 export type PortfolioConfigView = {
