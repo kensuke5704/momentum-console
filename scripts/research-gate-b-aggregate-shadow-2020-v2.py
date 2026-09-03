@@ -51,7 +51,6 @@ def extract_gfin(text,series):
     q=agg.plain(x)
     vals=re.findall(r'\$\s*([\d,]+)',q)
     if vals and pct>0:net=float(vals[-1].replace(',',''))/(pct/100.0);break
-  # Never enter a second Common Stocks section after the first one ended.
   if ended and seen and re.search(r'^Common Stocks?\s*[–—-]',line,re.I):break
  return rows,net
 
@@ -59,3 +58,4 @@ agg.extract_ppty=extract_ppty
 agg.extract_gfin=extract_gfin
 agg.OUT=ROOT/'data/research/gate-b-aggregate-shadow-2020-v2.json'
 if __name__=='__main__':agg.main()
+# trigger marker 2026-09-03
