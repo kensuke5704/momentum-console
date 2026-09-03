@@ -1,0 +1,41 @@
+name: Research Country UNKNOWN Retry Merge 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-unknown-retry-merge-2006.py"
+      - ".github/workflows/research-country-unknown-retry-merge-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download base mapping and country artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/base /tmp/map /tmp/full /tmp/retry
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9900626120/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/country-full-coverage-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/map.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/map/nq-npx-mapping-2006.json data/research/
+          for id in 9899576576 9899613855 9899615372 9899726555 9899657365 9899586966 9899685447 9899596629 9899611719 9899631303 9899573753 9899610056; do
+            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/$id.zip
+            unzip -q /tmp/$id.zip -d /tmp/full/$id
+            cp /tmp/full/$id/sec-us-attribution-full-shard-*-2006.json data/research/
+          done
+          for id in 9901489585 9901228008 9901316051 9901425889 9901307457 9901200878 9901336772 9901109369 9901180766 9901238698 9901359780 9901284107; do
+            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/r$id.zip
+            unzip -q /tmp/r$id.zip -d /tmp/retry/$id
+            cp /tmp/retry/$id/sec-us-attribution-unknown-retry-*-2006.json data/research/
+          done
+      - run: python3 scripts/research-country-unknown-retry-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-full-coverage-unknown-retry-2006
+          path: data/research/country-full-coverage-unknown-retry-2006.json
