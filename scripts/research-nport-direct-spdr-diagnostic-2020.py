@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'data' / 'research' / 'nport-direct-spdr-diagnostic-2020.json'
+RAW = ROOT / 'data' / 'research' / 'nport-direct-spdr-xlK-20200331-jina.txt'
 UA = {'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com','Accept':'application/xml,text/xml,text/plain,*/*'}
 
 FIXTURE = {
@@ -50,14 +51,12 @@ out={
     'looksXml':text.lstrip().startswith('<?xml') or '<edgarSubmission' in text or '<invstOrSec' in text,
     'invstOrSecCount':len(re.findall(r'<(?:[A-Za-z0-9_.-]+:)?invstOrSec(?:\s|>)',text,re.I)),
     'tagCounts':local_tag_counts(text),
-    'sampleAroundInvestment':None,
 }
-m=re.search(r'<(?:[A-Za-z0-9_.-]+:)?invstOrSec(?:\s|>)',text,re.I)
-if m: out['sampleAroundInvestment']=text[m.start():m.start()+5000]
 OUT.parent.mkdir(parents=True,exist_ok=True)
 OUT.write_text(json.dumps(out,indent=2)+'\n',encoding='utf-8')
-print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'tagCounts','sampleAroundInvestment','attempts'}},sort_keys=True))
+RAW.write_text(text,encoding='utf-8')
+print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'tagCounts','attempts'}},sort_keys=True))
 print('ATTEMPTS',json.dumps(attempts,sort_keys=True))
 print('TOP_TAGS',json.dumps(out['tagCounts'][:40]))
-if out['sampleAroundInvestment']: print('SAMPLE',out['sampleAroundInvestment'][:3000])
+print('RAW_PATH',RAW,'RAW_LENGTH',len(text))
 if not transport: raise SystemExit(2)
