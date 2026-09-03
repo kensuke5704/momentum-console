@@ -1,0 +1,23 @@
+name: Research Production NPORT Registrant Inventory 2020
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-production-nport-registrant-inventory-2020.py"
+      - ".github/workflows/research-production-nport-registrant-inventory-2020.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-production-nport-registrant-inventory-2020.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-nport-registrant-inventory-2020
+          path: data/research/production-nport-registrant-inventory-2020.json
