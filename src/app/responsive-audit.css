@@ -5,10 +5,15 @@
 }
 
 .next-action-stage21 {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  display: block;
   padding: 0 !important;
 }
+
+.next-action-primary,
+.next-action-secondary { display: grid; }
+
+.next-action-primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.next-action-secondary { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 
 .next-action-cell {
   align-content: center;
@@ -20,18 +25,17 @@
   color: var(--text);
   display: grid;
   gap: 9px;
-  grid-column: span 2;
   min-height: 112px;
   min-width: 0;
   padding: 18px 20px;
   text-align: left;
 }
 
-.next-action-cell:nth-child(3) { border-right: 0; }
+.next-action-primary > .next-action-cell:nth-child(3) { border-right: 0; }
+.next-action-secondary > .next-action-cell { border-bottom: 0; }
+.nport-deadline-cell > strong { white-space: nowrap; }
 .next-action-cell.target-cell {
-  border-bottom: 0;
   border-right: 0;
-  grid-column: 1 / -1;
   padding: 14px 20px 20px;
 }
 
@@ -314,13 +318,14 @@
   .dynamic-shell .topbar { top: 58px !important; }
   .dynamic-content { max-width: 100vw; min-width: 0; padding: 16px 13px 36px; width: 100%; }
 
-  .next-action.next-action-stage21 { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
 }
 
 @media (max-width: 520px) {
-  .next-action.next-action-stage21 {
+  .next-action-primary {
     grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.4fr) minmax(0, 1.7fr) !important;
   }
+
+  .next-action-secondary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
 
   .sidebar nav button {
     scroll-margin-inline: 12px;
@@ -377,7 +382,6 @@
 
   .next-action-cell {
     gap: 7px;
-    grid-column: auto;
     min-height: 94px;
     padding: 12px 7px;
   }
@@ -385,6 +389,7 @@
   .next-action-cell > span { font-size: 9px; line-height: 1.2; }
   .next-action-cell > strong,
   .next-action-cell.execution-cell > strong { font-size: clamp(11px, 3.3vw, 14px); line-height: 1.2; white-space: nowrap; }
+  .next-action-cell.nport-deadline-cell > strong { font-size: clamp(10px, 3vw, 13px); }
   .action-value-line { gap: 5px; }
   .action-value-line > strong { font-size: clamp(11px, 3.3vw, 14px); line-height: 1.2; }
   .action-value-line > .close-basis-warning { font-size: 7px; padding: 3px; }

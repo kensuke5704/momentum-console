@@ -31,7 +31,7 @@ import type { PortfolioTarget } from "@/lib/portfolio-types";
 import type { DashboardPayload, EquityPoint, MomentumCandidate, UniverseMember } from "@/lib/types";
 
 type Tab = "overview" | "universe" | "portfolio" | "oos" | "backtest" | "schedule";
-type DetailKey = "regime" | "action" | "execution" | "target" | "cftc" | "m3" | "fixed60" | "oos";
+type DetailKey = "regime" | "action" | "execution" | "nport" | "target" | "cftc" | "m3" | "fixed60" | "oos";
 type SortDirection = "asc" | "desc";
 type CombinedSortKey =
   | "universeRank"
@@ -248,6 +248,7 @@ function Overview({ data }: { data: DashboardPayload }) {
   const actionLabel = action.type === "REBALANCE_NEXT_OPEN" ? "REBALANCE" : action.type === "HOLD" ? "HOLD" : "REVIEW";
   const execution = action.executionDate ? usOpenJst(action.executionDate) : "NO ORDER";
   const executionState = action.executionDate ? "NEXT OPEN" : "NO ORDER";
+  const nportDeadline = data.nportOperations?.nextImportDeadlineAt ? updatedAt(data.nportOperations.nextImportDeadlineAt) : "NOT SET";
   const nonLatestClose = latestCompletedSession != null && (!portfolio.asOf || portfolio.asOf < latestCompletedSession);
 
   useEffect(() => {
@@ -264,15 +265,20 @@ function Overview({ data }: { data: DashboardPayload }) {
     return () => window.removeEventListener("keydown", close);
   }, [detail]);
 
-  const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "fixed60" ? "Inner Fixed60" : "OOS Gate";
+  const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "nport" ? "N-PORT Deadline" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "fixed60" ? "Inner Fixed60" : "OOS Gate";
 
   return <div className="dynamic-stack">
     <Section title="Next Action">
       <div className="next-action next-action-stage21">
-        <button type="button" className="next-action-cell" onClick={() => setDetail("regime")}><span>Regime</span><strong>{portfolio.regime}</strong></button>
-        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><div className="action-value-line"><strong>{actionLabel}</strong>{nonLatestClose && <span className="close-basis-warning" title={`Decision uses ${portfolio.asOf || "no"} daily close; latest completed session is ${latestCompletedSession}.`}>STALE</span>}</div></button>
-        <button type="button" className="next-action-cell execution-cell" onClick={() => setDetail("execution")}><span>Execution (JST)</span><strong>{execution}</strong></button>
-        <button type="button" className="next-action-cell target-cell" onClick={() => setDetail("target")}><span>Target</span><AllocationBand targets={action.targets} compact /></button>
+        <div className="next-action-primary">
+          <button type="button" className="next-action-cell" onClick={() => setDetail("regime")}><span>Regime</span><strong>{portfolio.regime}</strong></button>
+          <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><div className="action-value-line"><strong>{actionLabel}</strong>{nonLatestClose && <span className="close-basis-warning" title={`Decision uses ${portfolio.asOf || "no"} daily close; latest completed session is ${latestCompletedSession}.`}>STALE</span>}</div></button>
+          <button type="button" className="next-action-cell execution-cell" onClick={() => setDetail("execution")}><span>Execution (JST)</span><strong>{execution}</strong></button>
+        </div>
+        <div className="next-action-secondary">
+          <button type="button" className="next-action-cell nport-deadline-cell" onClick={() => setDetail("nport")}><span>N-PORT Deadline (JST)</span><strong>{nportDeadline}</strong></button>
+          <button type="button" className="next-action-cell target-cell" onClick={() => setDetail("target")}><span>Target</span><AllocationBand targets={action.targets} compact /></button>
+        </div>
       </div>
     </Section>
 
@@ -306,6 +312,10 @@ function Overview({ data }: { data: DashboardPayload }) {
           {detail === "execution" && <DefinitionList current={executionState} items={[
             { name: "NO ORDER", meaning: "No execution is currently scheduled." },
             { name: "NEXT OPEN", meaning: "Execute the displayed target at the next US market open after close confirmation." },
+          ]} />}
+          {detail === "nport" && <DefinitionList current={nportDeadline} items={[
+            { name: nportDeadline, meaning: "Complete the next quarterly N-PORT import before this cutoff." },
+            { name: "FALLBACK", meaning: "If the deadline is missed or import validation fails, the prior valid Universe remains active." },
           ]} />}
           {detail === "target" && <><AllocationBand targets={action.targets} /><p>100% total / no leverage</p></>}
           {detail === "cftc" && <DefinitionList current={portfolio.cftc.yellow ? "YELLOW" : "CLEAR"} items={[
