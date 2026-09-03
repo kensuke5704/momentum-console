@@ -1,0 +1,32 @@
+name: Research SEC Raw Header Country Merge 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-raw-header-country-merge-2006.py"
+      - ".github/workflows/research-sec-raw-header-country-merge-2006.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download baseline and all raw-header shards
+        run: |
+          mkdir -p data/research /tmp/base /tmp/raw
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/country-full-coverage-unknown-retry-2006.json data/research/
+          gh run download 33818793113 --repo kensuke5704/momentum-console --pattern 'sec-raw-header-country-shard-*-2006' --dir /tmp/raw
+          find /tmp/raw -name 'sec-raw-header-country-shard-*-2006.json' -exec cp {} data/research/ \;
+          test "$(find data/research -name 'sec-raw-header-country-shard-*-2006.json' | wc -l)" -eq 12
+      - run: python3 scripts/research-sec-raw-header-country-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-full-coverage-raw-header-2006
+          path: data/research/country-full-coverage-raw-header-2006.json
