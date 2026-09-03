@@ -32,7 +32,7 @@ def fixed_fixture_sample():
 
 
 def shared_nport_series_contracts(_submission: str, _company: str):
-    """Supply only series identity metadata from the frozen N-PORT side."""
+    """Supply only series identity metadata from the frozen Production N-PORT side."""
     with gzip.open(repro.BOOTSTRAP, 'rt', encoding='utf-8') as f:
         bp = json.load(f)
     rows = bp.get('snapshots') or bp.get('filings') or []
@@ -42,7 +42,7 @@ def shared_nport_series_contracts(_submission: str, _company: str):
         name = str(row.get('seriesName') or '').strip()
         if not sid or not name:
             continue
-        by_id.setdefault(sid, {'seriesId': sid, 'seriesName': name, 'isEtf': True, 'etfTickers': []})
+        by_id.setdefault(sid, {'seriesId': sid, 'seriesName': name, 'isEtf': True, 'productionSeriesNameEligible': True, 'etfTickers': []})
     out = list(by_id.values())
     print('FROZEN_SHARED_SERIES_IDENTITIES', len(out), flush=True)
     return out
@@ -60,7 +60,7 @@ def normalized_holdings_with_empty_fallback(block: str):
 
     fallback_raw = repro.ov.pit.legacy_holdings.parse_html_table(block)
     fallback, fallback_total = repro.ov.pit._normalize(fallback_raw)
-    if len(fallback) >= 2 and fallback_total > 0 and repro.ov.pit.legacy_holdings.structural_sanity(fallback):
+    if fallback and fallback_total > 0 and repro.ov.pit.legacy_holdings.structural_sanity(fallback):
         reason = 'empty-primary' if not holdings else 'year-artifact'
         return f'html-{reason}-fallback', fallback, fallback_total
     return method, holdings, total
@@ -75,13 +75,12 @@ def _block_fingerprint(holdings: list[dict], total: float) -> tuple:
 
 
 def structural_mapped_modern_series(text: str, series: list[dict]):
-    """Exact-heading mapping plus raw-value merge of all valid blocks per series.
+    """Production-parity exact-heading mapping plus raw-value block merge.
 
-    Shareholder reports can split one ETF across repeated Portfolio/Schedule headings.
-    Every source block must pass structural sanity independently. Valid blocks are
-    converted from normalized weights back to raw market value, deduplicated, merged,
-    then normalized once at series level. No prices, returns, concentration targets,
-    strategy ranks, or backtest output are used.
+    The parity path does not apply legacy research name exclusions or arbitrary
+    holdings-count/concentration limits that Production does not have. The only
+    parser-quality gate is positive parsed value plus structural sanity. Series
+    identities supplied here already come from Production's accepted N-PORT set.
     """
     blocks = repro.ov.schedule_blocks(text)
     unique_name_matches = parsed_nonempty = structural_block_pass = 0
@@ -106,7 +105,7 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
         if count:
             parsed_nonempty += 1
         sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
-        block_gate = bool(repro.ov.seg.eligible_name(s.get('seriesName') or '') and count >= 2 and total > 0 and sane)
+        block_gate = bool(count >= 1 and total > 0 and sane)
         if block_gate:
             structural_block_pass += 1
             g = grouped.setdefault(s['seriesId'], {'series': s, 'blocks': [], 'fingerprints': set()})
@@ -146,7 +145,7 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
         ]
         holdings.sort(key=lambda h: -h['weight'])
         final_sane = bool(holdings and repro.ov.pit.legacy_holdings.structural_sanity(holdings))
-        final_gate = bool(10 <= len(holdings) <= 3000 and merged_total > 0 and final_sane)
+        final_gate = bool(holdings and merged_total > 0 and final_sane)
         merge_diag.append({
             'seriesId': sid, 'seriesName': g['series'].get('seriesName'),
             'mergedBlockCount': len(g['blocks']), 'mergedHoldingCount': len(holdings),
