@@ -1,0 +1,37 @@
+name: Research Country Uncertainty Universe Bounds 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-uncertainty-universe-bounds-2006.py"
+      - ".github/workflows/research-country-uncertainty-universe-bounds-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  bounds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download research inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/pit /tmp/map /tmp/country /tmp/newc
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          cp /tmp/pit/nq-pit-holdings-2006-ec-filtered.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9900708609/zip > /tmp/map.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/map/nq-npx-structural-mapping-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/country.zip
+          unzip -q /tmp/country.zip -d /tmp/country
+          cp /tmp/country/country-full-coverage-unknown-retry-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903255442/zip > /tmp/newc.zip
+          unzip -q /tmp/newc.zip -d /tmp/newc
+          cp /tmp/newc/structural-new-matches-country-2006.json data/research/
+      - run: python3 scripts/research-country-uncertainty-universe-bounds-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-uncertainty-universe-bounds-2006
+          path: data/research/country-uncertainty-universe-bounds-2006.json
