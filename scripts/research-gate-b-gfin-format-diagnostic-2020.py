@@ -8,8 +8,7 @@ URL='https://www.sec.gov/Archives/edgar/data/1479026/000119312519276095/d774917d
 UA={'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com','Accept':'text/plain,text/html,*/*'}
 TITLE=re.compile(r'Goldman Sachs (?:Motif )?Finance Reimagined ETF',re.I)
 SCHED=re.compile(r'Schedule of Investments|Portfolio of Investments',re.I)
-NET=re.compile(r'net assets|net asset',re.I)
-COMMON=re.compile(r'common stocks?',re.I)
+KEY=re.compile(r'Common Stocks|Repurchase Agreements|Total Investments|Net Assets',re.I)
 
 def get():
     last=None
@@ -20,26 +19,27 @@ def get():
         except Exception as e:last=repr(e)
     raise RuntimeError(last)
 
+def plain(s): return ' '.join(re.sub(r'[*_]+','',s or '').replace('\xa0',' ').split())
+
 def main():
-    text,tr=get();lines=text.splitlines()
-    title_hits=[i for i,x in enumerate(lines) if TITLE.search(x)]
-    sched_hits=[i for i,x in enumerate(lines) if SCHED.search(x)]
-    net_hits=[i for i,x in enumerate(lines) if NET.search(x)]
-    common_hits=[i for i,x in enumerate(lines) if COMMON.search(x)]
-    candidates=[]
+    text,tr=get();lines=text.splitlines();title_hits=[i for i,x in enumerate(lines) if TITLE.search(x)];sched_hits=[i for i,x in enumerate(lines) if SCHED.search(x)]
+    starts=[]
     for t in title_hits:
-        near=sorted(sched_hits,key=lambda s:abs(s-t))[:5]
-        candidates.append({'titleAt':t,'nearestScheduleHits':near,'distances':[abs(s-t) for s in near]})
-    selected=[]
-    for t in title_hits:
-        selected.append(t)
-        selected.extend(s for s in sched_hits if abs(s-t)<=250)
-        selected.extend(n for n in net_hits if 0 <= n-t <= 500)
-        selected.extend(c for c in common_hits if 0 <= c-t <= 300)
-    selected=sorted(set(selected))
-    windows=[{'at':i,'kind':'title' if i in title_hits else ('net' if i in net_hits else ('common' if i in common_hits else 'schedule')),'lines':lines[max(0,i-12):min(len(lines),i+55)]} for i in selected]
-    out={'transport':tr,'lineCount':len(lines),'titleHits':title_hits,'scheduleHitsNearTitles':candidates,'netHitsNearTitles':[n for n in net_hits if any(0<=n-t<=500 for t in title_hits)],'commonHitsNearTitles':[c for c in common_hits if any(0<=c-t<=300 for t in title_hits)],'windows':windows}
-    print('SUMMARY',json.dumps({k:out[k] for k in ('lineCount','titleHits','scheduleHitsNearTitles','netHitsNearTitles','commonHitsNearTitles')}),flush=True)
-    for w in windows:print('WINDOW',json.dumps(w),flush=True)
+        near=[s for s in sched_hits if abs(s-t)<=30]
+        if near: starts.append(min([t]+near))
+    start=min(starts) if starts else (title_hits[0] if title_hits else 0)
+    # Stop before the next Goldman Sachs ETF title after the target schedule.
+    end=min(len(lines),start+700)
+    for i in range(start+30,end):
+        p=plain(lines[i])
+        if re.match(r'^Goldman Sachs .* ETF$',p,re.I) and not TITLE.search(p):
+            end=i;break
+    key=[]
+    for i in range(start,end):
+        p=plain(lines[i])
+        if KEY.search(p):
+            key.append({'at':i,'line':p,'next':[plain(x) for x in lines[i+1:min(end,i+8)] if plain(x)]})
+    out={'transport':tr,'start':start,'end':end,'keyLines':key}
+    print('KEYLINES',json.dumps(key),flush=True)
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
 if __name__=='__main__':main()
