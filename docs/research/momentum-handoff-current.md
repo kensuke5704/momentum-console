@@ -1,21 +1,20 @@
 # Momentum Research Handoff — Current
 
-Last updated: 2026-09-02 JST
+Last updated: 2026-09-03 JST
 Branch: `research/cagr40-new-alpha-20260901`
 Repository: `kensuke5704/momentum-console`
 
-> This file is the canonical handoff for ongoing Momentum strategy research. Update it whenever research code, validation results, assumptions, conclusions, or next actions change.
+> Canonical handoff for ongoing Momentum research. The exact live branch head must always be read from GitHub. Material research changes are required to update this file; a freshness CI gate enforces that policy.
 
 ## 1. Current objective
 
-Validate whether the frozen Stage21 momentum strategy has useful out-of-sample-like robustness beyond the currently available 2020–2026 backtest period, without modifying the frozen production strategy.
+Reconstruct a point-in-time ETF-holdings universe for 2006–2018 that is structurally faithful to the frozen Production N-PORT universe, without changing the Production strategy and without consuming the historical return sample all at once.
 
-The current workstream is specifically trying to reconstruct a longer historical ETF-holdings-based universe for 2006 onward using only free sources.
+The immediate question is **universe reproducibility**, not strategy performance: can legacy N-Q/N-CSR holdings, with N-PX identity support, reproduce the same economic universe that Production builds from N-PORT?
 
-## 2. Frozen production strategy — do not modify
+## 2. Frozen Production — do not modify
 
 Frozen identifier: `momentum-stage21-sbi-2026-09-v1`
-Frozen date: 2026-09-02
 True Forward start: 2026-09-02
 
 Stage21 allocations:
@@ -26,360 +25,259 @@ Stage21 allocations:
 - Monthly rebalance plus immediate state-change rebalance
 - Transaction cost assumption: 10 bps one-way
 
-Frozen backtest period: 2020-01-01 through 2026-08-25
-- CAGR: 48.61%
-- MaxDD: -16.89%
-- Calmar: 2.879
-- Final equity: 13.905x
+Frozen Production/backtest logic remains untouched. Historical reconstruction is research-only.
 
-Primary downside-control interpretation:
-- M3 is the main downside-control engine.
-- GLDM materially improves the return/drawdown tradeoff.
-- CFTC is a secondary overlay.
+## 3. Production universe rule that legacy history must reproduce
 
-Production/frozen logic must remain unchanged. All extended-history work stays in research-only scripts/workflows.
+Production universe inputs per security:
+- distinct ETF count (`etfCount`)
+- aggregate holding weight
+- maximum holding weight
+- filing-recency-weighted holding weight
 
-## 3. Existing robustness results
+Production score:
 
-### 3.1 Local Stage21 SPA family
+`3*log1p(etfCount) + 0.5*log1p(aggregateWeight) + 0.5*log1p(recencyWeight)`
 
-32 nearby Stage21-family candidates were tested.
+Security eligibility:
 
-Stage21 vs QQQ family-wise SPA p-values were approximately:
-- block 5: 0.034
-- block 10: 0.041 range
-- block 20: within the same ~0.03–0.04 range
+`etfCount >= 2 OR maxWeight >= 4`
 
-Stage21 vs Fixed60 raw mean-return SPA p-value = 1.0 because Fixed60 is intentionally riskier and has higher raw mean return. This does not invalidate the drawdown-controlled objective.
+Recency:
 
-### 3.2 Architecture-wide SPA
+`exp(-ageDays / 120)`
 
-Historical `cagr40-*` scripts were instrumented in GitHub Actions to capture all full-period `performanceStats()` curves.
+ETF structural eligibility includes Production-style series-name exclusions, 10–120 holdings, total positive weight >=50, and top-10 concentration >=25. N-PORT additionally exposes explicit `ASSET_CAT=EC`, `INVESTMENT_COUNTRY=US`, and `ISSUER_TYPE=CORP`; legacy filings require a structural proxy for these fields.
 
-- 333 unique full-period curves
-- common sample: 2020-01-01 through 2026-08-25
-- 1,669 common trading days
-- 36/38 scripts succeeded
-- `cagr40-sec-fundamental-stage6`: rc=1
-- `cagr40-putcall-stage17`: timeout 120s
-
-Architecture SPA vs QQQ:
-- block 5: global p = 0.176
-- block 10: global p = 0.161
-- block 20: global p = 0.142
-
-Stage21 family-wise p-values under the broad architecture family:
-- block 5: 0.346
-- block 10: 0.323
-- block 20: 0.313
-
-Conclusion: raw-return alpha does not survive broad architecture correction. Architecture-selection bias remains material and is not ruled out.
-
-### 3.3 Architecture Calmar bootstrap
-
-Script: `scripts/architecture-calmar-bootstrap.mjs`
-
-Observed Stage21 Calmar rank: 1 / 333
-Fixed60-like Calmar: 1.992
-
-Paired stationary-bootstrap probability that Stage21 Calmar > Fixed60:
-- block 5: 72.22%
-- block 10: 74.42%
-- block 20: 75.62%
-- block 60: 78.88%
-
-All 95% Calmar-difference intervals cross zero. Therefore this is supportive but not conventionally significant.
-
-Relevant docs:
-- `docs/research/stage21-validation-summary-20260902.md`
-- `docs/research/stage21-spa-20260902.md`
-- `docs/research/stage21-architecture-spa-20260902.md`
-- `docs/research/stage21-calmar-bootstrap-20260902.md`
-
-## 4. Why a longer backtest is needed
-
-The current 2020–2026 sample is only about 6.7 years and is dominated by a limited set of market regimes.
-
-A 2006–2026 test would add:
-- pre-GFC expansion
-- 2008 financial crisis
-- 2009 recovery
-- 2011 euro-area stress
-- 2015–2016 correction
-- 2018 selloff
-- 2020 COVID shock
-- 2022 tightening regime
-
-The goal is not to refit Stage21 to this history. The goal is to reconstruct the historical data inputs as faithfully as possible, freeze the reconstruction rules before seeing performance, then run the frozen Stage21 logic.
-
-## 5. Main data limitation
-
-The production universe uses SEC N-PORT-based ETF holdings breadth.
-
-Current universe implementation:
-- `src/lib/universe/universe.ts`
-- `src/lib/universe/sec-nport.ts`
-- `src/lib/universe/nport-quarterly.ts`
-
-Current universe score:
-
-`3 * log1p(etfCount) + 0.5 * log1p(aggregateWeight) + 0.5 * log1p(recencyWeight)`
-
-Eligibility filter includes:
-- at least 10 and at most 120 holdings
-- total positive holding weight >= 50
-- top-10 weight >= 25
-- excludes structured/income/broad-benchmark funds by series-name rules
-
-Production N-PORT parsing also restricts holdings to US corporate equities using the N-PORT fields `ASSET_CAT=EC`, `INVESTMENT_COUNTRY=US`, and `ISSUER_TYPE=CORP`.
-
-N-PORT itself cannot be extended far enough backward, so the research is testing legacy SEC fund filings as a historical bridge.
-
-## 6. Free-source alternatives tested
-
-### 6.1 SEC 13F — rejected as direct N-PORT substitute
-
-Layline 13F was tested as a free institutional-holdings proxy.
-
-2020 overlap diagnostics:
-- average Top80 ticker mapping coverage: ~65.0%
-- median mapping coverage: ~70.0%
-- average direct N-PORT Top80 overlap: ~40.56%
-- median direct overlap: ~43.13%
-- average conditional overlap among mapped 13F names: ~55.29%
-- median conditional overlap: ~59.09%
-
-More importantly, production Top2 retention in 2020 was poor:
-- 6 / 22 selected names retained in 13F Top80 = 27.3%
-- both Top2 retained in only 2 / 11 months = 18.2%
-
-Conclusion: 13F changes the economic universe too much. Do not use it for the extended Stage21 backtest.
-
-### 6.2 Legacy N-Q / N-CSR — current primary route
-
-This is conceptually much closer to N-PORT because it is registered-fund portfolio holdings data.
-
-2006 SEC index extraction succeeded using the public Notre Dame master-index archive.
-
-2006 target filing counts:
-- total target forms: 13,610
-- N-Q: 6,489
-- N-CSR: 3,668
-- N-CSRS: 3,067
-- N-CSR/A: 238
-- N-Q/A: 84
-- N-CSRS/A: 64
-
-2006 holdings parser pilot:
-- fetch success: 100% in the fixed sample
-- >=20 holdings parsed: 50.0%
-- median parsed holdings: 35
-- positive market values in 83.3% of sampled filings
-
-2019 bridge parser pilot:
-- fetch success: 100% in the fixed sample
-- >=20 holdings parsed: 52.8%
-- median parsed holdings: 21
-
-Interpretation: old filings are not inherently unusable; parser quality is the main issue.
-
-## 7. 2006 ETF-series identification — latest confirmed result
-
-Targeted metadata probe run:
-- workflow: `Research NQ Series Metadata 2006`
-- run id: `33635790761`
-- commit: `aea69ecf30f677786771917ce75540dffe907105`
-
-Targeted sample: 14 known ETF registrant / Vanguard ETF-share-class candidates.
-
-Result:
-- fetch success: 14/14 = 100%
-- series metadata rate: 78.57%
-- ticker metadata rate: 71.43%
-- structured series rate: 78.57%
-
-Successfully recovered filing-time ETF ticker sets including:
-- Select Sector SPDR: XLY, XLP, XLE, XLF, XLV, XLI, XLB, XLK, XLU
-- Rydex ETF Trust: XLG, RSP
-- StreetTRACKS: FEU, FEZ
-- PowerShares examples: PBE, PBJ, PBS, PPA, PHO, PGJ, etc.
-- StreetTRACKS Series Trust examples: RWR, SDY, XBI, XHB, XSD, etc.
-
-Important caveats:
-- iShares samples returned no SGML series metadata through the current transport/parser.
-- ProShares returned series metadata but no tickers in that sample.
-- Vanguard often embeds ETF share classes inside broader mutual-fund series, so explicit `ETF` text alone is insufficient.
-
-Conclusion: historical ETF identification is feasible, but classification must use the SGML hierarchy and class-level metadata rather than only fund/series names.
-
-## 8. Historical issuer/ticker/security-id mapping — N-PX pilot
-
-Current supporting route: SEC Form N-PX.
-
-2006 N-PX index:
-- 3,541 filings total
-- N-PX: 3,429
-- N-PX/A: 112
-
-Pilot run:
-- workflow run: `33638519487`
-- N-PX job id: `100275380996`
-- sample fetch success: 4/4
-- filings with >=1 ticker/security-ID pair: 50%
-- filings with >=50 pairs: 50%
-- median paired records: 200
-
-Examples recovered directly from filing text:
-- ABBOTT LABORATORIES → ABT → 002824100
-- REYNOLDS & REYNOLDS CO. → REY → 761695105
-- SUPERVALU INC. → SVU → 868536103
-
-Conclusion: N-PX can become a free historical issuer ↔ ticker ↔ security-id security master, especially for securities no longer listed today.
-
-Script:
-- `scripts/research-npx-security-master-2006.py`
-
-## 9. BeanCounter path — rejected for holdings reconstruction
-
-BeanCounter was investigated as a free bulk EDGAR text mirror.
-
-The 2006 shard range was identified around shards 144–164.
-
-CUSIP extraction from generic text was not reliable:
-- naive 9-character matching produced obvious false positives such as `TRUSTEES1`
-- check-digit validation still allowed textual false positives such as `OFFICERS3`
-- real CUSIPs found in the body often referred to the filing fund/share class itself rather than portfolio holdings
-
-Conclusion: do not use BeanCounter CUSIP-frequency counting as the historical universe source.
-
-## 10. N-Q series-to-holdings and PIT representation — confirmed but coverage-limited
-
-The original segmentation feasibility probe in run `33638519487` reported 94 / 99 ETF series as segmentable. That was a coarse heading/series assignment feasibility measure and should not be interpreted as 94 usable holdings records.
-
-A stricter end-to-end rerun was completed after the handoff was created:
-- workflow run: `33644227262`
-- commit: `cb74de04e3f0184e34b2b038bf0ec12459df7e82`
-- 6 deterministic ETF registrant filings fetched successfully
-- 34 series actually mapped to parsed schedule blocks
-- 30 mapped series passed the production-style name exclusions
-- 18 passed the preliminary structural rule of 10–120 parsed holdings and positive market value
-
-A point-in-time holdings representation script was then added:
-- `scripts/research-nq-pit-holdings-2006.py`
-- stores accession, CIK, filing date, report date, series ID/name, fund ticker metadata, mapping score, parser method, holdings descriptions, market values, and parser-relative series weights
-- weights are normalized from positive parsed market values within each series; they are not yet validated against reported net assets
-- no return/performance data is used
-
-The production top-10 concentration rule was then added and rerun:
-- workflow run: `33644613585`
-- commit: `1531b8caf5d5d6bfac7c060f6f99c67023d6cf41`
-- filings attempted/succeeded: 6 / 6
-- final PIT series records passing production-style name exclusions, 10–120 holdings, and normalized top-10 weight >=25%: **9**
-- median holdings per retained record: **49**
-- weight normalization error: **0.0**
-
-Examples of retained PIT records:
-- XLE — report date 2005-12-31, filing date 2006-02-28, 30 holdings, top-10 weight ~63.75%
-- XLG — report date 2006-01-31, filing date 2006-03-27, 52 holdings, top-10 weight ~43.24%
-- MTK — report date 2006-03-31, filing date 2006-05-24, 49 holdings, top-10 weight ~38.37%
-- XBI — report date 2006-03-31, filing date 2006-05-24, 14 holdings, top-10 weight ~97.54%
-- XHB — report date 2006-03-31, filing date 2006-05-24, 41 holdings, top-10 weight ~26.72%
-
-Interpretation:
-- series-level PIT holdings reconstruction is technically feasible for legacy N-Q filings
-- current coverage is not yet sufficient for a historical universe backtest
-- the earlier 94/99 segmentation number was optimistic if treated as end-to-end usable coverage
-- parser/mapping coverage, issuer ticker mapping, and the lack of direct legacy equivalents for N-PORT `US/CORP/EC` fields remain active limitations
-
-## 11. Current active gate: historical security mapping and coverage improvement
-
-Do not run 2006–2018 Stage21 performance yet.
-
-The next technical gate is to turn the retained legacy holdings descriptions into stable point-in-time security identities and determine whether coverage can become sufficient for N-PORT-like breadth ranking without performance-driven tuning.
-
-Proceed next with:
-1. Expand the N-PX security master beyond the four-file feasibility pilot using a deterministic, non-performance-based sampling/build rule.
-2. Normalize legacy N-Q issuer descriptions and join them to N-PX issuer ↔ ticker ↔ security-id records.
-3. Measure mapping coverage by holdings count and by holdings weight for the retained N-Q PIT series.
-4. Diagnose currently unmapped N-Q series/schedule blocks using parser/structure evidence only.
-5. Investigate structural proxies for the missing N-PORT `US/CORP/EC` fields; do not choose rules based on strategy returns.
-6. Only after mapping/coverage quality is acceptable, construct the legacy universe scoring inputs.
-
-## 12. Planned validation sequence
-
-Do not jump directly to a 2006–2026 performance backtest.
-
-Proceed in this order:
-
-1. N-Q series-to-holdings segmentation feasibility test. **Completed; feasible but coverage-limited.**
-2. Point-in-time historical ETF-series holdings representation. **Pilot completed; 9 retained records under production-style structural constraints in the current six-filing sample.**
-3. Build/extend historical issuer ↔ ticker/security-id mapping, using N-PX where needed. **Current step.**
-4. Construct a legacy-N-Q universe using the same economic scoring inputs as the N-PORT universe where possible:
-   - ETF count
-   - aggregate weight
-   - max weight
-   - recency-weighted weight
-5. Use an overlap period near the N-Q/N-PORT transition to measure:
-   - Top80 overlap
-   - rank correlation
-   - production Top2 retention
-6. Freeze the legacy-universe conversion rules before looking at 2006–2018 Stage21 performance.
-7. If the bridge is sufficiently faithful, extend the universe backward and run frozen Stage21 research backtests.
-8. Report the extended test separately from the frozen 2020–2026 production backtest.
-
-## 13. Interpretation rules / anti-overfitting constraints
-
-- Do not change Stage21 production parameters based on extended-history results.
-- Do not tune legacy parser/universe rules against CAGR, MaxDD, Calmar, or trade outcomes.
-- Parser and mapping quality may be improved using only structural/data-quality evidence.
-- Define overlap/mapping acceptance rules before running long-history performance where practical.
-- Label any proxy period clearly; do not call it true OOS.
-- Keep True Forward OOS from 2026-09-02 conceptually separate from all historical reconstruction work.
-
-## 14. Known research-code caveat
-
-`stage21-spa.ts` has/had a GLDM→Cash spread-order issue in the research script. The relevant workflow patched it at runtime. Frozen production strategy is unaffected.
-
-If touching SPA research code again, cleanly verify/fix source parity before using new results.
-
-## 15. Important files
-
-Production/universe logic:
+Key Production files:
 - `src/lib/universe/universe.ts`
 - `src/lib/universe/sec-nport.ts`
 - `src/lib/universe/nport-quarterly.ts`
 - `scripts/build-universe.ts`
 
-Long-history research:
-- `scripts/research-nq-index-extract.py`
-- `scripts/research-nq-parser-pilot.py`
-- `scripts/research-nq-bridge-2019.py`
-- `scripts/research-nq-series-metadata-2006.py`
+## 4. Legacy source architecture — frozen direction
+
+Primary historical route:
+- N-Q: main legacy portfolio-holdings source through 2006–2018
+- N-CSR/N-CSRS: complementary holdings source and 2020 overlap-validation source
+- N-PX: historical issuer ↔ ticker ↔ security-id support
+
+Rejected as direct Production-universe substitutes:
+- direct 13F universe: economic universe differs too much; 2020 Production Top2 retention was poor
+- BeanCounter/CUSIP-frequency reconstruction: false-positive and fund-level CUSIP contamination
+
+Do not revive rejected routes without new structural evidence.
+
+## 5. Critical N-Q series-assignment correction
+
+The first legacy parser sometimes attached a `Schedule of Investments` block to the neighboring ETF series because the actual series heading appeared before the generic schedule marker.
+
+Current strict rule:
+- inspect a tight pre/post schedule-heading context
+- prefer exact filing-time series phrase
+- reject exact ties and near ties
+- use the same mapping rule in segmentation and PIT holdings construction
+- run deterministic semantic anchors for known ETF series
+
+Strict 2006 result:
+- filings succeeded: 6/6
+- retained PIT series: 13
+- median holdings: 54
+- weight normalization error: 0
+- semantic audit: PASS
+
+Known coherent retained series include XLY, XLE, XLI, XLB, XLK, ELR, ELG, ELV, DGT, KBE, KCE, KIE and OOO. Previously misassigned XBI/XHB/MTK schedules are no longer force-retained.
+
+## 6. Historical security identity — latest confirmed 2006 result
+
+N-PX master uses 96 deterministic equal-quantile filing positions; selection does not use performance.
+
+Latest completed mapping workflow: `33653470171`
+
+Identity tiers:
+- Tier A: unique exact/conservative legal-name issuer match to exactly one `(ticker, securityId)`
+- Tier B: no Tier A; unique issuer match to one structurally valid 2–5 character historical ticker with missing securityId
+- Unresolved: multiple identities/tickers, parser/header token, one-character ticker-only evidence, fuzzy-only evidence, or no structural match
+
+Corrected 13-series result:
+- eligible holdings: 728
+- Tier A count: 616 / 728 = 84.62%
+- Tier A eligible-weight coverage: **91.21%**
+- Tier B count: 3 / 728 = 0.41%
+- Tier B eligible-weight coverage: **0.15%**
+- Tier A+B eligible-weight coverage: **91.37%**
+- ambiguous weight: ~1.83%
+- unmapped count: 93
+
+Selected per-series Tier A+B weight coverage:
+- XLE 100.0%
+- XLI 96.2%
+- XLK 92.6%
+- ELR 92.2%
+- ELG 95.0%
+- ELV 93.3%
+- KBE 94.2%
+- KCE 88.0%
+- KIE 94.6%
+- OOO 97.1%
+- XLY 89.7%
+- XLB 85.5%
+- DGT 68.6%
+
+Interpretation: 2006 identity mapping is structurally strong enough to continue, but this alone does **not** prove Production-universe parity.
+
+## 7. Legacy proxy for N-PORT US/CORP/EC
+
+Only explicit structural evidence is used:
+- accepted Tier A/B identity required
+- ADR/GDR/depositary receipt -> `NON_US_PROXY`
+- debt/preferred/options/warrants/rights -> `NON_EC_PROXY`
+- LP/limited partnership/LLC -> `NON_CORP_PROXY`
+- otherwise -> `LEGACY_EQUITY_CANDIDATE`
+
+Do not infer domicile from issuer spelling, ticker, price availability or performance.
+
+2006 corrected 13-series aggregate:
+- total parser-relative weight: 1300.0
+- accepted identity weight: 1180.68 = 90.82%
+- legacy equity candidate weight: 1175.52 = **90.42%**
+- unresolved identity weight: 111.57
+- parser artifact weight: 7.75
+- explicit ADR/GDR exclusion weight: 5.16
+
+## 8. Universe reproducibility gates — current source of truth
+
+The current reproducibility implementation is `scripts/research-legacy-universe-reproducibility-2020.py`.
+
+### Gate A — shared-series fidelity
+
+Hold the SEC `seriesId` set fixed and compare legacy N-CSR/N-CSRS reconstruction against nearest same-series N-PORT holdings.
+
+PASS requires:
+- at least 10 paired series
+- median legacy symbol-weight coverage >= **80%**
+- Top80 overlap >= **80%**
+- common-Top80 rank correlation >= **0.80**
+- N-PORT Top2 retention >= **90%**
+
+This isolates parser + issuer identity + scoring fidelity.
+
+### Gate B — missing-series impact
+
+Use N-PORT holdings on both sides:
+- full eligible N-PORT series set
+- N-PORT restricted to series that the legacy pipeline can reconstruct
+
+PASS requires:
+- Top80 overlap >= **80%**
+- common-Top80 rank correlation >= **0.80**
+- N-PORT Top2 retention >= **90%**
+
+This isolates source-series coverage from parser/mapping error.
+
+**Only Gate A + Gate B PASS allows the bridge to be called structurally equivalent to the Production universe.**
+
+## 9. Current reproducibility status
+
+Parity is **not yet established**.
+
+Latest fast workflow attempt:
+- workflow: `Research Legacy Universe Reproducibility Fast 2020`
+- run: `33660812007`
+- head at that run: `95c2f7be8fc56dc609c1c75e10dfe9ae1b6d35bf`
+- conclusion: failure before metrics were produced
+- cause: GitHub runner received HTTP 403 while fetching SEC quarterly `master.idx`
+
+This is a transport failure, not a Gate A/B metric failure. Do not interpret it as evidence for or against universe parity.
+
+Parser lessons already confirmed:
+- SPDR legacy reports can be parsed correctly by the original parser path
+- some iShares/modern shareholder reports need HTML fallback because the plain-text path can misread a year/header as a holding
+- the current parser is composite: preserve the original result when structurally sane, invoke HTML fallback only for zero/obvious-artifact output
+
+Next reproducibility task: remove SEC runner-network dependence by using a deterministic frozen 2020 filing/overlap fixture, then run Gate A/B on identical fixed inputs.
+
+## 10. Historical-data preservation protocol
+
+Structural filing data may be inspected across **all 2006–2018** years for parser, identity, PIT and universe reconstruction work. Performance data must not be consumed all at once.
+
+Performance windows are frozen:
+1. DEVELOPMENT: 2006-01-01 .. 2010-12-31
+2. VALIDATION: 2011-01-01 .. 2014-12-31
+3. SEALED_HOLDOUT: 2015-01-01 .. 2018-12-31
+
+Default code permits DEVELOPMENT only. Later phases require explicit environment gates through `scripts/research-legacy-history-periods.py`.
+
+Do not open any historical performance window until universe reproducibility/conversion rules are structurally frozen. Do not change parser/universe rules because of CAGR, MaxDD, Calmar, returns, trade outcomes or other performance quantities.
+
+## 11. 2006–2018 filing availability
+
+The structural inventory confirmed N-Q availability across the full 2006–2018 span. Therefore the preferred long-history architecture remains:
+
+**N-Q throughout the legacy period + N-CSR/N-CSRS complement + N-PX identity support.**
+
+Cross-year structural sampling must be deterministic. Samples may not be selected or replaced based on parser success or strategy outcomes.
+
+## 12. Existing robustness context
+
+Frozen Stage21 remains promising on the available 2020–2026 sample, but broad architecture correction does not establish conventional raw-return significance.
+
+Architecture-wide results already recorded:
+- 333 full-period curves
+- global SPA vs QQQ p approximately 0.176 / 0.161 / 0.142 for block 5/10/20
+- Stage21-family p approximately 0.346 / 0.323 / 0.313
+- observed Stage21 Calmar rank 1/333
+- paired stationary-bootstrap P(Stage21 Calmar > Fixed60) 72.22% / 74.42% / 75.62% / 78.88% for block 5/10/20/60
+- all 95% Calmar-difference intervals cross zero
+
+This is why the longer historical test is useful, but it must not be contaminated by reconstruction tuning.
+
+## 13. Current active sequence
+
+1. **DONE:** strict N-Q schedule→series correction and semantic audit.
+2. **DONE:** 2006 N-PX identity mapping; Tier A+B weight coverage 91.37%.
+3. **DONE:** structural legacy US/CORP/EC proxy definition; no performance tuning.
+4. **DONE:** staged historical-performance guard; 2011–2018 remain sealed by default.
+5. **IN PROGRESS:** freeze deterministic 2020 overlap fixture so validation no longer depends on SEC runner transport.
+6. Run Gate A shared-series reproducibility on the fixed fixture.
+7. Run Gate B missing-series impact on the same fixture.
+8. If either gate fails, diagnose by filing/parser/series evidence only; thresholds must not be relaxed.
+9. If both pass, freeze legacy conversion rules and build monthly PIT universe history for 2006–2018 without strategy returns.
+10. Only then open DEVELOPMENT performance (2006–2010).
+11. Keep VALIDATION (2011–2014) and SEALED_HOLDOUT (2015–2018) closed until their predeclared release conditions are met.
+
+## 14. Important files
+
+Canonical/current:
+- `docs/research/momentum-handoff-current.md`
+- `docs/research/nq-npx-mapping-2006-20260903.md`
+- `docs/research/legacy-universe-data-gates.md`
+- `docs/research/legacy-history-evaluation-protocol.md`
+
+Legacy reconstruction:
 - `scripts/research-nq-series-segmentation-2006.py`
 - `scripts/research-nq-pit-holdings-2006.py`
-- `scripts/research-npx-security-master-2006.py`
-- `.github/workflows/research-nq-index-extract.yml`
-- `.github/workflows/research-nq-series-metadata-2006.yml`
+- `scripts/research-npx-security-master-build-2006.py`
+- `scripts/research-nq-npx-mapping-2006.py`
+- `scripts/research-legacy-holdings-parser.py`
+- `scripts/research-ncsr-nport-overlap-2020.py`
+- `scripts/research-legacy-universe-reproducibility-2020.py`
+- `scripts/research-legacy-universe-reproducibility-fast-2020.py`
+- `scripts/research-legacy-history-periods.py`
 
-Robustness research:
-- `scripts/stage21-spa.ts`
-- `scripts/architecture-spa-analyze.mjs`
-- `scripts/architecture-calmar-bootstrap.mjs`
+## 15. Freshness protocol
 
-## 16. Handoff protocol
+At the start of every session:
+1. Read this file.
+2. Read the live branch head from GitHub; do not trust a SHA copied into conversation history as current.
+3. Inspect any newer research workflow runs/artifacts relevant to the active sequence.
+4. Treat this file and current code as authoritative over older chat summaries.
 
-At the start of a new chat/session:
+On every material research change:
+- update this file in the same change set whenever possible
+- record decisive metrics/run IDs and rejected paths
+- remove or explicitly mark superseded conclusions
+- never leave an older pilot result presented as the current result
+- freshness CI must fail when material research code/docs/workflows change without this canonical handoff being updated
 
-1. Read this file first.
-2. Inspect the latest commit on `research/cagr40-new-alpha-20260901`.
-3. Inspect any workflow run IDs listed in the current active gate.
-4. Continue from the `Planned validation sequence` without re-running already rejected approaches unless there is new evidence.
-5. Do not modify frozen Stage21 production/backtest logic.
-
-When research is changed:
-
-- Update this file in the same change set/commit whenever possible.
-- Update `Last updated`.
-- Move completed items out of `Current active gate` into confirmed results.
-- Record decisive run IDs, commit SHAs, metrics, failures, and rejected paths.
-- Keep the next action explicit so a new chat can resume without relying on conversation history.
+Production strategy remains frozen and separate.
