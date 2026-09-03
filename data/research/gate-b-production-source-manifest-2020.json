@@ -1,0 +1,40 @@
+{
+  "purpose": "Metadata-only manifest for the exact SEC series that generate the 2020-01 Production Universe. Sources are selected as the latest identified complete holdings report preceding the first Production N-PORT report. No holdings overlap, Universe rank, or strategy returns were used to select them.",
+  "selectionRule": "Exact SEC series continuity; latest publicly filed complete holdings report with reportDate before first Production N-PORT reportDate. Allowed transition forms: N-Q, N-CSR, N-CSRS, NPORT-EX. Aggregate Gate B must not be declared until all material source series are verified.",
+  "sources": [
+    {
+      "seriesId": "S000057700",
+      "seriesName": "ClearBridge Large Cap Growth ESG ETF",
+      "registrantCik": "0001645194",
+      "firstProductionNportReportDate": "2019-11-29",
+      "sourceForm": "N-CSRS",
+      "sourceReportDate": "2019-05-31",
+      "sourceAccession": "0001193125-19-202172",
+      "sourceDocumentUrl": "https://www.sec.gov/Archives/edgar/data/1645194/000119312519202172/d716779dncsrs.htm",
+      "status": "VERIFIED_COMPLETE_HOLDINGS"
+    },
+    {
+      "seriesId": "S000063326",
+      "seriesName": "Goldman Sachs Motif Finance Reimagined ETF",
+      "registrantCik": "0001479026",
+      "firstProductionNportReportDate": "2019-11-29",
+      "sourceForm": "N-CSR",
+      "sourceReportDate": "2019-08-31",
+      "sourceAccession": null,
+      "sourceDocumentUrl": null,
+      "status": "REPORT_EXISTENCE_VERIFIED_DOCUMENT_URL_PENDING",
+      "note": "SEC filings independently establish an audited Schedule of Investments dated 2019-08-31 for the Motif fund group. Exact N-CSR accession/document remains to be fixed before formal aggregate Gate B."
+    },
+    {
+      "seriesId": "S000061208",
+      "seriesName": "PPTY - U.S. Diversified Real Estate ETF",
+      "registrantCik": "0001540305",
+      "firstProductionNportReportDate": "2019-11-30",
+      "sourceForm": "NPORT-EX",
+      "sourceReportDate": "2019-05-31",
+      "sourceAccession": "0001193125-19-207140",
+      "sourceDocumentUrl": "https://www.sec.gov/Archives/edgar/data/1540305/000119312519207140/d784474dnportex.htm",
+      "status": "VERIFIED_COMPLETE_HOLDINGS"
+    }
+  ]
+}
