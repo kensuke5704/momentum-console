@@ -270,7 +270,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     <Section title="Next Action">
       <div className="next-action next-action-stage21">
         <button type="button" className="next-action-cell" onClick={() => setDetail("regime")}><span>Regime</span><strong>{portfolio.regime}</strong></button>
-        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><div className="action-value-line"><strong>{actionLabel}</strong>{nonLatestClose && <span className="close-basis-warning" title={`Decision uses ${portfolio.asOf || "no"} daily close; latest completed session is ${latestCompletedSession}.`}>NON-LATEST</span>}</div></button>
+        <button type="button" className="next-action-cell" onClick={() => setDetail("action")}><span>Action</span><div className="action-value-line"><strong>{actionLabel}</strong>{nonLatestClose && <span className="close-basis-warning" title={`Decision uses ${portfolio.asOf || "no"} daily close; latest completed session is ${latestCompletedSession}.`}>STALE</span>}</div></button>
         <button type="button" className="next-action-cell execution-cell" onClick={() => setDetail("execution")}><span>Execution (JST)</span><strong>{execution}</strong></button>
         <button type="button" className="next-action-cell target-cell" onClick={() => setDetail("target")}><span>Target</span><AllocationBand targets={action.targets} compact /></button>
       </div>
