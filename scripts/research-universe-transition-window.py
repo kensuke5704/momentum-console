@@ -14,11 +14,12 @@ OUT = ROOT / "data/research/universe-transition-window.json"
 
 def main() -> None:
     with gzip.open(BOOT, "rt", encoding="utf-8") as f:
-        nport = json.load(f)
+        bootstrap = json.load(f)
+    nport = bootstrap.get("snapshots", []) if isinstance(bootstrap, dict) else bootstrap
     history = json.loads(HISTORY.read_text())
 
-    report_dates = [x.get("reportDate") for x in nport if x.get("reportDate")]
-    filing_dates = [x.get("filingDate") for x in nport if x.get("filingDate")]
+    report_dates = [x.get("reportDate") for x in nport if isinstance(x, dict) and x.get("reportDate")]
+    filing_dates = [x.get("filingDate") for x in nport if isinstance(x, dict) and x.get("filingDate")]
     report_months = Counter(x[:7] for x in report_dates)
     filing_months = Counter(x[:7] for x in filing_dates)
 
@@ -36,6 +37,8 @@ def main() -> None:
     signal_months = sorted({x.get("signalMonth") for x in months if isinstance(x, dict) and x.get("signalMonth")})
 
     out = {
+        "bootstrapStartQuarter": bootstrap.get("startQuarter") if isinstance(bootstrap, dict) else None,
+        "bootstrapEndQuarter": bootstrap.get("endQuarter") if isinstance(bootstrap, dict) else None,
         "nportFilings": len(nport),
         "earliestReportDate": min(report_dates) if report_dates else None,
         "latestReportDate": max(report_dates) if report_dates else None,
