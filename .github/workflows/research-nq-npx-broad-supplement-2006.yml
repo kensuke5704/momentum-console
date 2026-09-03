@@ -7,6 +7,7 @@ on:
       - "scripts/research-npx-broad-fund-supplement-2006.py"
       - "scripts/research-npx-merge-master-2006.py"
       - "scripts/research-nq-npx-mapping-2006.py"
+      - "scripts/research-nq-unmapped-diagnostics-2006.py"
       - ".github/workflows/research-nq-npx-broad-supplement-2006.yml"
   workflow_dispatch:
 
@@ -40,6 +41,8 @@ jobs:
           mv data/research/npx-security-master-2006-merged.json data/research/npx-security-master-2006.json
       - name: Re-run structural N-Q mapping
         run: python3 scripts/research-nq-npx-mapping-2006.py
+      - name: Diagnose remaining unmapped holdings
+        run: python3 scripts/research-nq-unmapped-diagnostics-2006.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -48,4 +51,5 @@ jobs:
             data/research/npx-security-master-broad-fund-supplement-2006.json
             data/research/npx-security-master-2006.json
             data/research/nq-npx-mapping-2006.json
+            data/research/nq-npx-unmapped-diagnostics-2006.json
           if-no-files-found: warn
