@@ -64,6 +64,15 @@ fast.FIXTURE_FILINGS = (
         'fixtureBasis': 'SEC shareholder report for 2019-12-31; multi-series US-equity ETF trust',
     },
     {
+        'cik': '1510337',
+        'company': 'First Trust Exchange-Traded AlphaDEX Fund II',
+        'form': 'N-CSRS',
+        'dateFiled': '2020-08-31',
+        'filename': 'edgar/data/1510337/0001445546-20-004251.txt',
+        'accession': '0001445546-20-004251',
+        'fixtureBasis': 'Predeclared fast-parity fixture; SEC shareholder report for 2020-06-30; multi-series ETF registrant',
+    },
+    {
         'cik': '1100663',
         'company': 'ISHARES TRUST',
         'form': 'N-CSR',
