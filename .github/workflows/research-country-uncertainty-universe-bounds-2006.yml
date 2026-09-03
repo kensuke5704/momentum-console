@@ -24,9 +24,9 @@ jobs:
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9900708609/zip > /tmp/map.zip
           unzip -q /tmp/map.zip -d /tmp/map
           cp /tmp/map/nq-npx-structural-mapping-2006.json data/research/
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/country.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9917570078/zip > /tmp/country.zip
           unzip -q /tmp/country.zip -d /tmp/country
-          cp /tmp/country/country-full-coverage-unknown-retry-2006.json data/research/
+          cp /tmp/country/country-full-coverage-raw-header-2006.json data/research/
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903255442/zip > /tmp/newc.zip
           unzip -q /tmp/newc.zip -d /tmp/newc
           cp /tmp/newc/structural-new-matches-country-2006.json data/research/
