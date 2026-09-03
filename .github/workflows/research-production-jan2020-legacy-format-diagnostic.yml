@@ -1,0 +1,23 @@
+name: Research Production Jan2020 Legacy Format Diagnostic
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-production-jan2020-legacy-format-diagnostic.py"
+      - ".github/workflows/research-production-jan2020-legacy-format-diagnostic.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-production-jan2020-legacy-format-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-jan2020-legacy-format-diagnostic
+          path: data/research/production-jan2020-legacy-format-diagnostic.json
+          if-no-files-found: warn
