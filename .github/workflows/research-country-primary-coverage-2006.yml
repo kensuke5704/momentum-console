@@ -1,0 +1,29 @@
+name: Research Country Primary Coverage 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-primary-coverage-2006.py"
+      - ".github/workflows/research-country-primary-coverage-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download primary mapping and country evidence cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/a
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899509849/zip > /tmp/a/map.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899752236/zip > /tmp/a/cache.zip
+          unzip -qo /tmp/a/map.zip -d data/research
+          unzip -qo /tmp/a/cache.zip -d data/research
+      - run: python3 scripts/research-country-primary-coverage-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-primary-coverage-2006
+          path: data/research/country-primary-coverage-2006.json
