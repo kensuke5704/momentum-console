@@ -1,0 +1,27 @@
+name: Research NQ Section Context 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-section-context-2006.py"
+      - ".github/workflows/research-nq-section-context-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose N-Q section headings
+        run: python3 scripts/research-nq-section-context-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-section-context-2006
+          path: data/research/nq-section-context-2006.json
+          if-no-files-found: warn
