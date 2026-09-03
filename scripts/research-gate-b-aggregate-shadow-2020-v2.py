@@ -7,14 +7,15 @@ spec=importlib.util.spec_from_file_location('agg',ROOT/'scripts/research-gate-b-
 agg=importlib.util.module_from_spec(spec);spec.loader.exec_module(agg)
 
 def extract_ppty(text,series):
- lines=agg.schedule_segment(text,series);cleaned=[agg.plain(x) for x in lines];inside=False;rows=[];net=None
+ lines=agg.schedule_segment(text,series);cleaned=[agg.plain(x) for x in lines];inside=False;rows=[];net=None;seen_common=False
  for i,line in enumerate(cleaned):
-  if re.search(r'^COMMON STOCKS\s*-\s*100\.0%',line,re.I):inside=True;continue
+  if not seen_common and re.search(r'^COMMON STOCKS\s*-\s*100\.0%',line,re.I):inside=True;seen_common=True;continue
   if inside and re.search(r'^TOTAL COMMON STOCKS',line,re.I):inside=False
-  if re.search(r'^NET ASSETS\s*-\s*100\.0%',line,re.I):
+  if seen_common and re.search(r'^NET ASSETS\s*-\s*100\.0%',line,re.I):
    for x in cleaned[i+1:min(len(cleaned),i+8)]:
     q=x.replace('$','').strip()
     if re.fullmatch(r'\d[\d,]*',q):net=float(q.replace(',',''));break
+   if net is not None:break
   if not inside or not line or not re.search(r'[A-Za-z]',line):continue
   if re.search(r'\d+(?:\.\d+)?\s*%$',line) or re.match(r'^(TOTAL|COMMON STOCK|SHARES|SECURITY DESCRIPTION|VALUE|SCHEDULE OF INVESTMENTS)',line,re.I):continue
   prev=[x for x in cleaned[max(0,i-5):i] if x];foll=[x for x in cleaned[i+1:min(len(cleaned),i+6)] if x]
@@ -27,12 +28,23 @@ def extract_ppty(text,series):
   if value and value>0:rows.append((line,value))
  return rows,net
 
+def gfin_segment(text):
+ lines=text.splitlines();target=re.compile(r'^GOLDMAN SACHS MOTIF FINANCE REIMAGINED ETF$',re.I)
+ for t,raw in enumerate(lines):
+  if not target.fullmatch(agg.plain(raw)):continue
+  for s in range(t+1,min(len(lines),t+12)):
+   if re.fullmatch(r'Schedule of Investments',agg.plain(lines[s]),re.I):
+    window='\n'.join(agg.plain(x) for x in lines[s:min(len(lines),s+40)])
+    if re.search(r'^Common Stocks\s*[–—-]\s*99\.5%',window,re.I|re.M):
+     return lines[s:min(len(lines),s+800)]
+ raise RuntimeError('GFIN exact Schedule of Investments not found')
+
 def extract_gfin(text,series):
- lines=agg.schedule_segment(text,series);rows=[];net=None;inside=False;seen=False;ended=False
+ lines=gfin_segment(text);rows=[];net=None;inside=False;seen=False
  for i,raw in enumerate(lines):
   line=agg.plain(raw)
-  if not seen and re.search(r'^Common Stocks?\s*[–—-]',line,re.I):inside=True;seen=True;continue
-  if inside and re.search(r'^(?:Repurchase Agreements?|Short-Term Investments?|Securities Lending|Total Investments)',line,re.I):inside=False;ended=True
+  if not seen and re.search(r'^Common Stocks?\s*[–—-]\s*99\.5%',line,re.I):inside=True;seen=True;continue
+  if inside and re.search(r'^(?:Repurchase Agreements?|Short-Term Investments?|Securities Lending|Total Investments|NET ASSETS)',line,re.I):inside=False
   if inside:
    m=re.match(r'^([\d,]+)\s+(.+?)\s+(?:\$\s*)?([\d,]+)\s*$',line)
    if m:
@@ -40,22 +52,20 @@ def extract_gfin(text,series):
     if re.search(r'[A-Za-z]',desc) and not re.match(r'^(Total|Common Stocks)',desc,re.I):rows.append((desc,v))
   if seen and re.search(r'^NET ASSETS\s*[–—-]\s*100\.0%',line,re.I):
    nums=re.findall(r'\d[\d,]*',line)
-   if nums:net=float(nums[-1].replace(',',''));break
-   for x in lines[i+1:min(len(lines),i+8)]:
-    q=agg.plain(x).replace('$','').strip()
-    if re.fullmatch(r'\d[\d,]*',q):net=float(q.replace(',',''));break
-   if net:break
-  if ended and re.search(r'^Total Investments\s*[–—-]\s*(\d+(?:\.\d+)?)%',line,re.I) and net is None:
+   if nums:net=float(nums[-1].replace(',',''))
+   if net is None:
+    for x in lines[i+1:min(len(lines),i+8)]:
+     q=agg.plain(x).replace('$','').strip()
+     if re.fullmatch(r'\d[\d,]*',q):net=float(q.replace(',',''));break
+   break
+  if seen and re.search(r'^Total Investments\s*[–—-]\s*(\d+(?:\.\d+)?)%',line,re.I) and net is None:
    pct=float(re.search(r'(\d+(?:\.\d+)?)%',line).group(1))
-   for x in lines[i:min(len(lines),i+8)]:
-    q=agg.plain(x)
-    vals=re.findall(r'\$\s*([\d,]+)',q)
-    if vals and pct>0:net=float(vals[-1].replace(',',''))/(pct/100.0);break
-  if ended and seen and re.search(r'^Common Stocks?\s*[–—-]',line,re.I):break
+   scan=' '.join(agg.plain(x) for x in lines[i:min(len(lines),i+5)])
+   vals=re.findall(r'\$\s*([\d,]+)',scan)
+   if vals and pct>0:net=float(vals[-1].replace(',',''))/(pct/100.0)
  return rows,net
 
 agg.extract_ppty=extract_ppty
 agg.extract_gfin=extract_gfin
 agg.OUT=ROOT/'data/research/gate-b-aggregate-shadow-2020-v2.json'
 if __name__=='__main__':agg.main()
-# trigger marker 2026-09-03
