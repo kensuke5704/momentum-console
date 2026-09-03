@@ -1,0 +1,23 @@
+name: Research Transition Source Retention Structural 2019
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-transition-source-retention-structural-2019.py"
+      - ".github/workflows/research-transition-source-retention-structural-2019.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-transition-source-retention-structural-2019.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transition-source-retention-structural-2019
+          path: data/research/transition-source-retention-structural-2019.json
+          if-no-files-found: warn
