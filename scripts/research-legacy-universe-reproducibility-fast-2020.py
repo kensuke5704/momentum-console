@@ -75,15 +75,16 @@ def _block_fingerprint(holdings: list[dict], total: float) -> tuple:
 
 
 def structural_mapped_modern_series(text: str, series: list[dict]):
-    """Production-parity exact-heading mapping plus raw-value block merge.
+    """Exact-heading boundary mapping, then Production eligibility, then raw-value merge.
 
-    The parity path does not apply legacy research name exclusions or arbitrary
-    holdings-count/concentration limits that Production does not have. The only
-    parser-quality gate is positive parsed value plus structural sanity. Series
-    identities supplied here already come from Production's accepted N-PORT set.
+    Every filing-time registered series participates in boundary resolution. This is
+    important because a non-Production series may sit between two Production series;
+    filtering identities before boundary assignment can incorrectly attach that
+    intervening schedule to the preceding Production series. Only after one exact
+    series identity owns a schedule do we apply productionSeriesNameEligible.
     """
     blocks = repro.ov.schedule_blocks(text)
-    unique_name_matches = parsed_nonempty = structural_block_pass = 0
+    unique_name_matches = production_name_matches = parsed_nonempty = structural_block_pass = 0
     examples = []
     grouped: dict[str, dict] = {}
 
@@ -100,6 +101,9 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
             continue
         unique_name_matches += 1
         s = exact[0]
+        if not s.get('productionSeriesNameEligible'):
+            continue
+        production_name_matches += 1
         method, holdings, total = repro.ov.pit.normalized_holdings(block)
         count = len(holdings)
         if count:
@@ -164,6 +168,7 @@ def structural_mapped_modern_series(text: str, series: list[dict]):
 
     print('LEGACY_INVESTMENT_HEADING_BLOCKS', len(blocks), flush=True)
     print('LEGACY_UNIQUE_SERIES_NAME_MATCHES', unique_name_matches, flush=True)
+    print('LEGACY_PRODUCTION_SERIES_NAME_MATCHES', production_name_matches, flush=True)
     print('LEGACY_PARSED_NONEMPTY_BLOCKS', parsed_nonempty, flush=True)
     print('LEGACY_STRUCTURAL_BLOCKS', structural_block_pass, flush=True)
     print('LEGACY_MAPPED_SERIES', len(mapped), sorted(mapped), flush=True)
