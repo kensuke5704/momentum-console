@@ -18,18 +18,34 @@ mspec = importlib.util.spec_from_file_location(
 filing_meta = importlib.util.module_from_spec(mspec)
 mspec.loader.exec_module(filing_meta)
 
+ispec = importlib.util.spec_from_file_location(
+    'issuer_aliases', ROOT / 'scripts' / 'research-legacy-issuer-aliases.py'
+)
+issuer_aliases = importlib.util.module_from_spec(ispec)
+ispec.loader.exec_module(issuer_aliases)
+
 _frozen_series_contracts = fast.shared_nport_series_contracts
+_original_aliases = fast.repro.issuer_aliases
+
+
+def production_aliases(raw: str):
+    return issuer_aliases.issuer_aliases(raw, fast.repro.ov.norm_issuer)
+
+
+# All alias matches still flow through unique_alias_symbol_map, which accepts an
+# alias only when exactly one symbol owns it inside the same N-PORT series.
+fast.repro.issuer_aliases = production_aliases
 
 
 def filing_preferred_series_contracts(submission: str, company: str):
     filing_series = [
         s for s in filing_meta.parse_series_contracts(submission, company)
-        if s.get('seriesId') and s.get('seriesName') and s.get('isEtf')
+        if s.get('seriesId') and s.get('seriesName') and s.get('productionSeriesNameEligible')
     ]
     if filing_series:
-        print('FILING_TIME_SERIES_IDENTITIES', len(filing_series), company, flush=True)
+        print('FILING_TIME_PRODUCTION_SERIES_IDENTITIES', len(filing_series), company, flush=True)
         return filing_series
-    print('FILING_TIME_SERIES_IDENTITIES 0; FALLBACK_FROZEN_NPORT', company, flush=True)
+    print('FILING_TIME_PRODUCTION_SERIES_IDENTITIES 0; FALLBACK_FROZEN_NPORT', company, flush=True)
     return _frozen_series_contracts(submission, company)
 
 
@@ -63,7 +79,7 @@ fast.FIXTURE_FILINGS = (
         'dateFiled': '2020-06-05',
         'filename': 'edgar/data/1064641/0001193125-20-161980.txt',
         'accession': '0001193125-20-161980',
-        'fixtureBasis': 'SEC N-CSRS for report period 2020-03-31; eleven US sector-equity SPDR funds',
+        'fixtureBasis': 'SEC N-CSRS for report period 2020-03-31; negative control because Production series-name regex excludes the Select Sector names',
     },
     {
         'cik': '1524513',
@@ -72,7 +88,7 @@ fast.FIXTURE_FILINGS = (
         'dateFiled': '2020-07-02',
         'filename': 'edgar/data/1524513/0001193125-20-186178.txt',
         'accession': '0001193125-20-186178',
-        'fixtureBasis': 'SEC N-CSRS for report period 2020-04-30; explicit U.S. ETF registrant retained as a structural negative/control family even if equity-eligible series are absent',
+        'fixtureBasis': 'SEC N-CSRS for report period 2020-04-30; explicit U.S. ETF registrant retained as structural control',
     },
     {
         'cik': '1552740',
