@@ -21,13 +21,19 @@ Frozen strategy ID: `momentum-stage21-sbi-2026-09-v1`.
 
 Current active gate: historical security mapping and coverage improvement for legacy N-Q holdings using N-PX issuer/ticker/security-ID data.
 
-Latest confirmed structural remap on frozen successful 2006 artifacts:
+Latest confirmed structural mapping on the same frozen 2006 N-Q PIT sample:
 - eligible N-Q holdings: 487
-- unique mapping coverage by count: 33.47%
-- unique mapping coverage by eligible holding weight: 50.43%
+- merged N-PX master: frozen 24-filing deterministic baseline plus independently pre-fixed broad-fund-family supplement
+- unique mapping coverage by count: **42.71%**
+- unique mapping coverage by eligible holding weight: **59.79%**
+- XLE weight coverage: 94.41%
+- XLG weight coverage: 93.54%
+- XBI eligible-weight coverage: 100.00%
 - no strategy-return data used
 
-The next frozen structural design is a 64-sample N-PX master using one deterministic representative per unique CIK and equal-quantile CIK sampling. Source-index transport from GitHub-hosted runners is currently being hardened; this is a data transport issue, not a strategy-performance result.
+The broad-fund supplement materially improves mapping and is retained as structural evidence, but coverage remains insufficient to call the reconstructed universe Production-equivalent.
+
+The next frozen structural design remains a 64-sample N-PX master using one deterministic representative per unique CIK and equal-quantile CIK sampling. Source-index transport from GitHub-hosted runners is currently blocked by SEC 403 / proxy 422 behavior; this is a data transport issue, not a strategy-performance result.
 
 Do **not** run the 2006–2018 Stage21 performance backtest yet. First finish structural mapping/coverage validation, construct and validate the legacy universe bridge, and freeze those rules before exposing long-history strategy returns.
 
