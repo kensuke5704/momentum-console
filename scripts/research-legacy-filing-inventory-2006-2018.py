@@ -89,6 +89,16 @@ def main() -> None:
             'etfFamilyHintFormCounts': dict(sorted(etf_form_counts.items())),
         }
 
+    # Persist only structural 2018 ETF-family filing rows so later continuity
+    # analysis does not need to download the large historical master index again.
+    # This contains no holdings, prices, returns, ranks, or strategy outcomes.
+    continuity_rows_2018 = [
+        {k: r[k] for k in ('cik', 'company', 'form', 'dateFiled', 'filename')}
+        for r in rows
+        if r['year'] == 2018 and r['etfFamilyHint']
+    ]
+    continuity_rows_2018.sort(key=lambda r: (r['dateFiled'], r['cik'], r['form'], r['filename']))
+
     out = {
         'purpose': 'Structural filing-availability inventory for legacy ETF universe reconstruction. No prices, returns, strategy outputs, or performance metrics are accessed.',
         'years': [2006, 2018],
@@ -96,10 +106,12 @@ def main() -> None:
         'etfFamilyHintRule': list(ETF_FAMILY_HINTS),
         'totalTargetFilings': len(rows),
         'byYear': by_year,
+        'continuityRows2018': continuity_rows_2018,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, indent=2) + '\n')
-    print('SUMMARY', json.dumps(out, sort_keys=True), flush=True)
+    print('SUMMARY', json.dumps({k: v for k, v in out.items() if k != 'continuityRows2018'}, sort_keys=True), flush=True)
+    print('CONTINUITY_ROWS_2018', len(continuity_rows_2018), flush=True)
 
 
 if __name__ == '__main__':
