@@ -63,16 +63,24 @@ const pct = (value: number | null | undefined, digits = 1) =>
   value == null ? "—" : `${(value * 100).toFixed(digits)}%`;
 const equityTick = (value: number) => value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
 
-const updatedAt = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
+const dateLabel = (value: string | null | undefined) => {
+  if (!value) return "—";
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[1].slice(-2)}/${match[2]}/${match[3]}` : value;
+};
+
+const updatedAt = (value: string) => {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
-    year: "numeric",
+    year: "2-digit",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
+    hourCycle: "h23",
+  }).formatToParts(new Date(value)).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
+};
 
 const usOpenJst = (date: string | null) => {
   if (!date) return "—";
@@ -157,9 +165,9 @@ function EquityChart({ curve }: { curve: EquityPoint[] }) {
   if (!chart.length) return <p className="page-note">No OOS equity data yet.</p>;
   return <div className="stage21-equity-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chart}>
     <CartesianGrid stroke="#dce1da" vertical={false} />
-    <XAxis dataKey="date" minTickGap={40} />
+    <XAxis dataKey="date" minTickGap={40} tickFormatter={dateLabel} />
     <YAxis scale="log" domain={domain} allowDataOverflow tickFormatter={equityTick} />
-    <Tooltip formatter={(value) => [equityTick(Number(value)), "Equity"]} />
+    <Tooltip labelFormatter={(value) => typeof value === "string" ? dateLabel(value) : value} formatter={(value) => [equityTick(Number(value)), "Equity"]} />
     <Area type="monotone" dataKey="equity" stroke="#246b38" fill="#246b38" fillOpacity={0.12} isAnimationActive={false} />
   </AreaChart></ResponsiveContainer></div>;
 }
@@ -290,7 +298,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     </div>
 
     <div className="dynamic-metric-grid four overview-input-grid">
-      <Metric label="CFTC Used (PIT)" value={portfolio.cftc.reportDate ?? "—"} nowrap />
+      <Metric label="CFTC Used (PIT)" value={dateLabel(portfolio.cftc.reportDate)} nowrap />
       <Metric label="CFTC Net" value={portfolio.cftc.net == null ? "—" : Math.round(portfolio.cftc.net).toLocaleString()} />
       <Metric label="Prior 4W" value={portfolio.cftc.priorNet == null ? "—" : Math.round(portfolio.cftc.priorNet).toLocaleString()} />
       <Metric label="M3 Gap" value={pct(portfolio.m3.gap)} />
@@ -409,8 +417,8 @@ function UniverseRanking({ data }: { data: DashboardPayload }) {
 function Oos({ data }: { data: DashboardPayload }) {
   const gate = evaluateOosActionGate(data.oos);
   return <div className="dynamic-stack"><Section title="Forward OOS" className="metric-section"><div className="dynamic-metric-grid five">
-    <Metric label="Start" value={data.oos.startedAt} nowrap />
-    <Metric label="As of" value={data.oos.asOf ?? "—"} nowrap />
+    <Metric label="Start" value={dateLabel(data.oos.startedAt)} nowrap />
+    <Metric label="As of" value={dateLabel(data.oos.asOf)} nowrap />
     <Metric label="CAGR" value={pct(data.oos.stats.cagr)} />
     <Metric label="MaxDD" value={pct(data.oos.stats.maxDrawdown)} />
     <Metric label="Gate" value={gate.level} />
@@ -430,6 +438,6 @@ function Backtest({ data }: { data: DashboardPayload }) {
 
 function Schedule({ data }: { data: DashboardPayload }) {
   return <div className="dynamic-stack"><Section title="Configuration"><div className="simple-table">
-    <div><strong>Production ID</strong><span>{data.portfolioConfig.strategyId}</span></div><div><strong>OOS Start</strong><span>{data.portfolioConfig.oosStartDate}</span></div><div><strong>Execution</strong><span>Close confirmation → next US open</span></div><div><strong>Cost</strong><span>{pct(data.portfolioConfig.execution.transactionCost, 2)} / side</span></div><div><strong>N-PORT Deadline</strong><span>{data.nportOperations?.nextImportDeadlineAt ? updatedAt(data.nportOperations.nextImportDeadlineAt) : "—"}</span></div>
+    <div><strong>Production ID</strong><span>{data.portfolioConfig.strategyId}</span></div><div><strong>OOS Start</strong><span>{dateLabel(data.portfolioConfig.oosStartDate)}</span></div><div><strong>Execution</strong><span>Close confirmation → next US open</span></div><div><strong>Cost</strong><span>{pct(data.portfolioConfig.execution.transactionCost, 2)} / side</span></div><div><strong>N-PORT Deadline</strong><span>{data.nportOperations?.nextImportDeadlineAt ? updatedAt(data.nportOperations.nextImportDeadlineAt) : "—"}</span></div>
   </div></Section></div>;
 }
