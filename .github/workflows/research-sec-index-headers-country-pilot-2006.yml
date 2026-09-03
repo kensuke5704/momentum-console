@@ -1,0 +1,31 @@
+name: Research SEC Index Headers Country Pilot 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-index-headers-country-pilot-2006.py"
+      - ".github/workflows/research-sec-index-headers-country-pilot-2006.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download UNKNOWN-retry country merge
+        run: |
+          mkdir -p data/research /tmp/src
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/src.zip
+          unzip -q /tmp/src.zip -d /tmp/src
+          cp /tmp/src/country-full-coverage-unknown-retry-2006.json data/research/
+      - name: Run index-headers country pilot
+        run: python3 scripts/research-sec-index-headers-country-pilot-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-index-headers-country-pilot-2006
+          path: data/research/sec-index-headers-country-pilot-2006.json
