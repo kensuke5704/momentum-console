@@ -1,0 +1,26 @@
+name: Research EFTS Legacy Inventory 2019
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-efts-legacy-inventory-2019.py"
+      - ".github/workflows/research-efts-legacy-inventory-2019.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-efts-legacy-inventory-2019.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: efts-legacy-inventory-2019
+          path: data/research/efts-legacy-inventory-2019.json
+          if-no-files-found: warn
