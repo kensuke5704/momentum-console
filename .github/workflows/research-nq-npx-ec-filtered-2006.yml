@@ -1,0 +1,44 @@
+name: Research NQ N-PX EC Filtered 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - ".github/workflows/research-nq-npx-ec-filtered-2006.yml"
+      - "scripts/research-nq-npx-mapping-2006.py"
+      - "scripts/research-nq-unmapped-diagnostics-2006.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen N-PX master and EC-filtered PIT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/master /tmp/pit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/master.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
+          unzip -q /tmp/master.zip -d /tmp/master
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          cp /tmp/master/npx-security-master-2006.json data/research/
+          cp /tmp/pit/nq-pit-holdings-2006-ec-filtered.json data/research/nq-pit-holdings-2006.json
+      - name: Map EC-filtered holdings
+        run: python3 scripts/research-nq-npx-mapping-2006.py
+      - name: Diagnose EC-filtered unmapped holdings
+        run: python3 scripts/research-nq-unmapped-diagnostics-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-npx-ec-filtered-2006
+          path: |
+            data/research/nq-npx-mapping-2006.json
+            data/research/nq-npx-unmapped-diagnostics-2006.json
+          if-no-files-found: warn
