@@ -41,13 +41,11 @@ def parse_name_first_us(seg):
             i+=1; continue
         cells=[nearest.clean(c) for c in re.split(r'\t+',raw) if nearest.clean(c) not in {'','$','—','-'}]
         nums=[(k,nearest.num(c)) for k,c in enumerate(cells) if nearest.NUM_RE.match(c)]
-        # Normal one-line form: issuer | shares | optional '$' | market value.
         if len(nums)>=2 and nums[0][0]>0:
             first_num=nums[0][0]; desc=' '.join(cells[:first_num]).strip(); value=nums[-1][1]
             if desc and value is not None and not desc.lower().startswith('total '):
                 rows.append({'raw':desc,'name':nearest.norm(desc),'value':value,'country':'United States'})
             i+=1; continue
-        # Occasional rendered split: issuer + shares on one line, value on the next.
         if len(nums)==1 and nums[0][0]>0 and i+1<len(lines):
             nxt=[nearest.clean(c) for c in re.split(r'\t+',lines[i+1]) if nearest.clean(c) not in {'','$','—','-'}]
             nxtnums=[nearest.num(c) for c in nxt if nearest.NUM_RE.match(c)]
@@ -58,9 +56,9 @@ def parse_name_first_us(seg):
         i+=1
     return nearest.finish(rows)
 
-# This Gate-B precursor intentionally uses the explicit-US grammar only. A zero-row series is reported
-# as structurally unresolved rather than silently falling back to all-country holdings.
 def parse_rows(seg):
     return ('name_first_explicit_us',parse_name_first_us(seg))
 nearest.parse_rows=parse_rows
-nearest.main()
+
+if __name__=='__main__':
+    nearest.main()
