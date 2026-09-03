@@ -1,0 +1,26 @@
+name: Research NQ NPORT Series Bridge Probe
+
+on:
+  push:
+    branches:
+      - research/nq-npx-mapping-2006-20260903
+    paths:
+      - scripts/research-nq-nport-series-bridge-probe.py
+      - .github/workflows/research-nq-nport-series-bridge-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe same-series transition bridge
+        run: python3 scripts/research-nq-nport-series-bridge-probe.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-nport-series-bridge-probe
+          path: data/research/nq-nport-series-bridge-probe.json
