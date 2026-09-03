@@ -1,0 +1,31 @@
+name: Research NQ N-PX Suffix Match Audit 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-npx-suffix-match-audit-2006.py"
+      - ".github/workflows/research-nq-npx-suffix-match-audit-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download structural mapping and N-PX master
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/map /tmp/master
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899299058/zip > /tmp/map.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/master.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          unzip -q /tmp/master.zip -d /tmp/master
+          cp /tmp/map/nq-npx-structural-mapping-2006.json data/research/
+          cp /tmp/master/npx-security-master-2006.json data/research/
+      - run: python3 scripts/research-nq-npx-suffix-match-audit-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-npx-suffix-match-audit-2006
+          path: data/research/nq-npx-suffix-match-audit-2006.json
