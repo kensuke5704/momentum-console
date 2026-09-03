@@ -16,11 +16,12 @@ OUT = ROOT / "data" / "research" / "npx-security-master-pilot-2006.json"
 DRIVE = "https://drive.usercontent.google.com/download?id=1yfQxR45DZ_vM5pkFvgyexc10NNqbxpFN&export=download&confirm=t"
 UA = {"User-Agent": "momentum-console research kensuke5704@users.noreply.github.com", "Accept": "text/plain,text/html,*/*"}
 TARGET_FORMS = {"N-PX", "N-PX/A"}
-TICKER_RE = re.compile(r"\bTICKER\s*:?\s*([A-Z0-9.\-]+)", re.I)
+TICKER_RE = re.compile(r"\bTICKER\s*:?\s*([A-Z0-9.\-/]+)", re.I)
 SECURITY_RE = re.compile(r"\bSECURITY\s+ID\s*:?\s*(?:CUSIP9\s+)?([A-Z0-9]{6,14})", re.I)
 MEETING_RE = re.compile(r"\bMEETING\s+DATE\s*:?\s*([^|]{6,30}?)(?=\s+(?:TICKER|SECURITY\s+ID|MEETING\s+TYPE|MEETING\s+STATUS|RECORD\s+DATE|$))", re.I)
 ISSUER_LABEL_RE = re.compile(r"^ISSUER\s+NAME\s*:\s*(.+)$", re.I)
 BAD_ISSUER = re.compile(r"^(?:TICKER|SECURITY ID|MEETING DATE|MEETING STATUS|MEETING TYPE|RECORD DATE|PROPOSAL|VOTE|MGMT|MANAGEMENT|ITEM|PAGE|FORM N-PX)\b", re.I)
+BAD_TICKERS = {"N/A", "NA", "NONE", "NULL", "SECURITY", "TICKER", "--", "-"}
 
 
 def download(url: str, path: Path) -> None:
@@ -93,13 +94,22 @@ def clean_issuer(raw: str) -> str | None:
     return s
 
 
+def clean_ticker(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    s = raw.strip().upper().rstrip(".,;:")
+    if s in BAD_TICKERS or "/" in s:
+        return None
+    if not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,9}", s):
+        return None
+    return s
+
+
 def issuer_before(lines: list[str], anchor: int) -> str | None:
-    # Fidelity-style reports label the issuer explicitly, sometimes two lines before Ticker.
     for j in range(anchor - 1, max(-1, anchor - 8), -1):
         m = ISSUER_LABEL_RE.match(lines[j])
         if m:
             return clean_issuer(lines[j])
-    # Broadridge-style reports put the issuer as the closest plain line before Ticker/Security ID.
     for j in range(anchor - 1, max(-1, anchor - 8), -1):
         candidate = clean_issuer(lines[j])
         if candidate:
@@ -119,7 +129,8 @@ def parse_records(text: str) -> list[dict]:
         window = " | ".join(lines[lo:hi])
         ticker_m = TICKER_RE.search(window)
         security_m = SECURITY_RE.search(window)
-        if not ticker_m and not security_m:
+        ticker = clean_ticker(ticker_m.group(1) if ticker_m else None)
+        if not ticker and not security_m:
             continue
         issuer = issuer_before(lines, i)
         if not issuer:
@@ -127,7 +138,7 @@ def parse_records(text: str) -> list[dict]:
         meeting_m = MEETING_RE.search(window)
         records.append({
             "issuer": issuer,
-            "ticker": ticker_m.group(1).upper() if ticker_m else None,
+            "ticker": ticker,
             "securityId": security_m.group(1).upper() if security_m else None,
             "meetingDateRaw": meeting_m.group(1).strip() if meeting_m else None,
         })
