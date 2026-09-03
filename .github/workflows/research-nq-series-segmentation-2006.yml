@@ -2,7 +2,7 @@ name: Research NQ Series Segmentation 2006
 
 on:
   push:
-    branches: ["research/cagr40-new-alpha-20260901"]
+    branches: ["research/nq-npx-mapping-2006-20260903"]
     paths:
       - "scripts/research-nq-series-segmentation-2006.py"
       - ".github/workflows/research-nq-series-segmentation-2006.yml"
@@ -19,11 +19,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Extract 2006 filing index
         run: python3 scripts/research-nq-index-extract.py
-      - name: Probe N-Q series segmentation
+      - name: Probe corrected N-Q series segmentation
         run: python3 scripts/research-nq-series-segmentation-2006.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nq-series-segmentation-2006
+          name: nq-series-segmentation-2006-corrected
           path: data/research/nq-series-segmentation-2006.json
           if-no-files-found: warn
