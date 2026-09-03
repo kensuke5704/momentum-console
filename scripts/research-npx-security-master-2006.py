@@ -22,32 +22,39 @@ BAD_ISSUER = re.compile(r"^(?:TICKER|SECURITY ID|MEETING DATE|MEETING STATUS|MEE
 BAD_TICKERS = {"N/A", "NA", "NONE", "NULL", "SECURITY", "TICKER", "--", "-"}
 
 
-def fetch_index_text(url: str, attempts: int = 4) -> str:
+def plausible_index(text: str) -> bool:
+    lines = [line for line in text.splitlines() if "|" in line]
+    return len(lines) > 1000 and any(line.startswith("CIK|") for line in lines[:100])
+
+
+def fetch_index_text(url: str, attempts: int = 3) -> tuple[str, str]:
+    candidates = [url, "https://r.jina.ai/" + url]
     last_error: Exception | None = None
-    for attempt in range(1, attempts + 1):
-        try:
-            req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=120) as r:
-                data = r.read()
-            if len(data) < 100_000:
-                raise ValueError(f"index response too small: bytes={len(data):,}")
-            text = data.decode("latin-1", "replace")
-            if "CIK|Company Name|Form Type|Date Filed|Filename" not in text:
-                raise ValueError("unexpected SEC master.idx format")
-            print(f"index {url} bytes={len(data):,} attempt={attempt}", flush=True)
-            return text
-        except Exception as e:
-            last_error = e
-            print(f"index fetch attempt {attempt}/{attempts} failed for {url}: {e!r}", flush=True)
-            if attempt < attempts:
-                time.sleep(2.0 * attempt)
-    raise RuntimeError(f"unable to fetch SEC master index: {url}") from last_error
+    for candidate in candidates:
+        for attempt in range(1, attempts + 1):
+            try:
+                req = urllib.request.Request(candidate, headers=UA)
+                with urllib.request.urlopen(req, timeout=180) as r:
+                    data = r.read()
+                if len(data) < 100_000:
+                    raise ValueError(f"index response too small: bytes={len(data):,}")
+                text = data.decode("latin-1", "replace")
+                if not plausible_index(text):
+                    raise ValueError("unexpected SEC master.idx format")
+                print(f"index {candidate} bytes={len(data):,} attempt={attempt}", flush=True)
+                return text, candidate
+            except Exception as e:
+                last_error = e
+                print(f"index fetch attempt {attempt}/{attempts} failed for {candidate}: {e!r}", flush=True)
+                if attempt < attempts:
+                    time.sleep(2.0 * attempt)
+    raise RuntimeError(f"unable to fetch SEC master index through direct or proxy route: {url}") from last_error
 
 
 def filing_index_2006() -> list[dict]:
     hits = []
     for q in range(1, 5):
-        text = fetch_index_text(INDEX_BASE.format(q=q))
+        text, _ = fetch_index_text(INDEX_BASE.format(q=q))
         for line in text.splitlines():
             p = line.split("|")
             if len(p) < 5:
@@ -160,7 +167,7 @@ def main() -> None:
     filings = filing_index_2006()
     form_counts = Counter(x["form"] for x in filings)
     month_counts = Counter(x["dateFiled"][:7] for x in filings)
-    print("INDEX", json.dumps({"source": "SEC full-index", "filings": len(filings), "forms": dict(form_counts), "months": dict(month_counts)}), flush=True)
+    print("INDEX", json.dumps({"source": "SEC full-index via direct/proxy transport", "filings": len(filings), "forms": dict(form_counts), "months": dict(month_counts)}), flush=True)
     samples = choose_samples(filings)
     print(f"samples={len(samples)}", flush=True)
     results = []
@@ -189,7 +196,7 @@ def main() -> None:
         return sum(1 for r in ok if pred(r)) / len(ok) if ok else None
     summary = {
         "year": 2006,
-        "indexSource": "Official SEC EDGAR quarterly full-index master.idx",
+        "indexSource": "Official SEC EDGAR quarterly full-index master.idx; direct or r.jina.ai transport",
         "allNpxFilings": len(filings),
         "formCounts": dict(form_counts),
         "monthCounts": dict(month_counts),
