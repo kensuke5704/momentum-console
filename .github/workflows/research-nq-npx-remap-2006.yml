@@ -1,0 +1,36 @@
+name: Research NQ N-PX Remap 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-npx-mapping-2006.py"
+      - ".github/workflows/research-nq-npx-remap-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  remap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen successful 2006 structural artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/npx /tmp/nq
+          gh api /repos/${{ github.repository }}/actions/artifacts/9854517632/zip > /tmp/npx.zip
+          gh api /repos/${{ github.repository }}/actions/artifacts/9854510485/zip > /tmp/nq.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          unzip -q /tmp/nq.zip -d /tmp/nq
+          cp /tmp/npx/npx-security-master-2006.json data/research/
+          cp /tmp/nq/nq-pit-holdings-2006.json data/research/
+      - name: Run conservative structural remap
+        run: python3 scripts/research-nq-npx-mapping-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-npx-remap-2006
+          path: data/research/nq-npx-mapping-2006.json
