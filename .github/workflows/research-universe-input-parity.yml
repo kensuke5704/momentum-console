@@ -1,0 +1,20 @@
+name: Research Universe Input Parity
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-universe-input-parity.py
+      - .github/workflows/research-universe-input-parity.yml
+  workflow_dispatch:
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-universe-input-parity.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: universe-input-parity
+          path: data/research/universe-input-parity.json
