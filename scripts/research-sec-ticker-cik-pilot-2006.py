@@ -27,6 +27,7 @@ SAMPLE = [
 ARCHIVE_CIK_RE = re.compile(r"/Archives/edgar/data/(\d+)/", re.I)
 ARCHIVE_RE = re.compile(r"https?://(?:www\.)?sec\.gov/Archives/edgar/data/\d+/[^\s\"'<>\)]+", re.I)
 STATE_RE = re.compile(r"State\s+of\s+Inc(?:orp)?\.?:\s*(?:\*\*)?([A-Z0-9]{2,3})(?:\*\*)?\b", re.I)
+CANDIDATE_ROW_RE = re.compile(r"\|\s*\[(\d{10})\]\([^\)]*CIK=\1[^\)]*\)\s*\|\s*([^|]+?)\s*\|", re.I)
 US_CODES = {
     "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC","X1"
 }
@@ -49,12 +50,22 @@ def sec_url(params: dict[str, str]) -> str:
     return "https://www.sec.gov/cgi-bin/browse-edgar?" + urllib.parse.urlencode(params)
 
 
+def normalize_name(s: str) -> str:
+    s = re.sub(r"\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD)\b", " ", s.upper())
+    s = re.sub(r"[^A-Z0-9]+", " ", s)
+    return " ".join(s.split())
+
+
 def parse_browse(url: str) -> dict:
     text, transport, nbytes = get(url)
     urls = list(dict.fromkeys(ARCHIVE_RE.findall(text)))
     ciks = list(dict.fromkeys(m.group(1).zfill(10) for u in urls for m in [ARCHIVE_CIK_RE.search(u)] if m))
     states = list(dict.fromkeys(x.upper() for x in STATE_RE.findall(text)))
-    return {"url": url, "transport": transport, "bytes": nbytes, "archiveUrls": urls[:12], "ciksFromArchive": ciks, "stateCodesOnBrowse": states, "snippet": " ".join(text.split())[:1000]}
+    candidates = []
+    for cik, raw_name in CANDIDATE_ROW_RE.findall(text):
+        name = re.sub(r"\s+SIC:.*$", "", raw_name.strip(), flags=re.I)
+        candidates.append({"cik": cik, "name": name, "normalizedName": normalize_name(name)})
+    return {"url": url, "transport": transport, "bytes": nbytes, "archiveUrls": urls[:12], "ciksFromArchive": ciks, "stateCodesOnBrowse": states, "companyCandidates": candidates[:20], "snippet": " ".join(text.split())[:1100]}
 
 
 def browse_by_ticker(ticker: str) -> dict:
@@ -63,6 +74,10 @@ def browse_by_ticker(ticker: str) -> dict:
 
 def browse_by_issuer(issuer: str) -> dict:
     return parse_browse(sec_url({"action":"getcompany","company":issuer,"type":"","dateb":"20061231","owner":"exclude","count":"40"}))
+
+
+def browse_by_cik(cik: str) -> dict:
+    return parse_browse(sec_url({"action":"getcompany","CIK":cik,"type":"","dateb":"20061231","owner":"exclude","count":"40"}))
 
 
 def inspect_index(url: str) -> dict:
@@ -81,10 +96,34 @@ def resolve_from_browse(browse: dict) -> tuple[str | None, list[dict]]:
         attempts.append(idx)
         if idx.get("stateCodes"):
             return idx["stateCodes"][0], attempts
-        time.sleep(0.2)
+        time.sleep(0.15)
     if browse.get("stateCodesOnBrowse"):
         return browse["stateCodesOnBrowse"][0], attempts
     return None, attempts
+
+
+def candidate_fallback(issuer: str, issuer_browse: dict) -> tuple[dict | None, list[dict]]:
+    target = normalize_name(issuer)
+    candidates = issuer_browse.get("companyCandidates", [])
+    exact = [c for c in candidates if c["normalizedName"] == target]
+    pool = exact if exact else candidates
+    audits = []
+    viable = []
+    for c in pool[:8]:
+        try:
+            b = browse_by_cik(c["cik"])
+            audit = {**c, "archiveCount": len(b.get("archiveUrls", [])), "stateCodesOnBrowse": b.get("stateCodesOnBrowse", [])}
+            audits.append(audit)
+            if b.get("archiveUrls"):
+                viable.append((c, b))
+        except Exception as e:
+            audits.append({**c, "error": repr(e)})
+        time.sleep(0.15)
+    # Conservative acceptance: exactly one candidate with filings no later than 2006-12-31.
+    if len(viable) == 1:
+        c, b = viable[0]
+        return {"candidate": c, "browse": b}, audits
+    return None, audits
 
 
 def main() -> None:
@@ -99,14 +138,20 @@ def main() -> None:
             if not browse.get("archiveUrls"):
                 issuer_browse = browse_by_issuer(item["issuer"])
                 row["issuerBrowse"] = issuer_browse
-                # Accept issuer fallback only when historical archive URLs resolve to one unique CIK.
                 if issuer_browse.get("archiveUrls") and len(issuer_browse.get("ciksFromArchive", [])) == 1:
-                    source = "ISSUER_EXACT_QUERY_SINGLE_CIK"
+                    source = "ISSUER_DIRECT_SINGLE_CIK"
                     browse = issuer_browse
+                elif issuer_browse.get("companyCandidates"):
+                    resolved_candidate, audits = candidate_fallback(item["issuer"], issuer_browse)
+                    row["issuerCandidateAudits"] = audits
+                    if resolved_candidate:
+                        source = "ISSUER_CANDIDATE_SINGLE_PIT_CIK"
+                        row["issuerCandidateResolved"] = resolved_candidate["candidate"]
+                        browse = resolved_candidate["browse"]
             state, attempts = resolve_from_browse(browse)
             row["historicalFilingAttempts"] = attempts
-            if browse.get("archiveUrls") and browse.get("ciksFromArchive"):
-                row["resolvedCik"] = browse["ciksFromArchive"][0] if len(browse["ciksFromArchive"]) == 1 else None
+            if browse.get("archiveUrls") and len(browse.get("ciksFromArchive", [])) == 1:
+                row["resolvedCik"] = browse["ciksFromArchive"][0]
             if state:
                 row["resolvedStateCode"] = state
                 row["resolvedUS"] = state in US_CODES
@@ -115,20 +160,19 @@ def main() -> None:
             row["error"] = repr(e)
         rows.append(row)
         print("SEC", json.dumps(row), flush=True)
-        time.sleep(0.35)
+        time.sleep(0.25)
 
     active = [r for r in rows if r["statusClass"].startswith("ACTIVE")]
     delisted = [r for r in rows if r["statusClass"].startswith("DELISTED")]
     summary = {
         "year": 2006,
-        "purpose": "Structural pilot for a conservative issuer-country hierarchy: mapped ticker -> SEC historical filing; if ticker fails, exact issuer-name SEC query is accepted only when historical archives resolve to one unique CIK. State/country is read from filings no later than 2006-12-31. No returns or universe rank used.",
+        "purpose": "Structural pilot for conservative issuer-country hierarchy: mapped ticker first; direct exact issuer query if one historical CIK; otherwise issuer-search candidate CIKs are queried and accepted only if exactly one has filings no later than 2006-12-31. State/country comes from historical SEC filing/browse metadata. No returns or universe rank used.",
         "sampleCount": len(rows),
         "resolvedCikCount": sum(1 for r in rows if r.get("resolvedCik")),
         "resolvedStateCount": sum(1 for r in rows if r.get("resolvedStateCode")),
         "activeResolvedRate": sum(1 for r in active if r.get("resolvedStateCode")) / max(1, len(active)),
         "delistedResolvedRate": sum(1 for r in delisted if r.get("resolvedStateCode")) / max(1, len(delisted)),
-        "tickerResolvedCount": sum(1 for r in rows if r.get("resolutionSource") == "TICKER"),
-        "issuerFallbackResolvedCount": sum(1 for r in rows if r.get("resolutionSource") == "ISSUER_EXACT_QUERY_SINGLE_CIK"),
+        "resolutionSources": {k: sum(1 for r in rows if r.get("resolutionSource") == k) for k in ["TICKER","ISSUER_DIRECT_SINGLE_CIK","ISSUER_CANDIDATE_SINGLE_PIT_CIK"]},
         "rows": rows,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
