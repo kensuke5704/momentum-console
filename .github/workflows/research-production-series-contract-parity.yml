@@ -1,0 +1,21 @@
+name: Research Production Series Contract Parity
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-production-series-contract-parity.py"
+      - "scripts/research-nq-series-metadata-2006.py"
+      - "src/lib/universe/nport-quarterly.ts"
+      - ".github/workflows/research-production-series-contract-parity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-production-series-contract-parity.py
