@@ -1,0 +1,27 @@
+name: Research NPORT CORP Redundancy
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nport-corp-redundancy.py"
+      - ".github/workflows/research-nport-corp-redundancy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect CORP filtering after EC plus US
+        run: python3 scripts/research-nport-corp-redundancy.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nport-corp-redundancy
+          path: data/research/nport-corp-redundancy.json
+          if-no-files-found: warn
