@@ -25,6 +25,7 @@ def main():
     months=hist.get('history',hist.get('months',[])) if isinstance(hist,dict) else hist
     fs=boot.get('snapshots',boot) if isinstance(boot,dict) else boot
     p=next(x for x in months if x.get('signalMonth')=='2020-01')
+    p2=next(x for x in months if x.get('signalMonth')=='2020-02')
     calc=latest(fs,p['asOf'])
     prod={(x['seriesId'],x['accession']) for x in p.get('sourceFilings',[])}
     now={(x['seriesId'],x['accession']) for x in calc}
@@ -32,7 +33,11 @@ def main():
     sizes=[]
     for m in sorted((x for x in months if '2020-01'<=x.get('signalMonth','')<='2020-12'),key=lambda x:x['signalMonth']):
         sizes.append({'signalMonth':m['signalMonth'],'asOf':m['asOf'],'universeSize':len(m.get('symbols',[])),'sourceFilings':len(m.get('sourceFilings',[]))})
-    out={'asOf':p['asOf'],'prodSourceCount':len(prod),'calcSourceCount':len(now),'sourceIntersection':len(prod&now),'prodOnly':len(prod-now),'calcOnly':len(now-prod),'prodAccessionsPresentInBootstrap':sum(1 for _,a in prod if a in allacc),'prodFirst10Symbols':[x['symbol'] for x in p.get('symbols',[])[:10]],'prodOnlyExamples':sorted(prod-now)[:20],'calcOnlyExamples':sorted(now-prod)[:20],'production2020':sizes}
+    feb=[]
+    for x in p2.get('sourceFilings',[]):
+        acc=x.get('accession','')
+        feb.append({'cik':re.sub(r'\D','',acc)[:10].zfill(10) if acc else None,'accession':acc,'seriesId':x.get('seriesId'),'seriesName':x.get('seriesName'),'filingDate':x.get('filingDate')})
+    out={'asOf':p['asOf'],'prodSourceCount':len(prod),'calcSourceCount':len(now),'sourceIntersection':len(prod&now),'prodOnly':len(prod-now),'calcOnly':len(now-prod),'prodAccessionsPresentInBootstrap':sum(1 for _,a in prod if a in allacc),'prodFirst10Symbols':[x['symbol'] for x in p.get('symbols',[])[:10]],'prodOnlyExamples':sorted(prod-now)[:20],'calcOnlyExamples':sorted(now-prod)[:20],'production2020':sizes,'production2020FebSources':feb}
     print(json.dumps(out,indent=2))
     (ROOT/'data/research/universe-input-parity.json').write_text(json.dumps(out,indent=2)+'\n')
 if __name__=='__main__':main()
