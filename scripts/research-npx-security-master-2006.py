@@ -24,15 +24,30 @@ BAD_ISSUER = re.compile(r"^(?:TICKER|SECURITY ID|MEETING DATE|MEETING STATUS|MEE
 BAD_TICKERS = {"N/A", "NA", "NONE", "NULL", "SECURITY", "TICKER", "--", "-"}
 
 
-def download(url: str, path: Path) -> None:
-    req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=600) as r, open(path, "wb") as f:
-        while True:
-            b = r.read(1024 * 1024)
-            if not b:
-                break
-            f.write(b)
-    print(f"index archive bytes={path.stat().st_size:,}", flush=True)
+def download(url: str, path: Path, attempts: int = 4) -> None:
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            if path.exists():
+                path.unlink()
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=600) as r, open(path, "wb") as f:
+                while True:
+                    b = r.read(1024 * 1024)
+                    if not b:
+                        break
+                    f.write(b)
+            size = path.stat().st_size
+            if size < 1_000_000 or not zipfile.is_zipfile(path):
+                raise ValueError(f"historical index response is not the expected ZIP: bytes={size:,}")
+            print(f"index archive bytes={size:,} attempt={attempt}", flush=True)
+            return
+        except Exception as e:
+            last_error = e
+            print(f"index download attempt {attempt}/{attempts} failed: {e!r}", flush=True)
+            if attempt < attempts:
+                time.sleep(3.0 * attempt)
+    raise RuntimeError(f"unable to download valid historical index ZIP after {attempts} attempts") from last_error
 
 
 def filing_index_2006() -> list[dict]:
