@@ -1,0 +1,37 @@
+name: Research NQ PIT EC Filtered 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-pit-ec-filtered-2006.py"
+      - "scripts/research-nq-per-holding-ec-2006.py"
+      - ".github/workflows/research-nq-pit-ec-filtered-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download corrected PIT holdings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/pit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878011119/zip > /tmp/pit.zip
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          cp /tmp/pit/nq-pit-holdings-2006-corrected.json data/research/
+      - name: Build EC-filtered PIT
+        run: python3 scripts/research-nq-pit-ec-filtered-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-pit-ec-filtered-2006
+          path: data/research/nq-pit-holdings-2006-ec-filtered.json
+          if-no-files-found: warn
