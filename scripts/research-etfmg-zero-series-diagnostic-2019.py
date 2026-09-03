@@ -25,15 +25,17 @@ def main():
    lo=max(0,i-10);hi=min(len(ls),i+260)
    sched=[j for j in range(i,hi) if re.search(r'(?:Portfolio|Schedule) of Investments',ls[j],re.I)]
    common=[j for j in range(i,hi) if re.search(r'\bCOMMON STOCKS?\b',ls[j],re.I)]
-   if sched or common:
-    windows.append({'titleLine':i+1,'scheduleLines':[j+1 for j in sched[:5]],'commonStockLines':[j+1 for j in common[:5]],'window':[{'line':j+1,'text':ls[j]} for j in range(lo,min(hi,i+120)) if ls[j].strip()]})
+   us=[j for j in range(i,hi) if re.match(r'^\s*United States\s*[-–—]\s*\d',ls[j],re.I)]
+   if sched or common or us:
+    windows.append({'titleLine':i+1,'scheduleLines':[j+1 for j in sched[:5]],'commonStockLines':[j+1 for j in common[:5]],'unitedStatesLines':[j+1 for j in us[:5]],'window':[{'line':j+1,'text':ls[j]} for j in range(lo,min(hi,i+140)) if ls[j].strip()]})
   detail['windows']=windows
-  # Also show existing slicer's size and parser counts, without using overlap.
   seg=sg.nearest.slice_series(text,name,all_names)
   detail['existingSegmentLines']=len(seg.splitlines()) if seg else 0
-  detail['nameFirstRows']=len(sg.parse_name_first(seg)) if seg else 0
+  detail['explicitUsRows']=len(sg.parse_name_first_us(seg)) if seg else 0
+  detail['segmentHasCommonStocks']=bool(re.search(r'\bCOMMON STOCKS?\b',seg,re.I)) if seg else False
+  detail['segmentHasUnitedStates']=bool(re.search(r'^\s*United States\s*[-–—]\s*\d',seg,re.I|re.M)) if seg else False
   rows.append(detail)
   print('SERIES',json.dumps({k:v for k,v in detail.items() if k!='windows'}),flush=True)
- out={'purpose':'Structural diagnosis of three fixed short-gap series that produced zero rows. No overlap or performance used to alter selection.','transport':tr,'rows':rows}
+ out={'purpose':'Structural diagnosis of three fixed short-gap series that produced zero explicit-US rows. No overlap or performance used to alter selection.','transport':tr,'rows':rows}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
 if __name__=='__main__':main()
