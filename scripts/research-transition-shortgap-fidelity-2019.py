@@ -21,43 +21,46 @@ nearest.CHOSEN={
 }
 nearest.OUT=ROOT/'data'/'research'/'transition-shortgap-fidelity-2019.json'
 
-# Structural grammar observed in the 2019 ETFMG N-CSR before fidelity results:
-# issuer description, shares, optional '$' cell, market value. Country/industry headings
-# contain no two numeric cells; totals contain no shares and are therefore excluded.
-def parse_name_first(seg):
-    rows=[]; in_common=False; lines=seg.splitlines(); i=0
+# Production N-PORT bootstrap is already ASSET_CAT=EC / INVESTMENT_COUNTRY=US / ISSUER_TYPE=CORP.
+# For this transition filing, EC is explicit COMMON STOCKS and country is explicitly printed.
+# Therefore only rows between an explicit "United States - xx%" heading and "Total United States"
+# are comparable to the Production-side country filter. No listing venue or missing-country inference is used.
+def parse_name_first_us(seg):
+    rows=[]; in_common=False; in_us=False; lines=seg.splitlines(); i=0
     while i<len(lines):
         raw=lines[i]; line=nearest.clean(raw)
         if re.search(r'\bCOMMON STOCKS?\b',line,re.I):
-            in_common=True; i+=1; continue
+            in_common=True; in_us=False; i+=1; continue
+        if in_common and re.match(r'^United States\s*[-–—]\s*\d',line,re.I):
+            in_us=True; i+=1; continue
+        if in_common and re.match(r'^Total United States\b',line,re.I):
+            in_us=False; i+=1; continue
         if in_common and nearest.STOP_RE.search(line):
-            in_common=False; i+=1; continue
-        if not in_common:
+            in_common=False; in_us=False; i+=1; continue
+        if not (in_common and in_us):
             i+=1; continue
         cells=[nearest.clean(c) for c in re.split(r'\t+',raw) if nearest.clean(c) not in {'','$','—','-'}]
         nums=[(k,nearest.num(c)) for k,c in enumerate(cells) if nearest.NUM_RE.match(c)]
-        # Normal one-line form: name | shares | value.
+        # Normal one-line form: issuer | shares | optional '$' | market value.
         if len(nums)>=2 and nums[0][0]>0:
             first_num=nums[0][0]; desc=' '.join(cells[:first_num]).strip(); value=nums[-1][1]
             if desc and value is not None and not desc.lower().startswith('total '):
-                rows.append({'raw':desc,'name':nearest.norm(desc),'value':value})
+                rows.append({'raw':desc,'name':nearest.norm(desc),'value':value,'country':'United States'})
             i+=1; continue
-        # Occasional rendered split: name + shares on one line, value on next line.
+        # Occasional rendered split: issuer + shares on one line, value on the next.
         if len(nums)==1 and nums[0][0]>0 and i+1<len(lines):
             nxt=[nearest.clean(c) for c in re.split(r'\t+',lines[i+1]) if nearest.clean(c) not in {'','$','—','-'}]
             nxtnums=[nearest.num(c) for c in nxt if nearest.NUM_RE.match(c)]
             if nxtnums:
                 desc=' '.join(cells[:nums[0][0]]).strip(); value=nxtnums[-1]
                 if desc and value is not None and not desc.lower().startswith('total '):
-                    rows.append({'raw':desc,'name':nearest.norm(desc),'value':value}); i+=2; continue
+                    rows.append({'raw':desc,'name':nearest.norm(desc),'value':value,'country':'United States'}); i+=2; continue
         i+=1
     return nearest.finish(rows)
 
-_old_parse_rows=nearest.parse_rows
+# This Gate-B precursor intentionally uses the explicit-US grammar only. A zero-row series is reported
+# as structurally unresolved rather than silently falling back to all-country holdings.
 def parse_rows(seg):
-    candidates=[('name_first',parse_name_first(seg)),_old_parse_rows(seg)]
-    plausible=[x for x in candidates if 5<=len(x[1])<=250]
-    if plausible:return max(plausible,key=lambda x:len(x[1]))
-    return max(candidates,key=lambda x:len(x[1]))
+    return ('name_first_explicit_us',parse_name_first_us(seg))
 nearest.parse_rows=parse_rows
 nearest.main()
