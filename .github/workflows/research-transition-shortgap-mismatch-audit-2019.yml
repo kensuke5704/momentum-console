@@ -1,0 +1,17 @@
+name: Research Transition ShortGap Mismatch Audit 2019
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-transition-shortgap-mismatch-audit-2019.py
+      - .github/workflows/research-transition-shortgap-mismatch-audit-2019.yml
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-transition-shortgap-mismatch-audit-2019.py
