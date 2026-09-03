@@ -6,19 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Load the existing frozen-fixture wrapper first so this validation uses exactly the
-# same hybrid legacy parser and structural gates.
 spec = importlib.util.spec_from_file_location(
     'fast_repro', ROOT / 'scripts' / 'research-legacy-universe-reproducibility-fast-2020.py'
 )
 fast = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fast)
 
-# Load an independent copy of the SEC filing-time series parser. The fast wrapper
-# replaces its own parser with frozen N-PORT names; that is useful as a fallback,
-# but some valid legacy ETF families (notably Select Sector SPDR) are missing
-# seriesName metadata in the frozen bootstrap. Filing <SERIES> contracts are the
-# authoritative identity source when present.
 mspec = importlib.util.spec_from_file_location(
     'filing_meta', ROOT / 'scripts' / 'research-nq-series-metadata-2006.py'
 )
@@ -54,6 +47,15 @@ fast.FIXTURE_FILINGS = (
         'fixtureBasis': 'SEC shareholder report for 2019-12-31; multi-series US-equity ETF trust',
     },
     {
+        'cik': '1100663',
+        'company': 'ISHARES TRUST',
+        'form': 'N-CSR',
+        'dateFiled': '2020-06-04',
+        'filename': 'edgar/data/1100663/0001193125-20-160176.txt',
+        'accession': '0001193125-20-160176',
+        'fixtureBasis': 'SEC N-CSR for report period 2020-03-31; broad iShares ETF registrant containing US-equity series',
+    },
+    {
         'cik': '1064641',
         'company': 'SELECT SECTOR SPDR TRUST',
         'form': 'N-CSRS',
@@ -69,7 +71,7 @@ fast.FIXTURE_FILINGS = (
         'dateFiled': '2020-07-02',
         'filename': 'edgar/data/1524513/0001193125-20-186178.txt',
         'accession': '0001193125-20-186178',
-        'fixtureBasis': 'SEC N-CSRS for report period 2020-04-30; explicit U.S. ETF registrant selected independently of parser output',
+        'fixtureBasis': 'SEC N-CSRS for report period 2020-04-30; explicit U.S. ETF registrant retained as a structural negative/control family even if equity-eligible series are absent',
     },
     {
         'cik': '1552740',
