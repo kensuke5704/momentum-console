@@ -57,8 +57,11 @@ def main():
       rec.setdefault('attempts',[]).append({'headerUrl':hu,'transport':tr,'nameMatch':ok,'names':names,'stateCode':st})
       if ok and st:
        rec.update({'classification':'US' if st in old.US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_INDEX_HEADERS_NAME_VALIDATED','headerUrl':hu});break
-     except Exception as e:rec.setdefault('attempts',[]).append({'headerUrl':hu,'error':type(e).__name__})
+     except Exception as e:
+      rec.setdefault('attempts',[]).append({'headerUrl':hu,'error':type(e).__name__})
      time.sleep(.05)
+   except Exception as e:
+    rec['browseError']=type(e).__name__
   results.append(rec);print('HEADER',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','seedCik','archiveCount','classification','stateCode','resolutionSource']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
  out={'purpose':'UNKNOWN-only PIT country pilot using current ticker only as an exact-name CIK seed; actual classification requires a historical SEC filing index-headers page by the legacy report date, historical COMPANY CONFORMED NAME matching the legacy issuer, and filing-time STATE OF INCORPORATION. No current state, returns, or ranks used.','sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
