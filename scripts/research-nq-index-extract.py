@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import json, tempfile, urllib.request, zipfile
+import json, tempfile, time, urllib.request, zipfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -9,14 +9,27 @@ UA={'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com
 OUT=ROOT/'data'/'research'/'nq-index-2006.json'
 TARGET_FORMS={'N-Q','N-Q/A','N-CSR','N-CSRS','N-CSR/A','N-CSRS/A'}
 
-def download(url:str,path:Path):
-    req=urllib.request.Request(url,headers=UA)
-    with urllib.request.urlopen(req,timeout=600) as r, open(path,'wb') as f:
-        while True:
-            b=r.read(1024*1024)
-            if not b: break
-            f.write(b)
-    print(f'download complete bytes={path.stat().st_size:,}',flush=True)
+def download(url:str,path:Path,attempts:int=4):
+    last_error=None
+    for attempt in range(1,attempts+1):
+        try:
+            if path.exists(): path.unlink()
+            req=urllib.request.Request(url,headers=UA)
+            with urllib.request.urlopen(req,timeout=600) as r, open(path,'wb') as f:
+                while True:
+                    b=r.read(1024*1024)
+                    if not b: break
+                    f.write(b)
+            size=path.stat().st_size
+            if size<1_000_000 or not zipfile.is_zipfile(path):
+                raise ValueError(f'historical index response is not the expected ZIP: bytes={size:,}')
+            print(f'download complete bytes={size:,} attempt={attempt}',flush=True)
+            return
+        except Exception as e:
+            last_error=e
+            print(f'index download attempt {attempt}/{attempts} failed: {e!r}',flush=True)
+            if attempt<attempts: time.sleep(3.0*attempt)
+    raise RuntimeError(f'unable to download valid historical index ZIP after {attempts} attempts') from last_error
 
 def main():
     with tempfile.TemporaryDirectory() as td:
