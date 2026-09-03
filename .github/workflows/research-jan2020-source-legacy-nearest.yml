@@ -1,0 +1,26 @@
+name: Research Jan2020 Source Legacy Nearest
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-jan2020-source-legacy-nearest.py"
+      - ".github/workflows/research-jan2020-source-legacy-nearest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-jan2020-source-legacy-nearest.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jan2020-source-legacy-nearest
+          path: data/research/jan2020-source-legacy-nearest.json
+          if-no-files-found: warn
