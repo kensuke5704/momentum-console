@@ -1,0 +1,22 @@
+name: Research Transition NQ PIT 2019
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-transition-nq-pit-2019.py
+      - .github/workflows/research-transition-nq-pit-2019.yml
+  workflow_dispatch:
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-transition-nq-pit-2019.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transition-nq-pit-2019
+          path: data/research/transition-nq-pit-2019.json
+          if-no-files-found: warn
