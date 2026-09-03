@@ -21,25 +21,21 @@ def get():
 
 def plain(s): return ' '.join(re.sub(r'[*_]+','',s or '').replace('\xa0',' ').split())
 
+def context(lines,i,a=10,b=24):
+    return [{'at':j,'line':plain(lines[j])} for j in range(max(0,i-a),min(len(lines),i+b)) if plain(lines[j])]
+
 def main():
     text,tr=get();lines=text.splitlines();title_hits=[i for i,x in enumerate(lines) if TITLE.search(x)];sched_hits=[i for i,x in enumerate(lines) if SCHED.search(x)]
-    starts=[]
+    title_windows=[{'titleAt':t,'title':plain(lines[t]),'nearestSchedules':sorted(sched_hits,key=lambda s:abs(s-t))[:5],'context':context(lines,t)} for t in title_hits]
+    print('TITLE_WINDOWS',json.dumps(title_windows),flush=True)
+    candidates=[]
     for t in title_hits:
-        near=[s for s in sched_hits if abs(s-t)<=30]
-        if near: starts.append(min([t]+near))
-    start=min(starts) if starts else (title_hits[0] if title_hits else 0)
-    # Stop before the next Goldman Sachs ETF title after the target schedule.
-    end=min(len(lines),start+700)
-    for i in range(start+30,end):
-        p=plain(lines[i])
-        if re.match(r'^Goldman Sachs .* ETF$',p,re.I) and not TITLE.search(p):
-            end=i;break
-    key=[]
-    for i in range(start,end):
-        p=plain(lines[i])
-        if KEY.search(p):
-            key.append({'at':i,'line':p,'next':[plain(x) for x in lines[i+1:min(end,i+8)] if plain(x)]})
-    out={'transport':tr,'start':start,'end':end,'keyLines':key}
-    print('KEYLINES',json.dumps(key),flush=True)
+        for s in sched_hits:
+            if 0 <= s-t <= 80:
+                window='\n'.join(plain(x) for x in lines[s:min(len(lines),s+140)])
+                if re.search(r'Common Stocks',window,re.I):
+                    candidates.append({'titleAt':t,'scheduleAt':s,'distance':s-t,'title':plain(lines[t]),'schedule':plain(lines[s]),'sample':[plain(x) for x in lines[s:min(len(lines),s+40)] if plain(x)][:25]})
+    print('CANDIDATES',json.dumps(candidates),flush=True)
+    out={'transport':tr,'titleHits':title_hits,'scheduleHits':sched_hits,'titleWindows':title_windows,'candidates':candidates}
     OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
 if __name__=='__main__':main()
