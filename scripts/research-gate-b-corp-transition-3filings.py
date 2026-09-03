@@ -33,18 +33,21 @@ def main():
   try:text,tr=get(url)
   except Exception as e:
    rows.append({'seriesId':sid,'accession':acc,'error':repr(e)});continue
-  # Extract investment blocks from raw XML embedded in complete submission. Namespace prefixes are tolerated.
   blocks=re.findall(r'<(?:[^:>]+:)?invstOrSec\b[^>]*>(.*?)</(?:[^:>]+:)?invstOrSec>',text,re.I|re.S)
   c=Counter(); examples={}
+  tagSample=sorted(set(re.findall(r'<(?:[^:>]+:)?([A-Za-z][A-Za-z0-9_]*)\b',blocks[0] if blocks else '')))
   for b in blocks:
-   asset=val(b,['assetCat','assetCategory']); country=val(b,['invCountry','investmentCountry','country']); issuer=val(b,['issuerType'])
+   asset=val(b,['assetCat','assetCategory']); country=val(b,['invCountry','investmentCountry','country']); issuer=val(b,['issuerCat','issuerType'])
    key=(asset,country,issuer);c[key]+=1
    if asset=='EC' and country=='US' and issuer!='CORP' and len(examples)<20:
     name=val(b,['name','issuerName']);examples.setdefault(issuer or 'MISSING',[]).append(name)
   ecus=sum(n for (a,co,i),n in c.items() if a=='EC' and co=='US')
   corp=sum(n for (a,co,i),n in c.items() if a=='EC' and co=='US' and i=='CORP')
-  rows.append({'seriesId':sid,'accession':acc,'transport':tr,'investmentBlocks':len(blocks),'ecUs':ecus,'ecUsCorp':corp,'corpShareWithinEcUs':corp/ecus if ecus else None,'issuerTypesWithinEcUs':dict(Counter({i or 'MISSING':n for (a,co,i),n in c.items() if a=='EC' and co=='US'})),'nonCorpExamples':examples})
+  types=Counter()
+  for (a,co,i),n in c.items():
+   if a=='EC' and co=='US':types[i or 'MISSING']+=n
+  rows.append({'seriesId':sid,'accession':acc,'transport':tr,'investmentBlocks':len(blocks),'ecUs':ecus,'ecUsCorp':corp,'corpShareWithinEcUs':corp/ecus if ecus else None,'issuerTypesWithinEcUs':dict(types),'nonCorpExamples':examples,'firstBlockTagNames':tagSample})
   print('ROW',json.dumps(rows[-1]),flush=True)
- out={'purpose':'Direct raw-filing transition diagnostic: among holdings with ASSET_CAT=EC and INVESTMENT_COUNTRY=US, measure whether ISSUER_TYPE=CORP removes material holdings in the exact three first Production source filings. No strategy returns or Universe ranking used.','rows':rows}
+ out={'purpose':'Direct raw-filing transition diagnostic: among holdings with ASSET_CAT=EC and INVESTMENT_COUNTRY=US, measure whether ISSUER_TYPE=CORP removes material holdings in the exact three first Production source filings. XML issuer category is read from issuerCat (with issuerType fallback). No strategy returns or Universe ranking used.','rows':rows}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
 if __name__=='__main__':main()
