@@ -1,0 +1,29 @@
+name: Research Jan2020 PPTY Schedule Marker Audit
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-jan2020-ppty-schedule-marker-audit.py"
+      - ".github/workflows/research-jan2020-ppty-schedule-marker-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen discovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/disc
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9887657315/zip > /tmp/disc.zip
+          unzip -q /tmp/disc.zip -d /tmp/disc
+          cp /tmp/disc/jan2020-source-legacy-nearest.json data/research/
+      - run: python3 scripts/research-jan2020-ppty-schedule-marker-audit.py
