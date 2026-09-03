@@ -16,6 +16,12 @@ with gzip.open(BOOTSTRAP, 'rt', encoding='utf-8') as f:
     bp = json.load(f)
 rows = bp.get('snapshots') or bp.get('filings') or []
 
+# Contract of the frozen bootstrap: import-nport.ts -> parseNportQuarterly()
+# retains only ASSET_CAT=EC, INVESTMENT_COUNTRY=US, ISSUER_TYPE=CORP.
+# Therefore a non-empty holdings array here is already Production-filtered US
+# corporate equity data; this inventory must not add name-based equity guesses.
+SOURCE_CONTRACT = 'Frozen data/sec-nport/bootstrap.json.gz holdings are already filtered to N-PORT EC + US + CORP by the Production importer.'
+
 # Keep one snapshot per (series, report date), preferring the latest public filing.
 latest = {}
 for r in rows:
@@ -73,7 +79,8 @@ group_rows.sort(key=lambda g: (-g['qualifyingSeries'], g['reportDate'], str(g.ge
 out = {
     'year': 2020,
     'purpose': 'Deterministically inventory frozen N-PORT series suitable for legacy reproducibility fixtures using only structural US-equity holding availability.',
-    'selectionRule': f'2020 N-PORT snapshot with at least {MIN_HOLDINGS} Production-eligible holdings; grouped by available registrant metadata and reportDate; sorted by qualifying series count then deterministic text keys.',
+    'sourceContract': SOURCE_CONTRACT,
+    'selectionRule': f'2020 N-PORT snapshot with at least {MIN_HOLDINGS} Production-filtered holdings; grouped by available registrant metadata and reportDate; sorted by qualifying series count then deterministic text keys.',
     'minimumHoldings': MIN_HOLDINGS,
     'candidateSnapshots': len(candidates),
     'groups': group_rows[:100],
@@ -82,6 +89,7 @@ out = {
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(json.dumps(out, indent=2) + '\n', encoding='utf-8')
 
+print('SOURCE_CONTRACT', SOURCE_CONTRACT)
 print('CANDIDATE_SNAPSHOTS', len(candidates))
 print('TOP_GROUPS', json.dumps([{k:v for k,v in g.items() if k != 'series'} for g in group_rows[:20]], sort_keys=True))
 for g in group_rows[:10]:
