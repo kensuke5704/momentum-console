@@ -10,8 +10,8 @@ FILINGS=[
  ('RYDEX_ETF','1208211','0000950135-06-001815'),
  ('STREETTRACKS','1064642','0000950135-06-003650'),
 ]
-SERIES_RE=re.compile(r'Series\s+(S\d{9})\s*.*?\|?\s*([^\r\n<]+)',re.I)
-PAIR_RE=re.compile(r'Series\s+(S\d{9}).*?Class/Contract\s+(C\d{9}).*?\|\s*([^\r\n<|]+?)\s*\|\s*([A-Z][A-Z0-9.\-]{0,9})\b',re.I|re.S)
+SERIES_LINE_RE=re.compile(r'^Series\s+\[(S\d{9})\]\([^\)]*\)(.+?)\s*$',re.I)
+CLASS_LINE_RE=re.compile(r'^Class/Contract\s+\[(C\d{9})\]\([^\)]*\)(.+?)\s+([A-Z][A-Z0-9.\-]{0,9})\s*$',re.I)
 
 def get(url):
  for u in ('https://r.jina.ai/'+url,url):
@@ -23,20 +23,19 @@ def main():
  rows=[]
  for label,cik,acc in FILINGS:
   compact=acc.replace('-','');url=f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{compact}/{acc}-index.html';text,tr=get(url)
+  lines=[x.strip() for x in text.splitlines() if x.strip()]
   pairs=[]
-  for m in PAIR_RE.finditer(text):pairs.append({'seriesId':m.group(1).upper(),'classId':m.group(2).upper(),'name':' '.join(m.group(3).split()),'ticker':m.group(4).upper()})
-  # r.jina markdown fallback: parse line blocks around Series/Class rows.
-  if not pairs:
-   lines=[x.strip() for x in text.splitlines()]
-   for i,line in enumerate(lines):
-    sm=re.search(r'Series\s+(S\d{9})',line,re.I)
-    if not sm:continue
-    sid=sm.group(1).upper();window='\n'.join(lines[i:i+8]);cm=re.search(r'Class/Contract\s+(C\d{9})',window,re.I);tm=re.search(r'\|\s*([A-Z][A-Z0-9.\-]{0,9})\s*$',window,re.M)
-    name=''
-    # capture likely series name from same/next line after series id.
-    after=re.sub(r'^.*?Series\s+S\d{9}\s*','',line,flags=re.I).strip(' |')
-    if after:name=after
-    if cm and tm:pairs.append({'seriesId':sid,'classId':cm.group(1).upper(),'name':name,'ticker':tm.group(1).upper()})
+  for i,line in enumerate(lines):
+   sm=SERIES_LINE_RE.match(line)
+   if not sm:continue
+   sid=sm.group(1).upper();sname=' '.join(sm.group(2).split())
+   # In SEC/r.jina index grammar the matching Class/Contract line immediately follows the Series line.
+   for nxt in lines[i+1:i+4]:
+    cm=CLASS_LINE_RE.match(nxt)
+    if cm:
+     cname=' '.join(cm.group(2).split());ticker=cm.group(3).upper()
+     pairs.append({'seriesId':sid,'classId':cm.group(1).upper(),'seriesName':sname,'className':cname,'ticker':ticker})
+     break
   dedup=[];seen=set()
   for p in pairs:
    k=(p['seriesId'],p['classId'],p['ticker'])
