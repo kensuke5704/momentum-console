@@ -73,6 +73,15 @@ fast.FIXTURE_FILINGS = (
         'fixtureBasis': 'Predeclared fast-parity fixture; SEC shareholder report for 2020-06-30; multi-series ETF registrant',
     },
     {
+        'cik': '1616668',
+        'company': 'Pacer Funds Trust',
+        'form': 'N-CSR',
+        'dateFiled': '2020-07-08',
+        'filename': 'edgar/data/1616668/0001398344-20-013455.txt',
+        'accession': '0001398344-20-013455',
+        'fixtureBasis': 'Predeclared source-coverage family; SEC N-CSR for 2020-04-30 with broad US-equity ETF series set',
+    },
+    {
         'cik': '1100663',
         'company': 'ISHARES TRUST',
         'form': 'N-CSR',
