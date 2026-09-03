@@ -1,0 +1,23 @@
+name: Research SEC Submissions Production Sources 2020
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-submissions-production-sources-2020.py"
+      - ".github/workflows/research-sec-submissions-production-sources-2020.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-sec-submissions-production-sources-2020.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-submissions-production-sources-2020
+          path: data/research/sec-submissions-production-sources-2020.json
+          if-no-files-found: warn
