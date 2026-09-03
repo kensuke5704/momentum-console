@@ -54,3 +54,16 @@ test("OOS keeps the current daily simulation when the displayed backtest is froz
  assert.equal(dashboard.backtest.equityCurve.length,1);
  assert.ok(dashboard.oosBacktest.equityCurve.length>dashboard.backtest.equityCurve.length);
 });
+
+test("Stage21 keeps its GLDM/Cash sleeve when the shared Fixed60 circuit exits",()=>{
+ const dates=Array.from({length:364},(_,index)=>new Date(Date.UTC(2025,0,1+index)).toISOString().slice(0,10));
+ const qqq=dates.map((date,index)=>point(date,index<=360?100+index*.05:80));
+ const aaa=dates.map((date,index)=>point(date,index===362?(100+361*.15)*.84:100+index*.15));
+ const bbb=dates.map((date,index)=>point(date,index===362?(90+361*.12)*.84:90+index*.12));
+ const gldm=dates.map(date=>point(date,50));
+ const circuitUniverse:UniverseMonth={...universe,signalMonth:dates[360].slice(0,7),asOf:dates[360]};
+ const dashboard=buildDashboardPayload({QQQ:qqq,AAA:aaa,BBB:bbb,GLDM:gldm},[circuitUniverse],[]);
+ assert.match(dashboard.liveState.lastTrigger??"",/circuit/);
+ assert.deepEqual(dashboard.portfolioState.targets.map(target=>target.symbol),["GLDM","CASH"]);
+ assert.ok(dashboard.oosBacktest.events.some(event=>event.type==="EXIT_OPEN"&&event.reason.includes("circuit")));
+});

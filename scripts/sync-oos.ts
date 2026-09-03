@@ -35,7 +35,7 @@ async function main() {
     cftc: dashboard.portfolioState.cftc,
     entryPrices: Object.fromEntries(dashboard.portfolioState.holdings.map((position) => [position.symbol, position.entryPrice])),
     exitPrices: {}, return: null, equity: null,
-    triggerHistory: dashboard.backtest.events.filter((event) => event.date >= OOS_START_DATE),
+    triggerHistory: dashboard.oosBacktest.events.filter((event) => event.date >= OOS_START_DATE),
   };
   const records = recordDate >= OOS_START_DATE
     ? [...oos.records.filter((row) => (row.recordDate ?? row.signalDate) !== recordDate), record].sort((a, b) => (a.recordDate ?? a.signalDate).localeCompare(b.recordDate ?? b.signalDate))

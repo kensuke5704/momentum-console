@@ -1,11 +1,11 @@
-import {performanceStats,runStrategySimulation} from "../backtest";
+import {performanceStats} from "../backtest";
 import {cftcStatus,type CftcPositionRow} from "../cftc";
 import {PRODUCTION_STRATEGY} from "../config";
 import {PRODUCTION_PORTFOLIO,type PortfolioRegime} from "../portfolio-config";
 import type {PortfolioHolding,PortfolioLiveState,PortfolioTarget} from "../portfolio-types";
 import {buildMonthlySignal} from "../strategy/momentum";
 import {runBreakoutShadow} from "../strategy/breakout-shadow";
-import {initialEngineState,transitionDay} from "../strategy/state-machine";
+import {initialEngineState,transitionDay,type EngineState} from "../strategy/state-machine";
 import {nextUsTradingSession} from "../trading-calendar";
 import type {BacktestResult,EquityPoint,LiveStrategyState,PricePoint,UniverseMonth} from "../types";
 
@@ -13,11 +13,10 @@ type FixedTarget={symbols:string[];weights:number[]};
 type FixedSnap={date:string;equity:number;target:FixedTarget};
 type RegimeRow={date:string;regime:PortfolioRegime;cftc:ReturnType<typeof cftcStatus>;m3:{deep:boolean;coreReturn20:number|null;qqqReturn20:number|null;gap:number|null;recoveryConfirm:number}};
 const START=PRODUCTION_STRATEGY.backtestStart;
-const mean=(values:number[])=>values.reduce((sum,value)=>sum+value,0)/(values.length||1);
 const returns=(curve:EquityPoint[])=>{const out=new Map<string,number>();for(let i=1;i<curve.length;i++)out.set(curve[i].date,curve[i].equity/curve[i-1].equity-1);return out};
 const targetKey=(target:FixedTarget)=>target.symbols.map((symbol,index)=>`${symbol}:${(target.weights[index]??0).toFixed(6)}`).join("|");
 
-function fixedSnapshots(histories:Record<string,PricePoint[]>,universeHistory:UniverseMonth[]):{snaps:FixedSnap[];state:LiveStrategyState}{
+function fixedSnapshots(histories:Record<string,PricePoint[]>,universeHistory:UniverseMonth[]):{snaps:FixedSnap[];state:EngineState}{
  const qqq=[...(histories.QQQ??[])].sort((a,b)=>a.date.localeCompare(b.date));
  const dates=qqq.map(point=>point.date),dateIndex=new Map(dates.map((date,index)=>[date,index]));
  const priceMaps=Object.fromEntries(Object.entries(histories).map(([symbol,points])=>[symbol,new Map(points.map(point=>[point.date,point]))]));
@@ -92,7 +91,7 @@ export function buildStage21Portfolio(histories:Record<string,PricePoint[]>,univ
  if(!(histories.GLDM??[]).length)throw new Error("Stage21 requires GLDM history");
  const {snaps,state:innerState}=fixedSnapshots(histories,universeHistory);if(snaps.length<2)throw new Error("Stage21 fixed snapshots are empty");
  const base=snaps[0].equity||1,fixedCurve=snaps.map(snap=>({date:snap.date,equity:snap.equity/base,drawdown:0}));let peak=0;for(const point of fixedCurve){peak=Math.max(peak,point.equity);point.drawdown=point.equity/peak-1}
- const g=runBreakoutShadow(histories,universeHistory,START,snaps.at(-1)!.date),regimes=regimeRows(fixedCurve,g,histories.QQQ??[],cftcRows),simulation=simulateNextOpen(histories,snaps,regimes),backtest=simulation.backtest;
+ const g=runBreakoutShadow(histories,universeHistory,START,snaps.at(-1)!.date),regimes=regimeRows(fixedCurve,g,histories.QQQ??[],cftcRows),simulation=simulateNextOpen(histories,snaps,regimes),backtest={...simulation.backtest,events:[...simulation.backtest.events,...innerState.events].sort((left,right)=>left.date.localeCompare(right.date)||left.type.localeCompare(right.type))};
  const latest=snaps.at(-1)!,previous=snaps.at(-2)!,regime=regimes.at(-1)!,previousRegime=regimes.at(-2),targets=combinedTargets(regime.regime,latest.target),latestDate=latest.date;
  const firstOosDate=latestDate===PRODUCTION_PORTFOLIO.oosStartDate,monthly=latestDate.slice(0,7)!==previous.date.slice(0,7),changed=regime.regime!==previousRegime?.regime||targetKey(latest.target)!==targetKey(previous.target),eligible=latestDate>=PRODUCTION_PORTFOLIO.oosStartDate;
  const rebalance=eligible&&(firstOosDate||monthly||changed),executionDate=rebalance?nextUsTradingSession(latestDate):null;
