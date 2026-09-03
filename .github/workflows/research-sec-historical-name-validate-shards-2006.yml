@@ -1,0 +1,37 @@
+name: Research SEC Historical Name Validate Shards 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-historical-name-validate-shard-2006.py"
+      - ".github/workflows/research-sec-historical-name-validate-shards-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHARD_INDEX: ${{ matrix.shard }}
+      SHARD_COUNT: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download UNKNOWN retry merged country artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/src
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/src.zip
+          unzip -q /tmp/src.zip -d /tmp/src
+          cp /tmp/src/country-full-coverage-unknown-retry-2006.json data/research/
+      - run: python3 scripts/research-sec-historical-name-validate-shard-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-historical-name-validate-shard-${{ matrix.shard }}-2006
+          path: data/research/sec-historical-name-validate-shard-*-2006.json
