@@ -18,7 +18,6 @@ def clean(s):return re.sub(r'\s+',' ',s or '').strip()
 def plain(s):return clean(MARKUP.sub('',s or '').replace('\xa0',' '))
 def norm(s):
  s=FOOT.sub('',s or '').upper().replace('&',' AND ')
- # Explicit trailing filing country annotation is metadata, not issuer identity.
  m=re.search(r'\s*\(([^()]*)\)\s*$',s)
  if m and m.group(1).strip() in COUNTRIES:s=s[:m.start()]
  s=re.sub(r'/[A-Z]{2}\b',' ',s);s=re.sub(r'\b(?:CLASS\s+[A-Z]|NON[- ]?VOTING|VOTING)\s+SHARES?\b',' ',s);s=re.sub(r'\bCLASS\s+[A-Z]\b',' ',s);s=re.sub(r'\bSHARES?\b',' ',s);s=re.sub(r'\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|LLC|LP)\b',' ',s);s=re.sub(r'[^A-Z0-9]+',' ',s);s=' '.join(s.split())
@@ -41,23 +40,18 @@ def get(url):
  raise RuntimeError(last or 'fetch failed')
 
 def schedule_segment(text,series):
- lines=text.splitlines()
- # Exact title + actual schedule marker. Table-of-contents mentions are rejected unless the target title and holdings header are nearby.
- title_positions=[i for i,x in enumerate(lines) if series.lower() in x.lower()]
+ lines=text.splitlines();title_positions=[i for i,x in enumerate(lines) if series.lower() in x.lower()]
  for t in title_positions:
   for i in range(max(0,t-12),min(len(lines),t+20)):
    if not re.search(r'^\s*Schedule of Investments|^\s*Portfolio of Investments',plain(lines[i]),re.I):continue
    window='\n'.join(plain(x) for x in lines[min(t,i):min(len(lines),max(t,i)+40)])
    if re.search(r'COMMON STOCK',window,re.I) and re.search(r'\b(?:Security|Description)\b.*\b(?:Shares|Value)\b|\bShares\b.*\b(?:Security Description|Description)\b.*\bValue\b',window,re.I):
-    # Stop at the next different fund's real schedule/title where possible; fixed upper bound is fallback.
-    end=min(len(lines),min(t,i)+5000)
-    return lines[min(t,i):end]
+    end=min(len(lines),min(t,i)+5000);return lines[min(t,i):end]
  for i,x in enumerate(lines):
   if not re.search(r'SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS',x,re.I):continue
   window='\n'.join(lines[i:min(len(lines),i+25)])
   if series.lower() in window.lower() and re.search(r'COMMON STOCK',window,re.I):return lines[i:min(len(lines),i+5000)]
- st=title_positions[-1] if title_positions else 0
- return lines[st:min(len(lines),st+5000)]
+ st=title_positions[-1] if title_positions else 0;return lines[st:min(len(lines),st+5000)]
 
 def parse_compact_inline(seg):
  rows=[];in_common=False;pat=re.compile(r'^(.*?\D)(\d[\d,]*)\s*\$?\s*(\d[\d,]*)(?:\s*\*)?$')
@@ -84,20 +78,15 @@ def parse_nearby_vertical(seg):
  return rows
 
 def parse_shares_description_value(seg):
- """Goldman rendered row: leading shares, description, optional $, trailing market value on one line."""
- rows=[];in_common=False
- pat=re.compile(r'^\s*([\d,]+)\s+(.+?)\s+(?:\$\s*)?([\d,]+)\s*$')
+ rows=[];in_common=False;pat=re.compile(r'^\s*([\d,]+)\s+(.+?)\s+(?:\$\s*)?([\d,]+)\s*$')
  for raw in seg:
   line=plain(raw)
   if re.search(r'\bCommon Stocks?\b',line,re.I):in_common=True;continue
   if in_common and STOP.search(line):break
-  if not in_common:continue
-  if re.search(r'\bcontinued\b',line,re.I) or re.search(r'\d+(?:\.\d+)?\s*%$',line):continue
+  if not in_common or re.search(r'\bcontinued\b',line,re.I) or re.search(r'\d+(?:\.\d+)?\s*%$',line):continue
   m=pat.match(line)
   if not m:continue
-  desc=m.group(2).strip().rstrip('*')
-  # Remove only footnote markers; country annotations are kept for country bridge and stripped only by norm().
-  desc=re.sub(r'\*?\([a-z]\)\s*$','',desc,flags=re.I).strip()
+  desc=re.sub(r'\*?\([a-z]\)\s*$','',m.group(2).strip().rstrip('*'),flags=re.I).strip()
   if desc and re.search(r'[A-Za-z]',desc) and not re.match(r'^(TOTAL|Common Stocks|Shares|Description)',desc,re.I):rows.append(desc)
  return rows
 
@@ -115,11 +104,13 @@ def parse_spaced(seg):
  return rows
 
 def parse_rows(text,series):
- seg=schedule_segment(text,series);header='\n'.join(plain(x) for x in seg[:80])
- # Grammar is chosen only from rendered SEC table header, before overlap is evaluated.
- if re.search(r'\bSecurity Shares Value\b',header,re.I):grammar='compact_inline';rows=parse_compact_inline(seg)
- elif re.search(r'\bShares\b.*\bDescription\b.*\bValue\b',header,re.I):grammar='shares_description_value';rows=parse_shares_description_value(seg)
- elif re.search(r'\bShares\b',header,re.I) and re.search(r'\bSecurity Description\b',header,re.I) and re.search(r'\bValue\b',header,re.I):grammar='nearby_vertical';rows=parse_nearby_vertical(seg)
+ seg=schedule_segment(text,series);header_lines=[plain(x) for x in seg[:80]];header='\n'.join(header_lines)
+ # Select one-line table grammar only when Shares/Description/Value are literally on the same rendered line.
+ same_line_columns=any(re.search(r'\bShares\b.*\b(?:Security Description|Description)\b.*\bValue\b',x,re.I) for x in header_lines)
+ separate_vertical_columns=(any(re.fullmatch(r'Shares',x,re.I) for x in header_lines) and any(re.fullmatch(r'Security Description',x,re.I) for x in header_lines) and any(re.fullmatch(r'Value',x,re.I) for x in header_lines))
+ if any(re.search(r'\bSecurity Shares Value\b',x,re.I) for x in header_lines):grammar='compact_inline';rows=parse_compact_inline(seg)
+ elif same_line_columns:grammar='shares_description_value';rows=parse_shares_description_value(seg)
+ elif separate_vertical_columns:grammar='nearby_vertical';rows=parse_nearby_vertical(seg)
  else:
   candidates=[('compact_inline',parse_compact_inline(seg)),('shares_description_value',parse_shares_description_value(seg)),('nearby_vertical',parse_nearby_vertical(seg)),('spaced',parse_spaced(seg))]
   grammar,rows=max(candidates,key=lambda x:len(set(x[1])))
