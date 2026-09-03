@@ -44,11 +44,9 @@ def main():
    idx=[]
    for i,f in enumerate(forms):
     if f=='10-K' and i<len(dates) and dates[i]<=c['reportDate']:idx.append(i)
-   # submissions recent may not reach 2005; use files list if necessary, but first inspect direct company browse.
    urls=[]
    for i in idx[:5]:
     acc=accs[i];doc=docs[i];urls.append(f'https://www.sec.gov/Archives/edgar/data/{digits}/{acc.replace("-","")}/{doc}')
-   # deterministic SEC browse fallback for historical 10-K before report date.
    import urllib.parse
    q=urllib.parse.urlencode({'action':'getcompany','CIK':cik,'type':'10-K','dateb':c['reportDate'].replace('-',''),'owner':'exclude','count':'40'})
    browse,btr=get('https://www.sec.gov/cgi-bin/browse-edgar?'+q,3_000_000);row['browseTransport']=btr
@@ -66,3 +64,4 @@ def main():
  summary={'purpose':'Validate fixed candidate historical CIKs for the three still-unresolved issuers against SEC submissions names before using PIT 10-K state-of-incorporation. No Universe ranks or returns used.','resolved':sum(x['classification']!='UNKNOWN' for x in out),'unknown':sum(x['classification']=='UNKNOWN' for x in out),'rows':out}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(summary,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k!='rows'}),flush=True)
 if __name__=='__main__':main()
+# trigger 2026-09-03
