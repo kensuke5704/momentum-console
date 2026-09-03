@@ -318,6 +318,10 @@
 }
 
 @media (max-width: 520px) {
+  .next-action.next-action-stage21 {
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.4fr) minmax(0, 1.7fr) !important;
+  }
+
   .sidebar nav button {
     scroll-margin-inline: 12px;
     padding-left: 9px !important;
@@ -373,15 +377,16 @@
 
   .next-action-cell {
     gap: 7px;
+    grid-column: auto;
     min-height: 94px;
-    padding: 12px 9px;
+    padding: 12px 7px;
   }
   .next-action-cell.target-cell { min-height: 104px; padding: 11px 10px 13px; }
   .next-action-cell > span { font-size: 9px; line-height: 1.2; }
   .next-action-cell > strong,
-  .next-action-cell.execution-cell > strong { font-size: 17px; line-height: 1.2; white-space: nowrap; }
+  .next-action-cell.execution-cell > strong { font-size: clamp(11px, 3.3vw, 14px); line-height: 1.2; white-space: nowrap; }
   .action-value-line { gap: 5px; }
-  .action-value-line > strong { font-size: 17px; line-height: 1.2; }
+  .action-value-line > strong { font-size: clamp(11px, 3.3vw, 14px); line-height: 1.2; }
   .action-value-line > .close-basis-warning { font-size: 7px; padding: 3px; }
 
   .allocation-band { min-height: 108px; }
