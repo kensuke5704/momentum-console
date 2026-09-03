@@ -80,7 +80,6 @@ def spear(a,b):
  ra={x['symbol']:i+1 for i,x in enumerate(a)};rb={x['symbol']:i+1 for i,x in enumerate(b)};common=set(ra)&set(rb);n=len(common)
  if n<2:return None
  d2=sum((ra[s]-rb[s])**2 for s in common)
- # rank positions are full-list positions; report this as positional rank agreement, not textbook subset re-ranking.
  return 1-6*d2/(n*(n*n-1)) if n>1 else None
 
 def main():
@@ -97,3 +96,4 @@ def main():
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('PARITY',json.dumps(parity));
  for k,v in res.items():print('VARIANT',k,json.dumps({x:y for x,y in v.items() if x!='symbols'}))
 if __name__=='__main__':main()
+# research rerun marker: 2026-09-03 Gate B source/filter audit
