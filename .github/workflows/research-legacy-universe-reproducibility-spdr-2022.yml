@@ -1,0 +1,32 @@
+name: Research Legacy Universe Reproducibility SPDR 2022
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+    paths:
+      - "scripts/research-legacy-universe-reproducibility-spdr-2022.py"
+      - "scripts/research-legacy-universe-reproducibility-fast-2020.py"
+      - "scripts/research-legacy-universe-reproducibility-2020.py"
+      - "scripts/research-ncsr-nport-overlap-2020.py"
+      - "scripts/research-nq-pit-holdings-2006.py"
+      - "scripts/research-legacy-holdings-parser.py"
+      - ".github/workflows/research-legacy-universe-reproducibility-spdr-2022.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate exact-date SPDR 2022 legacy/NPORT reproducibility
+        run: python3 scripts/research-legacy-universe-reproducibility-spdr-2022.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-universe-reproducibility-spdr-2022
+          path: data/research/legacy-universe-reproducibility-spdr-2022.json
+          if-no-files-found: warn
