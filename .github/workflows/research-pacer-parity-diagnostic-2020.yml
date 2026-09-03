@@ -1,0 +1,30 @@
+name: Research Pacer Parity Diagnostic 2020
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/cagr40-new-alpha-20260901
+    paths:
+      - 'scripts/research-pacer-parity-diagnostic-2020.py'
+      - 'scripts/research-legacy-universe-reproducibility-fast-2020.py'
+      - 'scripts/research-legacy-universe-reproducibility-2020.py'
+      - 'scripts/research-legacy-issuer-aliases.py'
+      - 'scripts/research-nq-series-metadata-2006.py'
+      - 'scripts/research-ncsr-nport-overlap-2020.py'
+      - 'scripts/research-nq-pit-holdings-2006.py'
+      - 'scripts/research-nq-series-segmentation-2006.py'
+      - '.github/workflows/research-pacer-parity-diagnostic-2020.yml'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose Pacer same-report parity
+        run: python3 scripts/research-pacer-parity-diagnostic-2020.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pacer-parity-diagnostic-2020
+          path: data/research/pacer-parity-diagnostic-2020.json
