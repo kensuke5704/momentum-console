@@ -39,10 +39,31 @@ def sec_url(params: dict[str, str]) -> str:
     return "https://www.sec.gov/cgi-bin/browse-edgar?" + urllib.parse.urlencode(params)
 
 
+def clean_issuer(s: str) -> str:
+    s = re.sub(r"\s*\((?:[a-z]{1,3}|\d{1,3})\)\s*$", "", s, flags=re.I)
+    return " ".join(s.replace("’", "'").split()).strip(" .,-")
+
+
 def normalize_name(s: str) -> str:
-    s = re.sub(r"\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|AG)\b", " ", s.upper())
+    s = clean_issuer(s).upper().replace("&", " AND ")
+    s = re.sub(r"\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|AG|THE)\b", " ", s)
     s = re.sub(r"[^A-Z0-9]+", " ", s)
     return " ".join(s.split())
+
+
+def issuer_query_variants(issuer: str) -> list[str]:
+    clean = clean_issuer(issuer)
+    simple = re.sub(r"[^A-Za-z0-9& ]+", " ", clean)
+    simple = " ".join(simple.split())
+    no_suffix = re.sub(r"\b(?:Incorporated|Inc|Corporation|Corp|Company|Co|Limited|Ltd|PLC|AG)\b\.?", " ", simple, flags=re.I)
+    no_suffix = " ".join(no_suffix.split())
+    no_the = re.sub(r"^The\s+", "", no_suffix, flags=re.I)
+    out = []
+    for q in (clean, simple, no_suffix, no_the):
+        q = q.strip(" .,-")
+        if len(q) >= 3 and q not in out:
+            out.append(q)
+    return out
 
 
 def parse_browse(url: str) -> dict:
@@ -80,28 +101,44 @@ def state_from_archives(urls: list[str]) -> tuple[str | None, int, list[str]]:
                 return states[0], attempts, errors
         except Exception as e:
             errors.append(type(e).__name__)
-        time.sleep(0.12)
+        time.sleep(0.10)
     return None, attempts, errors
 
 
-def candidate_fallback(issuer: str, issuer_browse: dict, dateb: str) -> tuple[dict | None, list[dict]]:
+def resolve_issuer_variants(issuer: str, dateb: str) -> tuple[dict | None, list[dict]]:
     target = normalize_name(issuer)
-    candidates = issuer_browse.get("companyCandidates", [])
-    exact = [c for c in candidates if c["normalizedName"] == target]
-    pool = exact if exact else candidates
     audits = []
+    direct_by_cik: dict[str, dict] = {}
+    candidate_names: dict[str, dict] = {}
+    for query in issuer_query_variants(issuer):
+        try:
+            b = browse_issuer(query, dateb)
+            audits.append({"query": query, "archiveCount": len(b.get("archiveUrls", [])), "ciks": b.get("ciksFromArchive", []), "candidateCount": len(b.get("companyCandidates", []))})
+            if b.get("archiveUrls") and len(b.get("ciksFromArchive", [])) == 1:
+                direct_by_cik[b["ciksFromArchive"][0]] = b
+            for c in b.get("companyCandidates", []):
+                candidate_names[c["cik"]] = c
+        except Exception as e:
+            audits.append({"query": query, "error": type(e).__name__})
+        time.sleep(0.08)
+    if len(direct_by_cik) == 1:
+        cik, b = next(iter(direct_by_cik.items()))
+        return {"source": "ISSUER_VARIANT_DIRECT_SINGLE_PIT_CIK", "cik": cik, "browse": b}, audits
+    exact = [c for c in candidate_names.values() if c["normalizedName"] == target]
+    pool = exact if exact else list(candidate_names.values())
     viable = []
-    for c in pool[:8]:
+    for c in pool[:10]:
         try:
             b = browse_cik(c["cik"], dateb)
-            audits.append({"cik": c["cik"], "name": c["name"], "archiveCount": len(b.get("archiveUrls", []))})
+            audits.append({"candidateCik": c["cik"], "candidateName": c["name"], "candidateArchiveCount": len(b.get("archiveUrls", []))})
             if b.get("archiveUrls"):
                 viable.append((c, b))
         except Exception as e:
-            audits.append({"cik": c["cik"], "name": c["name"], "error": type(e).__name__})
-        time.sleep(0.12)
+            audits.append({"candidateCik": c["cik"], "candidateName": c["name"], "error": type(e).__name__})
+        time.sleep(0.08)
     if len(viable) == 1:
-        return {"candidate": viable[0][0], "browse": viable[0][1]}, audits
+        c, b = viable[0]
+        return {"source": "ISSUER_VARIANT_CANDIDATE_SINGLE_PIT_CIK", "cik": c["cik"], "browse": b, "candidate": c}, audits
     return None, audits
 
 
@@ -112,17 +149,12 @@ def resolve_security(row: dict) -> dict:
         b = browse_ticker(ticker, dateb)
         source = "TICKER"
         if not b.get("archiveUrls"):
-            ib = browse_issuer(issuer, dateb)
-            out["issuerCandidateCount"] = len(ib.get("companyCandidates", []))
-            if ib.get("archiveUrls") and len(ib.get("ciksFromArchive", [])) == 1:
-                source = "ISSUER_DIRECT_SINGLE_CIK"
-                b = ib
-            elif ib.get("companyCandidates"):
-                resolved, audits = candidate_fallback(issuer, ib, dateb)
-                out["candidateAudits"] = audits
-                if resolved:
-                    source = "ISSUER_CANDIDATE_SINGLE_PIT_CIK"
-                    b = resolved["browse"]
+            resolved, audits = resolve_issuer_variants(issuer, dateb)
+            out["issuerAudits"] = audits
+            if resolved:
+                source = resolved["source"]
+                b = resolved["browse"]
+                if resolved.get("candidate"):
                     out["candidate"] = resolved["candidate"]
         out["archiveCount"] = len(b.get("archiveUrls", []))
         out["ciks"] = b.get("ciksFromArchive", [])
@@ -167,21 +199,22 @@ def main() -> None:
         resolved = resolve_security(row)
         results.append(resolved)
         print(f"{i}/{len(sample)}", json.dumps(resolved), flush=True)
-        time.sleep(0.2)
+        time.sleep(0.15)
 
     counts = {k: sum(1 for r in results if r["classification"] == k) for k in ["US", "NON_US", "UNKNOWN"]}
+    sources = ["TICKER","ISSUER_VARIANT_DIRECT_SINGLE_PIT_CIK","ISSUER_VARIANT_CANDIDATE_SINGLE_PIT_CIK"]
     summary = {
         "year": 2006,
         "purpose": "Deterministic structural coverage test of the candidate legacy US attribution hierarchy on actual EC-filtered uniquely N-PX-mapped securities. No returns, universe ranks, or strategy outcomes used.",
         "populationRule": "Deduplicate MATCHED_UNIQUE identities by ticker+securityId; use earliest N-Q report date per identity so no later filing state is required.",
-        "sampleRule": f"{SAMPLE_N} equal-quantile positions after deterministic ticker,securityId,issuer sort.",
-        "hierarchy": "SEC ticker query by earliest report date; if absent, exact issuer query with one historical CIK; otherwise candidate CIKs accepted only when exactly one has filings by that report date. State/country must be found on a historical filing page; otherwise UNKNOWN.",
+        "sampleRule": f"{SAMPLE_N} equal-quantile positions after deterministic ticker,securityId,issuer sort. Same frozen positions as prior run.",
+        "hierarchy": "SEC ticker query by earliest report date; if absent, deterministic structural issuer query variants (footnote/punctuation/legal-suffix cleanup) are tried. A direct issuer result is accepted only if it resolves to one historical CIK; candidate-table results are accepted only when exactly one candidate has filings by that report date. State/country must be found on a historical filing page; otherwise UNKNOWN.",
         "uniqueIdentityPopulation": len(population),
         "sampleCount": len(results),
         "classificationCounts": counts,
         "resolvedRate": (counts["US"] + counts["NON_US"]) / len(results),
         "usRateAmongResolved": counts["US"] / max(1, counts["US"] + counts["NON_US"]),
-        "resolutionSources": {s: sum(1 for r in results if r.get("resolutionSource") == s) for s in ["TICKER","ISSUER_DIRECT_SINGLE_CIK","ISSUER_CANDIDATE_SINGLE_PIT_CIK"]},
+        "resolutionSources": {s: sum(1 for r in results if r.get("resolutionSource") == s) for s in sources},
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
