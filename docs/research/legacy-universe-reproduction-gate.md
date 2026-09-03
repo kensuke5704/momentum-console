@@ -46,6 +46,12 @@ The primary historical constituent mapping keeps the existing deterministic exac
 
 Long-prefix reconciliation, edit-distance/fuzzy similarity, and diagnostic candidate matching are not primary identity evidence. A unique long-prefix result may be reported only as a sensitivity diagnostic. This rule is frozen before any 2006 aggregate Universe result is evaluated and does not change the Gate A or Gate B pass thresholds.
 
+### PIT issuer-country evidence rule frozen before historical aggregate evaluation
+
+Primary country classification is evidence-based and conservative. An alphabetic-first CINS security ID or an explicit ADR/GDR designation is sufficient NON_US evidence. Otherwise, US/NON_US classification requires a deterministically resolved issuer CIK and a historical SEC filing available by the legacy report date whose filing-time state/country metadata supplies the classification. Current SEC ticker metadata may be used only to seed a CIK; current state/country metadata is never classification evidence. A legacy country/exposure heading, numeric CUSIP, U.S. listing, or absence of ADR/GDR is never sufficient US evidence. If evidence is unavailable, the holding remains `UNKNOWN` and is excluded rather than imputed as US.
+
+SEC archive transport is nondeterministic, so country evidence is accumulated **monotonically**: once a specific issuer identity has been classified from valid PIT historical evidence, a later transport failure or `UNKNOWN` result cannot overwrite it. Re-running only unresolved identities is permitted because it changes data availability, not the classification rule. Conflicting positive historical evidence must be surfaced for audit rather than resolved by preference. This transport/evidence-cache rule is frozen before any 2006 aggregate Universe result is evaluated and does not change Gate thresholds.
+
 The final confirmation must include a direct or temporally adjacent Production comparison and must report:
 
 - reconstructed ETF-series coverage;
