@@ -20,6 +20,11 @@ def norm(raw: str) -> str:
     s = re.sub(r"\b(CORPORATION|CORPORA?TION)\b", "CORP", s)
     s = re.sub(r"\bCOMPANY\b", "CO", s)
     s = re.sub(r"\bLIMITED\b", "LTD", s)
+    # Collision-tested structural abbreviations only. On the frozen 2006 merged
+    # master these transformations do not create any additional issuer-identity
+    # ambiguity; broader/fuzzy abbreviation expansion remains prohibited.
+    s = re.sub(r"\bHLDGS\b", "HOLDINGS", s)
+    s = re.sub(r"\bPHARMACEUTICALS\b", "PHARMACEUTICAL", s)
     return " ".join(re.sub(r"[^A-Z0-9]+", " ", s).split())
 
 
@@ -75,7 +80,7 @@ def main() -> None:
             if ticker or security_id:
                 rejected_master_identities += 1
             continue
-        for key in edge_the_variants(row["normalizedIssuer"]):
+        for key in edge_the_variants(norm(row["normalizedIssuer"])):
             by_issuer[key].add((ticker, security_id))
     names = sorted(by_issuer)
 
@@ -118,7 +123,7 @@ def main() -> None:
     out = {
         "year": 2006,
         "purpose": "Structural validation of N-Q holdings issuer descriptions against deterministic N-PX issuer/ticker/security-id master. No return/performance data used.",
-        "mappingRule": "Unique exact match after conservative issuer normalization, trailing N-Q footnote-marker removal, and leading/trailing THE normalization. Fuzzy candidates are diagnostic only and never accepted automatically.",
+        "mappingRule": "Unique exact match after conservative issuer normalization, trailing N-Q footnote-marker removal, leading/trailing THE normalization, and collision-tested HLDGS/HOLDINGS plus PHARMACEUTICALS/PHARMACEUTICAL normalization. Fuzzy candidates are diagnostic only and never accepted automatically.",
         "identityQualityRule": "Reject obvious placeholder/invalid N-PX ticker tokens before issuer matching; security ID must be 8-14 alphanumeric characters.",
         "npxSampleRule": npx.get("sampleRule"),
         "npxPairedRecords": npx.get("pairedRecords"),
