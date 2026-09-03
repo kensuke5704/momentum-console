@@ -22,5 +22,7 @@ jobs:
         if: always()
         with:
           name: nport-direct-spdr-diagnostic-2020
-          path: data/research/nport-direct-spdr-diagnostic-2020.json
+          path: |
+            data/research/nport-direct-spdr-diagnostic-2020.json
+            data/research/nport-direct-spdr-xlK-20200331-jina.txt
           if-no-files-found: warn
