@@ -18,6 +18,7 @@ def classify(row):
 
 def main():
     cache=json.loads(CACHE.read_text())
+    # Sorted-modulo sharding is deterministic and independent of holdings weight or Universe rank.
     pop=sorted((r for r in cache.get('rows',[]) if r.get('classification')=='UNKNOWN'),key=lambda r:(r.get('ticker') or '',r.get('securityId') or ''))
     shard=[r for i,r in enumerate(pop) if i%COUNT==IDX]
     results=[]
