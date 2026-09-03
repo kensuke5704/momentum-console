@@ -4,6 +4,7 @@ on:
   push:
     branches: ["research/cagr40-new-alpha-20260901", "research/nq-npx-mapping-2006-20260903"]
     paths:
+      - "scripts/research-nq-index-extract.py"
       - "scripts/research-nq-series-metadata-2006.py"
       - "scripts/research-nq-series-segmentation-2006.py"
       - "scripts/research-nq-pit-holdings-2006.py"
@@ -19,7 +20,7 @@ permissions:
 jobs:
   npx:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Probe N-PX issuer ticker security-id mapping
@@ -37,7 +38,7 @@ jobs:
 
   nq:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Extract 2006 filing index
