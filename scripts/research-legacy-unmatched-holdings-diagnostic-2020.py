@@ -12,13 +12,14 @@ OUT=ROOT/'data'/'research'/'legacy-unmatched-holdings-diagnostic-2020.json'
 fspec=importlib.util.spec_from_file_location('fast',ROOT/'scripts'/'research-legacy-universe-reproducibility-fast-2020.py')
 fast=importlib.util.module_from_spec(fspec); fspec.loader.exec_module(fast)
 repro=fast.repro
-mspec=importlib.util.spec_from_file_location('meta',ROOT/'scripts'/'research-nq-series-metadata-2006.py')
-meta=importlib.util.module_from_spec(mspec); mspec.loader.exec_module(meta)
 
 FIX={'company':'First Trust Exchange-Traded Fund VI','dateFiled':'2020-12-07','filename':'edgar/data/1552740/0001445546-20-005815.txt'}
 transport,submission=repro.ov.fetch_full_filing(repro.ov.seg.meta.sec_url(FIX['filename']))
 rm=repro.ov.REPORT_DATE.search(submission); report=repro.ov.iso8(rm.group(1) if rm else None)
-series=[s for s in meta.parse_series_contracts(submission,FIX['company']) if s.get('isEtf') and s.get('seriesId')]
+# Use the exact frozen Production-side series identity set, as the successful
+# Gate-A fixture does. This avoids depending on SGML SERIES tags surviving Jina
+# text flattening; no holdings or scores are used to choose identities.
+series=fast.shared_nport_series_contracts(submission,FIX['company'])
 mapped=fast.structural_mapped_modern_series(repro.ov.embedded_csr(submission),series)
 with gzip.open(BOOT,'rt',encoding='utf-8') as f: bp=json.load(f)
 by=defaultdict(list)
@@ -48,12 +49,12 @@ for sid,row in mapped.items():
         if sym and w>0 and sym not in legacy_matched:
             nport_only.append({'symbol':sym,'issuerName':h.get('issuerName'),'weight':w,'aliases':repro.issuer_aliases(str(h.get('issuerName') or ''))[:8]})
     unmatched.sort(key=lambda x:-x['weight']); nport_only.sort(key=lambda x:-x['weight'])
-    rows.append({'seriesId':sid,'seriesName':row.get('seriesName'),'reportDate':report,'nportReportDate':nearest.get('reportDate'),'unmatchedLegacy':unmatched[:20],'nportOnly':nport_only[:20]})
+    rows.append({'seriesId':sid,'seriesName':row.get('seriesName'),'reportDate':report,'nportReportDate':nearest.get('reportDate'),'unmatchedLegacy':unmatched[:30],'nportOnly':nport_only[:30]})
 
 out={'purpose':'Structural diagnosis of unmatched issuer identities on fixed paired 2020 series. No prices, returns, ranks, or strategy outcomes are used to change mapping rules.','transport':transport,'fixture':FIX,'reportDate':report,'series':rows}
 OUT.parent.mkdir(parents=True,exist_ok=True); OUT.write_text(json.dumps(out,indent=2)+'\n',encoding='utf-8')
 print('PAIRED_DIAGNOSTIC_SERIES',len(rows))
 for r in rows:
     print('SERIES',r['seriesId'],r['seriesName'])
-    print('NPORT_ONLY',json.dumps(r['nportOnly'][:10],sort_keys=True))
-    print('UNMATCHED_LEGACY',json.dumps(r['unmatchedLegacy'][:10],sort_keys=True))
+    print('NPORT_ONLY',json.dumps(r['nportOnly'][:15],sort_keys=True))
+    print('UNMATCHED_LEGACY',json.dumps(r['unmatchedLegacy'][:15],sort_keys=True))
