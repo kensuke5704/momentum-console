@@ -1,0 +1,42 @@
+name: Research Country Full Merge 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-full-merge-2006.py"
+      - ".github/workflows/research-country-full-merge-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download mapping and country artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/a
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/map.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/map/nq-npx-mapping-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899094232/zip > /tmp/unmapped.zip
+          unzip -q /tmp/unmapped.zip -d /tmp/unmapped || true
+          if [ -f /tmp/unmapped/country-unmapped-structural-audit-2006.json ]; then cp /tmp/unmapped/country-unmapped-structural-audit-2006.json data/research/; fi
+          for id in 9899576576 9899613855 9899615372 9899726555 9899657365 9899586966 9899685447 9899596629 9899611719 9899631303 9899573753 9899610056; do
+            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/$id.zip
+            unzip -q /tmp/$id.zip -d /tmp/a/$id
+            cp /tmp/a/$id/sec-us-attribution-full-shard-*-2006.json data/research/
+          done
+      - name: Merge full country coverage
+        run: python3 scripts/research-country-full-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-full-coverage-2006
+          path: data/research/country-full-coverage-2006.json
