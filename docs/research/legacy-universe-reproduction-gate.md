@@ -52,6 +52,8 @@ Primary country classification is evidence-based and conservative. An alphabetic
 
 SEC archive transport is nondeterministic, so country evidence is accumulated **monotonically**: once a specific issuer identity has been classified from valid PIT historical evidence, a later transport failure or `UNKNOWN` result cannot overwrite it. Re-running only unresolved identities is permitted because it changes data availability, not the classification rule. Conflicting positive historical evidence must be surfaced for audit rather than resolved by preference. This transport/evidence-cache rule is frozen before any 2006 aggregate Universe result is evaluated and does not change Gate thresholds.
 
+Because unresolved country evidence may remain, the primary historical Universe always excludes `UNKNOWN`. A separately reported **country upper-bound sensitivity** may treat only already-mapped `UNKNOWN` identities as if they were US, solely to measure the maximum ranking impact of unresolved country attribution. This upper-bound case is never the primary Universe and cannot be used to choose thresholds, parser rules, identity rules, or strategy parameters. Stability between the primary and this upper bound is diagnostic evidence that country incompleteness is not material; instability means the country bridge remains unresolved.
+
 The final confirmation must include a direct or temporally adjacent Production comparison and must report:
 
 - reconstructed ETF-series coverage;
