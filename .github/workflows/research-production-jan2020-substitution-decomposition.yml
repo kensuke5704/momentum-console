@@ -1,0 +1,32 @@
+name: Research Production Jan2020 Substitution Decomposition
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-production-jan2020-substitution-decomposition.py"
+      - ".github/workflows/research-production-jan2020-substitution-decomposition.yml"
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  decompose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen legacy extraction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/legacy
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9885827567/zip > /tmp/legacy.zip
+          unzip -q /tmp/legacy.zip -d /tmp/legacy
+          cp /tmp/legacy/production-jan2020-legacy-extract.json data/research/
+      - run: python3 scripts/research-production-jan2020-substitution-decomposition.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-jan2020-substitution-decomposition
+          path: data/research/production-jan2020-substitution-decomposition.json
+          if-no-files-found: warn
