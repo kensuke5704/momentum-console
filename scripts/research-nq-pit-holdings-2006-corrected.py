@@ -15,6 +15,7 @@ sspec.loader.exec_module(seg)
 
 REPORT_DATE = re.compile(r"(?im)^\s*CONFORMED PERIOD OF REPORT:\s*(\d{8})\s*$")
 FILING_DATE = re.compile(r"(?im)^\s*FILED AS OF DATE:\s*(\d{8})\s*$")
+NET_ASSETS = re.compile(r"NET\s+ASSETS\s*(?:--|-)?\s*100(?:\.0)?\s*%", re.I)
 
 # Frozen before this correction: these are the exact three N-Q submissions used
 # by the prior PIT pilot. Only the page-to-series assignment method changes.
@@ -38,7 +39,27 @@ def accession(filename: str) -> str:
     return stem
 
 
+def trim_series_schedule(combined: str) -> str:
+    """Stop a grouped schedule after its first explicit NET ASSETS 100% line.
+
+    The final schedule in an N-Q document can otherwise bleed into later summary
+    tables because it has no following schedule marker. The small tail preserves
+    schedule footnotes without allowing later holdings-like tables into parsing.
+    """
+    m = NET_ASSETS.search(seg.visible(combined))
+    if not m:
+        return combined
+    # visible offsets are not raw offsets, so locate the corresponding final-page
+    # NET ASSETS text conservatively in raw markup and keep a short footnote tail.
+    raw_matches = list(re.finditer(r"NET(?:\s|<[^>]+>)+ASSETS[\s\S]{0,180}?100(?:\.0)?(?:\s|<[^>]+>)*%", combined, re.I))
+    if not raw_matches:
+        return combined
+    end = raw_matches[0].end()
+    return combined[: min(len(combined), end + 1800)]
+
+
 def parsed_holdings(combined: str) -> tuple[str, list[dict], float]:
+    combined = trim_series_schedule(combined)
     method, _, _, parsed = seg.nqpilot.parse_holdings(combined)
     out = []
     seen = set()
@@ -141,6 +162,7 @@ def main() -> None:
         "purpose": "Corrected point-in-time N-Q ETF-series holdings pilot. Schedule pages are assigned by explicit filing-time series names and grouped before holdings parsing. No returns/performance data used.",
         "sourceRule": "Same three fixed N-Q submissions as the prior pilot; only structurally incorrect schedule-to-series assignment is replaced.",
         "assignmentRule": "Nearest exact registered series title around each schedule marker; continuation pages remain with that explicit series. Holdings/industry words never determine series identity.",
+        "scheduleEndRule": "Grouped series are trimmed after the first explicit NET ASSETS 100% boundary plus a short footnote tail, preventing final-series bleed into later filing tables.",
         "weightRule": "Positive parsed market values normalized to 100 within each corrected grouped series.",
         "structuralEligibilityRule": "Production-style name exclusion plus 10-120 corrected grouped holdings, positive parsed market value, and top-10 normalized weight >=25%. Country/issuer-type parity is still unresolved.",
         "sourceResults": source_results,
