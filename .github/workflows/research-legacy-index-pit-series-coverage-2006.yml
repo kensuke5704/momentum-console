@@ -1,0 +1,31 @@
+name: Research Legacy Index PIT Series Coverage 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-legacy-index-pit-series-coverage-2006.py"
+      - ".github/workflows/research-legacy-index-pit-series-coverage-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download filing-index registry and EC PIT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/idx /tmp/pit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903251544/zip > /tmp/idx.zip
+          unzip -q /tmp/idx.zip -d /tmp/idx
+          cp /tmp/idx/legacy-filing-index-series-pilot-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          cp /tmp/pit/nq-pit-holdings-2006-ec-filtered.json data/research/
+      - run: python3 scripts/research-legacy-index-pit-series-coverage-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-index-pit-series-coverage-2006
+          path: data/research/legacy-index-pit-series-coverage-2006.json
