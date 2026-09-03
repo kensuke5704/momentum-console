@@ -112,9 +112,9 @@ const targetText = (targets: PortfolioTarget[]) =>
 
 const fixedRiskLabel = (state: string) => ({
   INVESTED: "INVESTED",
-  LOCKED_MARKET: "MARKET LOCK",
-  LOCKED_STOP: "STOP LOCK",
-  LOCKED_CIRCUIT: "CIRCUIT LOCK",
+  LOCKED_MARKET: "MARKET",
+  LOCKED_STOP: "STOP",
+  LOCKED_CIRCUIT: "CIRCUIT",
   WAITING_RECOVERY: "RECOVERY",
   READY_NEXT_OPEN: "READY",
   CASH: "CASH",
