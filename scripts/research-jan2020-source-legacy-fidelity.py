@@ -68,9 +68,12 @@ def plain_line(line):return re.sub(r'[*_#]+','',line or '').strip()
 
 def heading(line):
     p=plain_line(line)
+    # Leading punctuation is common in schedule-summary footnotes, e.g.
+    # "(Cost $105,014,225...)". Strip it only for structural header detection.
+    lead=re.sub(r'^[\s\(\[\{\-–—:;.,]+','',p)
     return bool(re.search(r'[-—–]\s*\d+(?:\.\d+)?%\s*(?:\([^)]*\))?$',p) or
                 re.search(r'[-—–]\s*(?:continued|cont.?d)\s*$',p,re.I) or
-                re.match(r'^(?:total\b|cost\b|security\b|shares\b|value\b|rate\b|see notes\b|the accompanying notes\b|schedule of investments\b|portfolio of investments\b)',p,re.I))
+                re.match(r'^(?:total\b|cost\b|security\b|shares\b|value\b|rate\b|see notes\b|the accompanying notes\b|schedule of investments\b|portfolio of investments\b)',lead,re.I))
 
 def terminal_two(line):
     p=plain_line(line);ms=list(NUM_RE.finditer(p))
@@ -83,9 +86,6 @@ def terminal_two(line):
     return desc,value
 
 def shares_first(line):
-    # PPTY-style rendering: "4,091 Choice Hotels International, Inc.$326,625".
-    # The first numeric token is shares and the final numeric token is market value;
-    # issuer text is strictly between those two structural columns.
     p=plain_line(line);ms=list(NUM_RE.finditer(p))
     if len(ms)<2 or ms[0].start()!=0:return None
     q,v=ms[0],ms[-1]
@@ -108,7 +108,10 @@ def parse_mixed_line(seg):
         one=shares_first(raw) or terminal_two(raw)
         if one:
             desc,value=one
-            if not desc.lower().startswith('total '):rows.append({'raw':desc,'name':nearest.norm(desc),'value':value})
+            # Final guard against total/cost summary rows that can have valid-looking
+            # terminal numeric columns but are not securities.
+            if not re.match(r'^\s*[\(\[]?\s*(?:total|cost)\b',desc,re.I):
+                rows.append({'raw':desc,'name':nearest.norm(desc),'value':value})
             i+=1;continue
         if i+1<len(ls):
             nxt=plain_line(ls[i+1]);ms=list(NUM_RE.finditer(nxt));nonnum=NUM_RE.sub('',nxt).replace('$','').strip(' _*\t')
