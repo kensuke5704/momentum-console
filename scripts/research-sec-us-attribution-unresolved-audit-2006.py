@@ -88,3 +88,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+# rerun marker: 2026-09-03 Gate B country bridge audit
