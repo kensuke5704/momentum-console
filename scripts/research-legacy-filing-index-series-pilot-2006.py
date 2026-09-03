@@ -24,11 +24,12 @@ def clean_name(line,prefix_pat):
   if p and not re.fullmatch(r'[A-Z][A-Z0-9.\-]{0,9}',p): return p
  return ' '.join(line.split())
 def get(url):
- for u in ('https://r.jina.ai/'+url,url):
+ last=None
+ for u in (url,'https://r.jina.ai/'+url):
   try:
    req=urllib.request.Request(u,headers=UA);return urllib.request.urlopen(req,timeout=20).read().decode('utf-8','replace'),u
-  except Exception:pass
- raise RuntimeError('fetch failed')
+  except Exception as e:last=repr(e)
+ raise RuntimeError(last or 'fetch failed')
 def main():
  rows=[]
  for label,cik,acc in FILINGS:
@@ -59,6 +60,6 @@ def main():
   r={'label':label,'cik':cik,'accession':acc,'indexUrl':url,'transport':tr,'seriesClassTickerCount':len(dedup),'pairs':dedup};rows.append(r);print('FILING',json.dumps({k:v for k,v in r.items() if k!='pairs'}),flush=True)
   for p in dedup:print('PAIR',json.dumps({'label':label,**p}),flush=True)
  all_series=sorted({p['seriesId'] for r in rows for p in r['pairs']});all_tickers=sorted({p['ticker'] for r in rows for p in r['pairs']})
- out={'purpose':'Production-independent metadata pilot: extract historical registered series/class/ticker from SEC filing index pages for the three frozen 2006 N-Q source submissions. Parser follows rendered SEC index grammar; no holdings content, ranks, or returns used.','filingCount':len(rows),'totalUniqueSeries':len(all_series),'totalUniqueTickers':len(all_tickers),'seriesIds':all_series,'tickers':all_tickers,'filings':rows}
+ out={'purpose':'Production-independent metadata pilot: extract historical registered series/class/ticker from SEC filing index pages for the three frozen 2006 N-Q source submissions. Native SEC filing index is preferred; r.jina is transport fallback only. No holdings content, ranks, or returns used.','filingCount':len(rows),'totalUniqueSeries':len(all_series),'totalUniqueTickers':len(all_tickers),'seriesIds':all_series,'tickers':all_tickers,'filings':rows}
  OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k!='filings'}),flush=True)
 if __name__=='__main__':main()
