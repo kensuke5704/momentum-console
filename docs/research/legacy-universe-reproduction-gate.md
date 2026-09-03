@@ -40,6 +40,12 @@ For the primary transition fidelity sample, the report-date gap should be at mos
 
 This adjacency/source rule does not change the final Gate B practical thresholds below.
 
+### Legacy constituent identity rule frozen before historical aggregate evaluation
+
+The primary historical constituent mapping keeps the existing deterministic exact normalized-issuer and unique ADR-base rules. In addition, a legacy holding may be mapped after removing only trailing presentation annotations (N-Q footnote markers, terminal `Class/Cl X [Shares]` labels, and SEC-style terminal jurisdiction suffixes such as `/DE`) **only when the resulting normalized issuer maps to exactly one valid ticker/security-ID identity in the frozen N-PX master and an issuer-stem collision audit confirms a single identity**.
+
+Long-prefix reconciliation, edit-distance/fuzzy similarity, and diagnostic candidate matching are not primary identity evidence. A unique long-prefix result may be reported only as a sensitivity diagnostic. This rule is frozen before any 2006 aggregate Universe result is evaluated and does not change the Gate A or Gate B pass thresholds.
+
 The final confirmation must include a direct or temporally adjacent Production comparison and must report:
 
 - reconstructed ETF-series coverage;
