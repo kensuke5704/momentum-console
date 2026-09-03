@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 PIT=ROOT/'data/research/nq-pit-holdings-2006-ec-filtered.json'
 MAP=ROOT/'data/research/nq-npx-structural-mapping-2006.json'
-COUNTRY=ROOT/'data/research/country-full-coverage-unknown-retry-2006.json'
+COUNTRY=ROOT/'data/research/country-full-coverage-raw-header-2006.json'
 NEWC=ROOT/'data/research/structural-new-matches-country-2006.json'
 OUT=ROOT/'data/research/country-uncertainty-universe-bounds-2006.json'
 EXCL1=('2X','3X','ULTRA','BULL','BEAR','INVERSE','SHORT','COVERED CALL','OPTION INCOME','PREMIUM INCOME','BUFFER','DEFINED OUTCOME','BOND','FIXED INCOME','TREASURY','MUNICIPAL','INCOME','DIVIDEND','ALLOCATION')
@@ -26,7 +26,6 @@ def eligible(name, hs):
  ws=sorted((h['weight'] for h in hs if h['weight']>0),reverse=True)
  return 10<=len(ws)<=120 and sum(ws)>=50 and sum(ws[:10])>=25
 def build(mode, records, details, cls):
- # Latest available 2006 research snapshot: use latest filing/report date in the fixed 20-series PIT set as common as-of.
  asof=max((r.get('filingDate') or r.get('reportDate') for r in records))
  byseries=defaultdict(list)
  for d in details:
@@ -64,6 +63,6 @@ def main():
  strict=build('STRICT',pit['records'],mp['details'],cls);upper=build('UPPER',pit['records'],mp['details'],cls)
  a=[x['symbol'] for x in strict['ranking']];b=[x['symbol'] for x in upper['ranking']];k=min(len(a),len(b),80);common=set(a[:k])&set(b[:k])
  top2=set(a[:2]);top2ret=len(top2&set(b[:2]))/len(top2) if top2 else None
- out={'purpose':'Country-uncertainty bound diagnostic only. STRICT excludes UNKNOWN; UPPER includes UNKNOWN as a sensitivity upper bound. NON_US is excluded in both. UPPER is never an operational US inference. Same structural mapping and Production breadth-score/eligibility mechanics are used; no return data.','strict':strict,'upper':upper,'comparison':{'K':k,'topKOverlapCount':len(common),'topKOverlapRate':len(common)/k if k else None,'commonNameSpearman':rho(a[:k],b[:k]),'strictTop2RetainedInUpperTop2':top2ret,'strictTop10Overlap':len(set(a[:10])&set(b[:10]))/min(10,len(a),len(b)) if min(len(a),len(b)) else None}}
+ out={'purpose':'Country-uncertainty bound diagnostic using latest raw-historical-header country evidence. STRICT excludes UNKNOWN; UPPER includes UNKNOWN only as a sensitivity upper bound. NON_US is excluded in both. UPPER is never an operational US inference. Same structural mapping and Production breadth-score/eligibility mechanics are used; no return data.','strict':strict,'upper':upper,'comparison':{'K':k,'topKOverlapCount':len(common),'topKOverlapRate':len(common)/k if k else None,'commonNameSpearman':rho(a[:k],b[:k]),'strictTop2RetainedInUpperTop2':top2ret,'strictTop10Overlap':len(set(a[:10])&set(b[:10]))/min(10,len(a),len(b)) if min(len(a),len(b)) else None}}
  OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({'strictEligibleSeries':strict['eligibleSeriesCount'],'upperEligibleSeries':upper['eligibleSeriesCount'],**out['comparison']}),flush=True);print('STRICT_TOP20',json.dumps(a[:20]),flush=True);print('UPPER_TOP20',json.dumps(b[:20]),flush=True)
 if __name__=='__main__':main()
