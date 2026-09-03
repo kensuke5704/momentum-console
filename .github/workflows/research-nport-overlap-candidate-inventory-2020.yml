@@ -14,3 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/research-nport-overlap-candidate-inventory-2020.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nport-overlap-candidate-inventory-2020
+          path: data/research/nport-overlap-candidate-inventory-2020.json
