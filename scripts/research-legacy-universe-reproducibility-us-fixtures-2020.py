@@ -35,7 +35,8 @@ def filing_preferred_series_contracts(submission: str, company: str):
 
 # Predeclared structural fixtures. Selection is based only on SEC registrant/report
 # identity and broad US-equity ETF-family relevance. No price, return, strategy rank,
-# parser-success feedback, or backtest result is used.
+# parser-success feedback, or backtest result is used. Exact accession IDs are printed
+# so the seriesId intersection can be audited independently of Gate A output.
 fast.FIXTURE_FILINGS = (
     {
         'cik': '1329377',
@@ -84,6 +85,7 @@ fast.FIXTURE_FILINGS = (
     },
 )
 
+print('FIXTURE_ACCESSIONS', [x['accession'] for x in fast.FIXTURE_FILINGS], flush=True)
 fast.repro.ov.seg.meta.parse_series_contracts = filing_preferred_series_contracts
 fast.repro.OUT = ROOT / 'data' / 'research' / 'legacy-universe-reproducibility-us-fixtures-2020.json'
 fast.repro.main()
