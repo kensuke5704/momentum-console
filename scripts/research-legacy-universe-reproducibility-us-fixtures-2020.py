@@ -41,8 +41,7 @@ def filing_preferred_series_contracts(submission: str, company: str):
 
 
 # Predeclared structural fixtures. Selection is based only on SEC registrant/report
-# identity and the frozen N-PORT inventory showing non-empty Production-filtered
-# US/CORP/EC holdings at the same report dates. No price, return, strategy rank,
+# identity and broad US-equity ETF-family relevance. No price, return, strategy rank,
 # parser-success feedback, or backtest result is used.
 fast.FIXTURE_FILINGS = (
     {
@@ -64,13 +63,22 @@ fast.FIXTURE_FILINGS = (
         'fixtureBasis': 'SEC N-CSRS for report period 2020-03-31; eleven US sector-equity SPDR funds',
     },
     {
+        'cik': '1524513',
+        'company': 'ISHARES U.S. ETF TRUST',
+        'form': 'N-CSRS',
+        'dateFiled': '2020-07-02',
+        'filename': 'edgar/data/1524513/0001193125-20-186178.txt',
+        'accession': '0001193125-20-186178',
+        'fixtureBasis': 'SEC N-CSRS for report period 2020-04-30; explicit U.S. ETF registrant selected independently of parser output',
+    },
+    {
         'cik': '1552740',
         'company': 'First Trust Exchange-Traded Fund VI',
         'form': 'N-CSRS',
         'dateFiled': '2020-12-07',
         'filename': 'edgar/data/1552740/0001445546-20-005815.txt',
         'accession': '0001445546-20-005815',
-        'fixtureBasis': 'SEC shareholder report for 2020-09-30; four explicit US Equity Select/Dividend ETF series',
+        'fixtureBasis': 'SEC shareholder report for 2020-09-30; explicit US Equity Select/Dividend ETF series',
     },
 )
 
