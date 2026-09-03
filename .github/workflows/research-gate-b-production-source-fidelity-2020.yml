@@ -1,0 +1,37 @@
+name: Research Gate B Production Source Fidelity 2020
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-gate-b-production-source-fidelity-2020.py"
+      - ".github/workflows/research-gate-b-production-source-fidelity-2020.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  fidelity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download latest Production-source legacy discovery artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/disc
+          id=$(gh api '/repos/kensuke5704/momentum-console/actions/artifacts?name=gate-b-production-source-legacy-discovery-2020&per_page=10' --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | reverse | .[0].id')
+          test -n "$id" && test "$id" != "null"
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/disc.zip
+          unzip -q /tmp/disc.zip -d /tmp/disc
+          cp /tmp/disc/gate-b-production-source-legacy-discovery-2020.json data/research/
+      - run: python3 scripts/research-gate-b-production-source-fidelity-2020.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gate-b-production-source-fidelity-2020
+          path: data/research/gate-b-production-source-fidelity-2020.json
+          if-no-files-found: warn
