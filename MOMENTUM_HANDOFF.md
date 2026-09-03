@@ -13,96 +13,106 @@ Latest same-branch delta:
 
 The detailed handoff is canonical. Read it first, then the delta.
 
-## Objective
+## Objective and hard stop
 
 Reconstruct a point-in-time historical ETF-holdings universe for 2006 onward that is economically as close as possible to frozen Production N-PORT, without changing Production strategy `momentum-stage21-sbi-2026-09-v1`.
 
-Do **not** run a broad 2006–2018 Stage21 performance test yet.
+Do **not** implement the historical/legacy Universe builder until reproducibility is confirmed. Do **not** run broad 2006–2018 Stage21 performance yet.
 
-## Critical correction
+## Current Gate state — 2026-09-04
 
-The old nine-series N-Q PIT sample is invalidated. `SCHEDULE OF INVESTMENTS (CONTINUED)` pages had been treated as independent portfolios and could be assigned to the wrong ETF by holdings-word similarity.
+### Gate A — PASS
 
-Corrected segmentation now uses only exact filing-time series titles, groups continuation pages, and trims the final series at `NET ASSETS ... 100%`.
+Production mechanics reproduce strongly over the first 12 Production Universe months:
+- median Top-K overlap 93.75%
+- minimum 92.5%
+- median Spearman 0.9996
+- Production Top2 retention 100%.
 
-Corrected PIT:
-- run `33714482859`
-- artifact `9878011119`
-- 20 retained series
-- median holdings 41.
+### Gate B transition evidence — strong but not sufficient for implementation
 
-The old 43.53% / 60.67% mapping number is mapping-engine history only.
+For the actual three source series behind 2020-01 Production, nearest pre-Production complete holdings reports are within 90–183 days and retain later N-PORT holdings at:
+- ClearBridge/LRGE: 92.9% count / 95.9% weight
+- Goldman GFIN: 94.2% / 97.4%
+- PPTY: 93.9% / 98.0%.
 
-## Accepted legacy EC bridge
+The three-series 2020-01 aggregate legacy shadow reproduces:
+- 8/9 Production names = 88.9%
+- Spearman 0.842
+- Production Top2 2/2 retained.
 
-Per-holding EC diagnostic:
-- run `33714785802`
-- artifact `9878123068`
-- 964 holdings
-- explicit asset-section attribution: **99.79% by count / 99.97% by weight**
-- explicit `COMMON_EQUITY`: **936 holdings / 99.63% of weight**.
+This direct-month result is strong, but the run starts from the known Production source series, so independent historical source discovery is still required before implementation.
 
-Accepted rule: a legacy holding is `EC` only when it inherits an explicit `COMMON STOCK(S/SHARES)` section. SHORT_TERM, DEBT, PREFERRED and UNKNOWN do not pass. Unknown is never coerced.
+### CORP bridge
 
-EC-filtered PIT:
-- run `33715016882`
-- artifact `9878189715`
-- all 20 corrected series still pass structural eligibility
-- original portfolio-relative weights are preserved; no post-EC renormalization.
+Valid raw N-PORT transition checks show that among `EC+US` holdings:
+- LRGE 42/42 CORP
+- GFIN 69/69 CORP
+- PPTY 115/115 CORP
+- combined **226/226 = 100% CORP**.
 
-## Active security-mapping baseline
+Thus CORP is empirically redundant after EC+US in this transition cohort and is no longer the principal blocker.
 
-Frozen merged N-PX master: artifact `9876020712`.
+### 2006 EC / identity mapping
 
-EC-filtered mapping:
-- run `33715050446`
-- artifact `9878201336`
-- 20 series
-- 935 mapping-eligible EC holdings
-- 654 unique matches
-- count coverage **69.95%**
-- weight coverage **78.98%**
-- ambiguous 14
-- unmapped 267
-- fuzzy mapping remains diagnostic only.
+Accepted legacy EC rule remains explicit `COMMON_EQUITY` only:
+- 936 EC holdings across 20 corrected PIT series
+- 99.63% of portfolio weight.
 
-This supersedes the pre-EC 69.28% / 78.92% mapping result as the active baseline.
+Baseline EC-filtered N-PX mapping:
+- 654 mapped holdings
+- 69.95% count / 78.98% weight.
 
-## US / CORP gates
+Deterministic structural mapping sensitivity, using only share-class/jurisdiction suffix cleanup and unique long-prefix identity reconciliation, improves this to:
+- 691 mapped holdings
+- **73.90% count / 82.49% weight**
+- no fuzzy/edit-distance auto-match.
 
-`INVESTMENT_COUNTRY=US` remains unresolved. SEC Form N-PORT defines the primary country field as the country where the issuer is organized. Therefore US listing venue, numeric CUSIP, or absence of ADR/GDR is not enough. Explicit country sections are usable where present; otherwise unknown remains unknown until a scalable issuer-country source is established.
+### 2006 PIT country bridge — still insufficient
 
-`ISSUER_TYPE=CORP` remains unresolved. A bootstrap-based redundancy test is rejected because Production bootstrap data has already been filtered on `EC+US+CORP` and no longer retains the raw issuer-type field.
+Conservative hierarchy:
+- alphabetic CINS prefix => NON_US
+- explicit ADR/GDR => NON_US
+- historical SEC filing-time state/country from a deterministically resolved CIK => US/NON_US
+- current SEC ticker data may seed a CIK only; current state is never evidence
+- UNKNOWN stays UNKNOWN.
 
-## 64-CIK master transport
+Full 12-shard attribution plus UNKNOWN-only historical 10-K retry resolved 53 additional identities.
 
-Frozen design remains:
-- one deterministic primary N-PX representative per unique CIK
-- sort by CIK
-- 64 equal-quantile CIK positions
-- no target-name, universe, momentum, or return selection.
+Baseline-mapping country coverage after retry:
+- mapped holdings: 59.17% count / 62.68% weight resolved
+- all 936 EC holdings: **42.95% count / 50.97% weight resolved**.
 
-GitHub-hosted runner transport currently gets SEC `master.idx` 403, `master.zip` 403, tested proxy 422. Continue this path in parallel but do not block US/CORP work on it.
+Country classification on newly recovered structural mapping identities adds resolved weight 27.53, raising all-EC resolved weight only to approximately **52.35%**.
+
+A further current-ticker-CIK + historical-name-validation pilot on the 50 highest-weight remaining UNKNOWN identities resolved **0/50** and is rejected as an effective next route.
+
+Country coverage is therefore still the main implementation blocker.
+
+### Historical source-series discovery — transport blocker isolated
+
+SEC native historical filing-index pages do expose `Series and Classes/Contracts Information`, including historical Series IDs, Class IDs and tickers. Example: accession `0000950135-06-001225` visibly contains Select Sector series/tickers.
+
+However GitHub-hosted runners cannot retrieve the native index page and fall back to r.jina; the r.jina rendering omits the Series/Class table. Complete-submission SGML also does not provide an equivalent reliable replacement.
+
+Therefore source discovery is currently blocked by **transport/acquisition**, not by absence of historical SEC series metadata.
 
 ## Current gate
 
-Proceed in this order:
-1. use EC-filtered PIT artifact `9878189715` as active 2006 holdings input;
-2. use EC-filtered mapping artifact `9878201336` as active security-mapping baseline;
-3. construct a scalable issuer-organization-country (`US`) bridge, keeping unresolved holdings UNKNOWN;
-4. investigate `CORP` independently;
-5. continue deterministic 64-CIK source-index/master work in parallel;
-6. only then build legacy ETF-count / aggregate-weight / max-weight / recency-weight scoring inputs;
-7. validate Top80 overlap, rank correlation, and Production Top2 retention in an overlap period;
-8. freeze the bridge before opening older returns;
-9. expose older history only in small staged windows, not 2006–2018 at once.
+Universe reconstruction is **not yet confirmed**. Continue in this order:
+1. improve conservative 2006 issuer-country resolved-weight coverage materially above ~52.35% without coercing UNKNOWN;
+2. establish a scalable, Production-independent acquisition route for historical SEC Series/Class/Ticker metadata;
+3. build a full aggregate legacy Universe from independently discovered sources;
+4. re-run Gate B overlap/rank/Top2 metrics;
+5. only if Gate B passes, explicitly declare `Universe reconstruction is confirmed` and implement the historical builder;
+6. keep broad 2006–2018 Stage21 performance unopened until bridge rules are frozen.
 
 ## New-session protocol
 
 When only the repository URL is provided:
 1. read this file;
-2. read the canonical research handoff on the branch above;
+2. read `docs/research/momentum-handoff-current.md` on `research/nq-npx-mapping-2006-20260903`;
 3. read the same-branch delta;
-4. do not revive the old nine-series sample;
-5. preserve frozen artifact inputs for apples-to-apples structural comparisons;
+4. do not revive the old nine-series sample or old country-heading assumptions;
+5. preserve frozen artifacts for apples-to-apples structural comparisons;
 6. do not change Production parameters or tune reconstruction rules against older strategy returns.
