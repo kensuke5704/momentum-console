@@ -1,5 +1,7 @@
 # Momentum Console — Stage21 Production
 
+> **New chat / research continuation:** read [`MOMENTUM_HANDOFF.md`](MOMENTUM_HANDOFF.md) first. This is the stable entry point to the current canonical research handoff.
+
 このNext.jsアプリは、SBI証券で実行可能なProduction portfolio **`momentum-stage21-sbi-2026-09-v1`** のsignal・target allocation・backtest・True Forward OOSを一元管理します。
 
 > Documentation entry point: [`docs/README.md`](docs/README.md)  
