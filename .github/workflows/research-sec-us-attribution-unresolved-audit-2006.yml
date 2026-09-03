@@ -1,0 +1,36 @@
+name: Research SEC US Attribution Unresolved Audit 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-us-attribution-unresolved-audit-2006.py"
+      - ".github/workflows/research-sec-us-attribution-unresolved-audit-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed-sample attribution artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/sample
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9884212384/zip > /tmp/sample.zip
+          unzip -q /tmp/sample.zip -d /tmp/sample
+          cp /tmp/sample/sec-us-attribution-current-ticker-sample-2006.json data/research/
+      - name: Audit unresolved historical issuer-country cases
+        run: python3 scripts/research-sec-us-attribution-unresolved-audit-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-us-attribution-unresolved-audit-2006
+          path: data/research/sec-us-attribution-unresolved-audit-2006.json
+          if-no-files-found: warn
