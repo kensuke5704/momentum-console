@@ -1,0 +1,37 @@
+name: Research NQ Per-Holding EC 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-per-holding-ec-2006.py"
+      - "scripts/research-nq-series-segmentation-2006.py"
+      - ".github/workflows/research-nq-per-holding-ec-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download corrected PIT holdings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/pit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878011119/zip > /tmp/pit.zip
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          cp /tmp/pit/nq-pit-holdings-2006-corrected.json data/research/
+      - name: Attribute per-holding EC section
+        run: python3 scripts/research-nq-per-holding-ec-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-per-holding-ec-2006
+          path: data/research/nq-per-holding-ec-2006.json
+          if-no-files-found: warn
