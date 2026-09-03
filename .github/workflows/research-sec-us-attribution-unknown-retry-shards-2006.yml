@@ -1,0 +1,48 @@
+name: Research SEC US Attribution UNKNOWN Retry Shards 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-us-attribution-unknown-retry-shard-2006.py"
+      - ".github/workflows/research-sec-us-attribution-unknown-retry-shards-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  retry:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SHARD_INDEX: ${{ matrix.shard }}
+      SHARD_COUNT: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download prior shard artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/src
+          case "$SHARD_INDEX" in
+            0) id=9899576576;; 1) id=9899613855;; 2) id=9899615372;; 3) id=9899726555;;
+            4) id=9899657365;; 5) id=9899586966;; 6) id=9899685447;; 7) id=9899596629;;
+            8) id=9899611719;; 9) id=9899631303;; 10) id=9899573753;; 11) id=9899610056;;
+          esac
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/src.zip
+          unzip -q /tmp/src.zip -d /tmp/src
+          cp /tmp/src/sec-us-attribution-full-shard-*-2006.json data/research/
+      - name: Retry UNKNOWN historical country attribution
+        run: python3 scripts/research-sec-us-attribution-unknown-retry-shard-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-us-attribution-unknown-retry-${{ matrix.shard }}-2006
+          path: data/research/sec-us-attribution-unknown-retry-*-2006.json
+          if-no-files-found: warn
