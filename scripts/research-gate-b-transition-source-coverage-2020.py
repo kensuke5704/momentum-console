@@ -40,7 +40,7 @@ def main():
  rows=[]
  for src in prod_sources:
   sid=src.get('seriesId');f=first_by_sid.get(sid,{})
-  rows.append({'seriesId':sid,'seriesName':src.get('seriesName') or f.get('seriesName'),'filingDate':src.get('filingDate'),'earliestNportReportDate':f.get('reportDate'),'legacyExactSeriesAvailable':sid in LEGACY_SERIES,'nportHoldings':len(f.get('holdings',[]))})
+  rows.append({'seriesId':sid,'seriesName':src.get('seriesName') or f.get('seriesName'),'accession':src.get('accession') or f.get('accession'),'filingDate':src.get('filingDate'),'earliestNportReportDate':f.get('reportDate'),'legacyExactSeriesAvailable':sid in LEGACY_SERIES,'nportHoldings':len(f.get('holdings',[]))})
  out={'purpose':'Determine whether the already frozen metadata-only legacy transition cohort covers the actual 2020-01 Production source filings before attempting aggregate Gate B reconstruction. No holdings overlap or returns used for source selection.', 'signalMonth':'2020-01','productionUniverseSize':len(m.get('symbols',[])),'productionSourceFilings':len(prod_sources),'productionUniqueSeries':len(set(prod_sids)),'legacyCoveredSourceFilings':len(covered),'legacyCoverageRate':len(covered)/len(prod_sources) if prod_sources else None,'coveredSeriesIds':[x.get('seriesId') for x in covered],'missingSeries':missing,'rows':rows}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
  print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('missingSeries','rows')}),flush=True)
