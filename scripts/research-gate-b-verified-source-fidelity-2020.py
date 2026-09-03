@@ -12,11 +12,16 @@ UA={'User-Agent':'momentum-console research kensuke5704@users.noreply.github.com
 FOOT=re.compile(r'\s*\([^)]{1,12}\)\s*$');NUM=re.compile(r'^\$?\(?[\d,]+(?:\.\d+)?\)?(?:\s*\*)?$')
 STOP=re.compile(r'\b(SHORT[- ]TERM INVESTMENTS?|MONEY MARKET|REPURCHASE|TOTAL INVESTMENTS|NET ASSETS|STATEMENT OF ASSETS)\b',re.I)
 MARKUP=re.compile(r'[*_]+');MONTHS={'JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'}
+COUNTRIES={'AUSTRALIA','BRAZIL','CANADA','CHINA','FRANCE','GERMANY','HONG KONG','ISRAEL','JAPAN','LUXEMBOURG','NETHERLANDS','RUSSIA','SINGAPORE','SOUTH KOREA','SPAIN','SWITZERLAND','UNITED KINGDOM','UNITED STATES'}
 
 def clean(s):return re.sub(r'\s+',' ',s or '').strip()
 def plain(s):return clean(MARKUP.sub('',s or '').replace('\xa0',' '))
 def norm(s):
- s=FOOT.sub('',s or '').upper().replace('&',' AND ');s=re.sub(r'/[A-Z]{2}\b',' ',s);s=re.sub(r'\b(?:CLASS\s+[A-Z]|NON[- ]?VOTING|VOTING)\s+SHARES?\b',' ',s);s=re.sub(r'\bSHARES?\b',' ',s);s=re.sub(r'\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC)\b',' ',s);s=re.sub(r'[^A-Z0-9]+',' ',s);s=' '.join(s.split())
+ s=FOOT.sub('',s or '').upper().replace('&',' AND ')
+ # Explicit trailing filing country annotation is metadata, not issuer identity.
+ m=re.search(r'\s*\(([^()]*)\)\s*$',s)
+ if m and m.group(1).strip() in COUNTRIES:s=s[:m.start()]
+ s=re.sub(r'/[A-Z]{2}\b',' ',s);s=re.sub(r'\b(?:CLASS\s+[A-Z]|NON[- ]?VOTING|VOTING)\s+SHARES?\b',' ',s);s=re.sub(r'\bCLASS\s+[A-Z]\b',' ',s);s=re.sub(r'\bSHARES?\b',' ',s);s=re.sub(r'\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|LLC|LP)\b',' ',s);s=re.sub(r'[^A-Z0-9]+',' ',s);s=' '.join(s.split())
  parts=s.split();out=[];i=0
  while i<len(parts):
   if len(parts[i])==1 and i+1<len(parts) and len(parts[i+1])==1:
@@ -31,17 +36,27 @@ def get(url):
  for u in ('https://r.jina.ai/'+url,url):
   try:
    req=urllib.request.Request(u,headers=UA)
-   with urllib.request.urlopen(req,timeout=35) as r:return r.read(8_000_000).decode('utf-8','replace'),u
+   with urllib.request.urlopen(req,timeout=45) as r:return r.read(12_000_000).decode('utf-8','replace'),u
   except Exception as e:last=repr(e)
  raise RuntimeError(last or 'fetch failed')
 
 def schedule_segment(text,series):
  lines=text.splitlines()
+ # Exact title + actual schedule marker. Table-of-contents mentions are rejected unless the target title and holdings header are nearby.
+ title_positions=[i for i,x in enumerate(lines) if series.lower() in x.lower()]
+ for t in title_positions:
+  for i in range(max(0,t-12),min(len(lines),t+20)):
+   if not re.search(r'^\s*Schedule of Investments|^\s*Portfolio of Investments',plain(lines[i]),re.I):continue
+   window='\n'.join(plain(x) for x in lines[min(t,i):min(len(lines),max(t,i)+40)])
+   if re.search(r'COMMON STOCK',window,re.I) and re.search(r'\b(?:Security|Description)\b.*\b(?:Shares|Value)\b|\bShares\b.*\b(?:Security Description|Description)\b.*\bValue\b',window,re.I):
+    # Stop at the next different fund's real schedule/title where possible; fixed upper bound is fallback.
+    end=min(len(lines),min(t,i)+5000)
+    return lines[min(t,i):end]
  for i,x in enumerate(lines):
   if not re.search(r'SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS',x,re.I):continue
   window='\n'.join(lines[i:min(len(lines),i+25)])
-  if series.lower() in window.lower() and re.search(r'COMMON STOCK|SECURITY\s+SHARES\s+VALUE|SHARES\s+SECURITY DESCRIPTION',window,re.I):return lines[i:min(len(lines),i+5000)]
- starts=[i for i,x in enumerate(lines) if series.lower() in x.lower()];st=starts[-1] if starts else 0
+  if series.lower() in window.lower() and re.search(r'COMMON STOCK',window,re.I):return lines[i:min(len(lines),i+5000)]
+ st=title_positions[-1] if title_positions else 0
  return lines[st:min(len(lines),st+5000)]
 
 def parse_compact_inline(seg):
@@ -68,6 +83,24 @@ def parse_nearby_vertical(seg):
   if re.search(r'\b\d[\d,]*\b',prev) and re.search(r'\b\d[\d,]*\b',foll):rows.append(line)
  return rows
 
+def parse_shares_description_value(seg):
+ """Goldman rendered row: leading shares, description, optional $, trailing market value on one line."""
+ rows=[];in_common=False
+ pat=re.compile(r'^\s*([\d,]+)\s+(.+?)\s+(?:\$\s*)?([\d,]+)\s*$')
+ for raw in seg:
+  line=plain(raw)
+  if re.search(r'\bCommon Stocks?\b',line,re.I):in_common=True;continue
+  if in_common and STOP.search(line):break
+  if not in_common:continue
+  if re.search(r'\bcontinued\b',line,re.I) or re.search(r'\d+(?:\.\d+)?\s*%$',line):continue
+  m=pat.match(line)
+  if not m:continue
+  desc=m.group(2).strip().rstrip('*')
+  # Remove only footnote markers; country annotations are kept for country bridge and stripped only by norm().
+  desc=re.sub(r'\*?\([a-z]\)\s*$','',desc,flags=re.I).strip()
+  if desc and re.search(r'[A-Za-z]',desc) and not re.match(r'^(TOTAL|Common Stocks|Shares|Description)',desc,re.I):rows.append(desc)
+ return rows
+
 def parse_spaced(seg):
  rows=[];in_common=False
  for raw in seg:
@@ -83,11 +116,12 @@ def parse_spaced(seg):
 
 def parse_rows(text,series):
  seg=schedule_segment(text,series);header='\n'.join(plain(x) for x in seg[:80])
- # Grammar is chosen from the rendered table header only, before any holdings-overlap result is observed.
+ # Grammar is chosen only from rendered SEC table header, before overlap is evaluated.
  if re.search(r'\bSecurity Shares Value\b',header,re.I):grammar='compact_inline';rows=parse_compact_inline(seg)
+ elif re.search(r'\bShares\b.*\bDescription\b.*\bValue\b',header,re.I):grammar='shares_description_value';rows=parse_shares_description_value(seg)
  elif re.search(r'\bShares\b',header,re.I) and re.search(r'\bSecurity Description\b',header,re.I) and re.search(r'\bValue\b',header,re.I):grammar='nearby_vertical';rows=parse_nearby_vertical(seg)
  else:
-  candidates=[('compact_inline',parse_compact_inline(seg)),('nearby_vertical',parse_nearby_vertical(seg)),('spaced',parse_spaced(seg))]
+  candidates=[('compact_inline',parse_compact_inline(seg)),('shares_description_value',parse_shares_description_value(seg)),('nearby_vertical',parse_nearby_vertical(seg)),('spaced',parse_spaced(seg))]
   grammar,rows=max(candidates,key=lambda x:len(set(x[1])))
  return grammar,list(dict.fromkeys(x for x in rows if norm(x)))
 
@@ -110,5 +144,5 @@ def main():
    r.update({'status':'PARSED' if legacy else 'PARSE_EMPTY','parserGrammar':grammar,'transport':tr,'daysBetweenReports':gap,'legacyParsedHoldings':len(legacy),'nportFilteredHoldings':len(nport),'nportRetainedCount':len(matched),'nportRetentionRate':len(matched)/len(nport) if nport else None,'nportRetainedWeightRate':mw/totalw if totalw else None,'legacySample':legacy[:20],'unmatchedNport':[{'issuer':h.get('issuerName'),'symbol':h.get('symbol'),'weight':h.get('weight')} for h in unmatched]})
   except Exception as e:r.update({'status':'ERROR','error':repr(e)})
   outrows.append(r);print('PAIR',json.dumps(r),flush=True)
- out={'purpose':'Source-fidelity audit for already verified complete pre-Production holdings reports of actual 2020-01 Production source series. Source selection was frozen before overlap results. Parser grammar is selected by rendered SEC table-header structure, not by overlap. Identity normalization is deterministic; no fuzzy similarity or strategy returns used.','rows':outrows};OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
+ out={'purpose':'Source-fidelity audit for verified complete pre-Production holdings reports of actual 2020-01 Production source series. Source selection was frozen before overlap. Parser grammar is selected by rendered SEC table-header structure, not overlap. Identity normalization is deterministic; no fuzzy similarity or strategy returns used.','rows':outrows};OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
 if __name__=='__main__':main()
