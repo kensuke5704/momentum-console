@@ -13,23 +13,51 @@ ROOT = Path(__file__).resolve().parents[1]
 BOOT = ROOT / 'data' / 'sec-nport' / 'bootstrap.json.gz'
 OUT = ROOT / 'data' / 'research' / 'sec-series-class-reference-2020.json'
 URL = 'https://www.sec.gov/files/investment/data/other/investment-company-series-and-class-information/investment_company_series_class_2020.csv'
+FETCH_URLS = (
+    URL,
+    'https://r.jina.ai/https://www.sec.gov/files/investment/data/other/investment-company-series-and-class-information/investment_company_series_class_2020.csv',
+    'https://r.jina.ai/http://www.sec.gov/files/investment/data/other/investment-company-series-and-class-information/investment_company_series_class_2020.csv',
+)
 UA = {
     'User-Agent': 'momentum-console research kensuke5704@users.noreply.github.com',
     'Accept': 'text/csv,text/plain,*/*',
 }
 
 
-def fetch_csv() -> str:
-    req = urllib.request.Request(URL, headers=UA)
-    with urllib.request.urlopen(req, timeout=120) as r:
-        raw = r.read()
-    # Historical SEC CSVs are generally UTF-8/Windows-1252 compatible.
+def decode(raw: bytes) -> str:
     for enc in ('utf-8-sig', 'cp1252', 'latin-1'):
         try:
             return raw.decode(enc)
         except UnicodeDecodeError:
             pass
     return raw.decode('latin-1', 'replace')
+
+
+def trim_proxy_preamble(text: str) -> str:
+    # Jina can prepend a short metadata block before raw text. Start at the first
+    # line that looks like the SEC CSV header instead of assuming byte zero.
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        u = line.upper()
+        if 'SERIES' in u and 'CIK' in u and ',' in line:
+            return '\n'.join(lines[i:]) + '\n'
+    return text
+
+
+def fetch_csv() -> tuple[str, str]:
+    errors = []
+    for url in FETCH_URLS:
+        try:
+            req = urllib.request.Request(url, headers=UA)
+            with urllib.request.urlopen(req, timeout=120) as r:
+                raw = r.read()
+            text = trim_proxy_preamble(decode(raw))
+            if 'SERIES' not in text.upper() or 'CIK' not in text.upper():
+                raise RuntimeError(f'payload does not look like series/class CSV; bytes={len(raw)}')
+            return url, text
+        except Exception as e:
+            errors.append(f'{url}: {e!r}')
+    raise RuntimeError('All series/class fetch routes failed: ' + ' | '.join(errors))
 
 
 def norm_header(x: str) -> str:
@@ -49,7 +77,7 @@ def find_field(fields: list[str], needles: tuple[str, ...]) -> str | None:
 
 
 def main() -> None:
-    text = fetch_csv()
+    fetch_url, text = fetch_csv()
     reader = csv.DictReader(io.StringIO(text))
     fields = list(reader.fieldnames or [])
     rows = list(reader)
@@ -106,6 +134,7 @@ def main() -> None:
     out = {
         'purpose': 'Map the frozen Production 2020 N-PORT series IDs to true SEC registrant identities using the official Investment Company Series/Class reference. No accession-prefix CIK inference, prices, returns, or strategy outputs are used.',
         'sourceUrl': URL,
+        'fetchUrl': fetch_url,
         'sourceHeaders': fields,
         'resolvedFields': {
             'seriesId': series_field,
