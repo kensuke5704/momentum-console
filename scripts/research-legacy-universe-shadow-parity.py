@@ -98,8 +98,6 @@ def score_sources(sources: list[dict], resolver=None) -> list[dict]:
 
 
 def build_identity_master(filings: list[dict], as_of: str):
-    # Point-in-time only. Keep series provenance so a holding can only be resolved
-    # when the same issuer identity is observed in another ETF series.
     by_alias: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for f in filings:
         if f.get("filingDate", "") > as_of:
@@ -174,28 +172,30 @@ def main() -> None:
         CURRENT_AS_OF = prod["asOf"]
         sources = latest_sources(filings, CURRENT_AS_OF)
         canonical = score_sources(sources)
-        # Verify local canonical reconstruction matches stored Production Universe before shadowing.
         stored = [x["symbol"] for x in prod.get("symbols", [])[:80]]
         canon_syms = [x["symbol"] for x in canonical]
-        canonical_overlap = len(set(stored) & set(canon_syms)) / 80
-        if canonical_overlap < 0.999:
-            raise RuntimeError(f"{prod['signalMonth']}: local canonical reconstruction mismatch {canonical_overlap:.3f}")
+        if stored != canon_syms:
+            common = len(set(stored) & set(canon_syms))
+            raise RuntimeError(f"{prod['signalMonth']}: local canonical reconstruction is not exact stored={len(stored)} calc={len(canon_syms)} common={common}")
 
+        k = len(stored)
+        if k < 1:
+            raise RuntimeError(f"{prod['signalMonth']}: empty Production Universe")
         master = build_identity_master(filings, CURRENT_AS_OF)
-        shadow = score_sources(sources, make_resolver(master))
+        resolver = make_resolver(master)
+        shadow = score_sources(sources, resolver)
         shadow_syms = [x["symbol"] for x in shadow]
         common = set(stored) & set(shadow_syms)
-        overlap = len(common) / 80
+        overlap = len(common) / k
         prod_rank = {s: i + 1 for i, s in enumerate(stored)}
         shadow_rank = {s: i + 1 for i, s in enumerate(shadow_syms)}
         spearman = corr([prod_rank[s] for s in common], [shadow_rank[s] for s in common])
         top2 = stored[:2]
         hits = sum(s in set(shadow_syms) for s in top2)
         all_top2_hits += hits; all_top2_total += len(top2)
-        if hits == 2:
+        if len(top2) == 2 and hits == 2:
             both_top2_months += 1
         mapped_weight = 0.0; total_weight = 0.0; mapped_count = 0; total_count = 0
-        resolver = make_resolver(master)
         for src in sources:
             for h in src.get("holdings", []):
                 w = float(h.get("weight") or 0)
@@ -206,8 +206,9 @@ def main() -> None:
                     mapped_count += 1; mapped_weight += w
         row = {
             "signalMonth": prod["signalMonth"], "asOf": CURRENT_AS_OF,
-            "sourceFilings": len(sources), "top80Overlap": overlap,
-            "commonNames": len(common), "spearmanCommonRanks": spearman,
+            "productionUniverseSize": k, "sourceFilings": len(sources),
+            "topKOverlap": overlap, "commonNames": len(common),
+            "spearmanCommonRanks": spearman,
             "productionTop2": top2, "top2Hits": hits,
             "identityMappingCountRate": mapped_count / total_count if total_count else None,
             "identityMappingWeightRate": mapped_weight / total_weight if total_weight else None,
@@ -215,17 +216,18 @@ def main() -> None:
         monthly.append(row)
         print("MONTH", json.dumps(row), flush=True)
 
-    overlaps = [x["top80Overlap"] for x in monthly]
+    overlaps = [x["topKOverlap"] for x in monthly]
     spears = [x["spearmanCommonRanks"] for x in monthly if x["spearmanCommonRanks"] is not None]
     summary = {
         "purpose": "Preregistered Gate A shadow parity. Production symbols are hidden from candidate holdings and recovered only through point-in-time cross-series issuer identity evidence. No strategy returns used.",
         "months": len(monthly),
-        "medianTop80Overlap": statistics.median(overlaps),
-        "minimumTop80Overlap": min(overlaps),
+        "productionUniverseSizes": [x["productionUniverseSize"] for x in monthly],
+        "medianTopKOverlap": statistics.median(overlaps),
+        "minimumTopKOverlap": min(overlaps),
         "medianSpearmanCommonRanks": statistics.median(spears) if spears else None,
         "productionTop2IndividualRetention": all_top2_hits / all_top2_total if all_top2_total else None,
         "bothProductionTop2RetainedMonthRate": both_top2_months / len(monthly),
-        "thresholds": {"medianTop80Overlap": 0.80, "minimumTop80Overlap": 0.70, "medianSpearmanCommonRanks": 0.75, "productionTop2IndividualRetention": 0.80, "bothProductionTop2RetainedMonthRate": 0.70},
+        "thresholds": {"medianTopKOverlap": 0.80, "minimumTopKOverlap": 0.70, "medianSpearmanCommonRanks": 0.75, "productionTop2IndividualRetention": 0.80, "bothProductionTop2RetainedMonthRate": 0.70},
         "monthly": monthly,
     }
     checks = {k: summary[k] >= v for k, v in summary["thresholds"].items()}
