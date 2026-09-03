@@ -20,10 +20,10 @@
       "firstProductionNportReportDate": "2019-11-29",
       "sourceForm": "N-CSR",
       "sourceReportDate": "2019-08-31",
-      "sourceAccession": null,
-      "sourceDocumentUrl": null,
-      "status": "REPORT_EXISTENCE_VERIFIED_DOCUMENT_URL_PENDING",
-      "note": "SEC filings independently establish an audited Schedule of Investments dated 2019-08-31 for the Motif fund group. Exact N-CSR accession/document remains to be fixed before formal aggregate Gate B."
+      "sourceAccession": "0001193125-19-276095",
+      "sourceDocumentUrl": "https://www.sec.gov/Archives/edgar/data/1479026/000119312519276095/d774917dncsr.htm",
+      "status": "VERIFIED_COMPLETE_HOLDINGS",
+      "note": "Primary N-CSR filename resolved from the SEC accession header; the same filing header explicitly lists series S000063326 / GFIN."
     },
     {
       "seriesId": "S000061208",
