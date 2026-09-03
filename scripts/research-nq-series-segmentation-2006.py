@@ -59,8 +59,84 @@ def series_tokens(name: str) -> set[str]:
     return {t for t in norm(name).split() if len(t) >= 3 and t not in stop}
 
 
+def explicit_series_hits(raw: str, series: list[dict]) -> list[tuple[dict, int]]:
+    """Return exact normalized series-name hits and their ending positions in visible text."""
+    vis = visible(raw)
+    nvis = norm(vis)
+    hits: list[tuple[dict, int]] = []
+    for s in series:
+        name = s.get("seriesName") or ""
+        nn = norm(name)
+        if not nn:
+            continue
+        pos = nvis.rfind(nn)
+        if pos >= 0:
+            hits.append((s, pos + len(nn)))
+    return hits
+
+
+def assign_marker_series(text: str, marker: re.Match, series: list[dict]) -> tuple[dict | None, str]:
+    """Assign schedule page using explicit filing-time series names only.
+
+    Holdings/industry words are intentionally excluded from assignment. The nearest
+    exact series title before the marker is preferred because N-Q page footers carry
+    the current series name, including continuation pages. If absent, a short window
+    after the marker can supply a title printed under the schedule heading.
+    """
+    start = marker.start()
+    before = text[max(0, start - 1400):start]
+    before_hits = explicit_series_hits(before, series)
+    if before_hits:
+        # nearest exact occurrence to the marker
+        best, _ = max(before_hits, key=lambda x: x[1])
+        return best, "EXPLICIT_BEFORE"
+
+    after = text[start:min(len(text), start + 1400)]
+    after_hits = explicit_series_hits(after, series)
+    if len(after_hits) == 1:
+        return after_hits[0][0], "EXPLICIT_AFTER"
+    if len(after_hits) > 1:
+        # In the forward window choose earliest explicit title.
+        vis = visible(after)
+        nvis = norm(vis)
+        ranked = []
+        for s, _ in after_hits:
+            nn = norm(s.get("seriesName") or "")
+            pos = nvis.find(nn)
+            if pos >= 0:
+                ranked.append((pos, s))
+        if ranked:
+            return min(ranked, key=lambda x: x[0])[1], "EXPLICIT_AFTER_EARLIEST"
+    return None, "UNASSIGNED"
+
+
+def grouped_schedule_blocks(text: str, series: list[dict]) -> tuple[dict[str, list[str]], list[dict]]:
+    markers = list(SCHEDULE.finditer(text))
+    grouped: dict[str, list[str]] = {}
+    audit: list[dict] = []
+    for j, marker in enumerate(markers):
+        start = marker.start()
+        end = markers[j + 1].start() if j + 1 < len(markers) else min(len(text), start + 300000)
+        block = text[start:end]
+        s, rule = assign_marker_series(text, marker, series)
+        audit.append({
+            "markerIndex": j,
+            "marker": visible(marker.group(0)),
+            "assignmentRule": rule,
+            "seriesId": s.get("seriesId") if s else None,
+            "seriesName": s.get("seriesName") if s else None,
+        })
+        if s and s.get("seriesId"):
+            grouped.setdefault(s["seriesId"], []).append(block)
+    return grouped, audit
+
+
 def map_schedule_to_series(block: str, series: list[dict]) -> tuple[dict | None, float]:
-    # A schedule heading is near the beginning of its block. Mapping is based only on filing text.
+    """Deprecated diagnostic fallback retained for old research scripts only.
+
+    Do not use this function for constructing PIT holdings. It can be fooled by
+    industry words on continuation pages. New segmentation uses explicit boundaries.
+    """
     context = visible(block[:5000])
     c_tokens = set(norm(context).split())
     best = None
@@ -71,7 +147,6 @@ def map_schedule_to_series(block: str, series: list[dict]) -> tuple[dict | None,
         if not toks:
             continue
         overlap = len(toks & c_tokens) / len(toks)
-        # Exact normalized series phrase is strongest; token coverage handles TM/entities/punctuation.
         exact = norm(name) in norm(context)
         score = 1.0 if exact else overlap
         if score > best_score:
@@ -109,36 +184,29 @@ def main() -> None:
             etf = [s for s in series if s["isEtf"]]
             primary_name, text = embedded_primary_nq(submission)
             markers = list(SCHEDULE.finditer(text))
+            grouped, assignment_audit = grouped_schedule_blocks(text, etf)
+            by_id = {s.get("seriesId"): s for s in etf if s.get("seriesId")}
 
-            mapped: dict[str, dict] = {}
-            unmapped_blocks = 0
-            for j, marker in enumerate(markers):
-                start = marker.start()
-                end = markers[j + 1].start() if j + 1 < len(markers) else min(len(text), start + 300000)
-                block = text[start:end]
-                s, score = map_schedule_to_series(block, etf)
-                if not s or not s.get("seriesId"):
-                    unmapped_blocks += 1
+            rows = []
+            for sid, blocks in grouped.items():
+                s = by_id.get(sid)
+                if not s:
                     continue
-                method, count, total_value = parse_segment(block)
-                candidate = {
-                    "seriesId": s.get("seriesId"),
+                combined = "\n".join(blocks)
+                method, count, total_value = parse_segment(combined)
+                rows.append({
+                    "seriesId": sid,
                     "seriesName": s.get("seriesName"),
                     "tickers": s.get("etfTickers", []),
-                    "mappingScore": score,
+                    "assignmentRule": "EXPLICIT_SERIES_BOUNDARY_GROUP",
+                    "schedulePages": len(blocks),
                     "parseMethod": method,
                     "parsedHoldings": count,
                     "parsedMarketValueTotal": total_value,
                     "eligibleByName": eligible_name(s.get("seriesName") or ""),
                     "structurallyUsable": bool(10 <= count <= 120 and total_value > 0),
-                }
-                # Duplicate generic/actual schedule markers can map to the same series. Keep the
-                # block with the larger parsed portfolio, then higher mapping score.
-                current = mapped.get(s["seriesId"])
-                if current is None or (count, score) > (current["parsedHoldings"], current["mappingScore"]):
-                    mapped[s["seriesId"]] = candidate
+                })
 
-            rows = list(mapped.values())
             eligible_rows = [r for r in rows if r["eligibleByName"]]
             usable_eligible = [r for r in eligible_rows if r["structurallyUsable"]]
             r = {
@@ -148,17 +216,21 @@ def main() -> None:
                 "primaryDocument": primary_name,
                 "registeredEtfSeries": len(etf),
                 "scheduleMarkers": len(markers),
-                "unmappedScheduleBlocks": unmapped_blocks,
+                "assignedScheduleMarkers": sum(1 for a in assignment_audit if a["seriesId"]),
+                "unassignedScheduleMarkers": sum(1 for a in assignment_audit if not a["seriesId"]),
                 "reportedSeries": len(rows),
                 "eligibleReportedSeries": len(eligible_rows),
                 "structurallyUsableEligibleSeries": len(usable_eligible),
                 "series": rows,
+                "assignmentAudit": assignment_audit,
             }
             print(
                 f"{i}/{len(chosen)} {x['company'][:42]} registered={len(etf)} schedules={len(markers)} "
-                f"reported={len(rows)} eligible={len(eligible_rows)} usableEligible={len(usable_eligible)}",
+                f"assigned={r['assignedScheduleMarkers']} reported={len(rows)} eligible={len(eligible_rows)} usableEligible={len(usable_eligible)}",
                 flush=True,
             )
+            for row in usable_eligible:
+                print("USABLE", json.dumps(row), flush=True)
         except Exception as e:
             r = {"company": x.get("company"), "cik": x.get("cik"), "error": repr(e)}
             print(f"{i}/{len(chosen)} FAIL {x.get('company')} {e!r}", flush=True)
@@ -170,14 +242,14 @@ def main() -> None:
     usable = sum(r["structurallyUsableEligibleSeries"] for r in ok)
     summary = {
         "year": 2006,
-        "sampleRule": "One deterministic N-Q filing per known ETF registrant; schedules mapped to filing-time registered series using heading text only; no return/performance selection.",
+        "sampleRule": "One deterministic N-Q filing per known ETF registrant. Schedule pages are assigned only from exact filing-time registered series names nearest each schedule marker; continuation pages are grouped by the same explicit series identity. No holdings-content similarity or return/performance selection.",
         "registrants": len(chosen),
         "fetchSuccess": len(ok),
         "reportedSeries": reported,
         "eligibleReportedSeries": eligible,
         "structurallyUsableEligibleSeries": usable,
         "structurallyUsableEligibleRate": usable / eligible if eligible else None,
-        "structuralEligibilityRule": "Same name exclusions as production plus 10 <= parsed holdings <= 120 and positive parsed market value; no returns used.",
+        "structuralEligibilityRule": "Same name exclusions as production plus 10 <= grouped parsed holdings <= 120 and positive parsed market value; no returns used.",
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
