@@ -12,11 +12,15 @@ Use Production N-PORT filings as ground truth, but hide each holding's symbol fr
 
 Evaluate the first 12 Production Universe months beginning 2020-01.
 
+### Structural clarification made before observing shadow-parity results
+
+The stored Production history begins before enough eligible public N-PORT filings existed to populate 80 names. For example, 2020-01 contains only 9 ranked names. Therefore overlap is measured against the actual stored Production size `K` for each month (`TopK`), with `K <= 80`; once `K=80` this is exactly Top80 overlap. The original overlap thresholds are unchanged. Canonical reconstruction from the same N-PORT inputs must first reproduce the stored Production list exactly for each evaluated month; otherwise the shadow test is invalid and stops.
+
 Pass only if all of the following hold:
 
-- median Top80 overlap >= 0.80;
-- minimum monthly Top80 overlap >= 0.70;
-- median Spearman rank correlation among common Top80 names >= 0.75;
+- median TopK/Top80 overlap >= 0.80;
+- minimum monthly TopK/Top80 overlap >= 0.70;
+- median Spearman rank correlation among common ranked names >= 0.75;
 - Production Universe Top2 individual-name retention >= 0.80;
 - both Production Universe Top2 names retained in >= 0.70 of evaluated months.
 
@@ -30,7 +34,7 @@ The final confirmation must include a direct or temporally adjacent Production c
 
 - reconstructed ETF-series coverage;
 - constituent/ticker mapping coverage by count and weight;
-- Top80 overlap;
+- TopK/Top80 overlap;
 - common-name rank correlation;
 - Production Universe Top2 retention.
 
