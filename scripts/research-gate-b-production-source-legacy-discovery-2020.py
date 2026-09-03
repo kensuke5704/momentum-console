@@ -12,22 +12,20 @@ SERIES_TEXT_RE=re.compile(r'\bSeries\s+(S\d{9})\b',re.I)
 REPORT_TEXT_RE=re.compile(r'Period of Report\s*(\d{4}-\d{2}-\d{2}|\d{8})',re.I)
 FORM_TEXT_RE=re.compile(r'Form\s+(N-Q|N-CSR|N-CSRS)\b',re.I)
 
-# Exact seriesId->registrant CIK continuity independently verified from SEC series/class records.
-# These are identifiers only; filing selection still uses historical report date + exact series continuity.
 REGISTRANT_CIK={
- 'S000057700':'0001645194', # Legg Mason ETF Investment Trust
- 'S000063326':'0001479026', # Goldman Sachs ETF Trust
- 'S000061208':'0001540305', # ETF Series Solutions
+ 'S000057700':'0001645194',
+ 'S000063326':'0001479026',
+ 'S000061208':'0001540305',
 }
 FIRST_NPORT_REPORT={'S000057700':'2019-11-29','S000063326':'2019-11-29','S000061208':'2019-11-30'}
 
-def get(url,timeout=30):
+def get(url,timeout=25):
  last=None
  for u in ('https://r.jina.ai/'+url,url):
   try:
    req=urllib.request.Request(u,headers=UA)
    with urllib.request.urlopen(req,timeout=timeout) as r:return r.read(4_000_000).decode('utf-8','replace'),u
-  except Exception as e:last=repr(e);time.sleep(.35)
+  except Exception as e:last=repr(e);time.sleep(.25)
  raise RuntimeError(last or 'fetch failed')
 
 def months(raw):
@@ -41,7 +39,7 @@ def months(raw):
 def base(cik,acc):return f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc.replace("-","")}'
 
 def browse(cik,form,dateb='20200131'):
- q=urllib.parse.urlencode({'action':'getcompany','CIK':cik,'type':form,'dateb':dateb,'owner':'exclude','count':'100'})
+ q=urllib.parse.urlencode({'action':'getcompany','CIK':cik,'type':form,'dateb':dateb,'owner':'exclude','count':'40'})
  text,tr=get('https://www.sec.gov/cgi-bin/browse-edgar?'+q)
  accs=[]
  for a in ACC_RE.findall(text):
@@ -69,14 +67,14 @@ def main():
    try:accs,tr=browse(cik,form,'20200131')
    except Exception as e:
     row.setdefault('browseErrors',[]).append({'form':form,'error':repr(e)});continue
-   for acc in accs[:60]:
+   for acc in accs[:12]:
     try:h=filing_index(cik,acc,form)
     except Exception:continue
     if sid not in h.get('seriesIds',[]):continue
     if h.get('reportDate') and h['reportDate']<boundary:legacy.append(h)
   legacy.sort(key=lambda x:(x.get('reportDate') or '',x.get('accession') or ''),reverse=True)
   row['legacyCandidates']=legacy[:10];row['chosenLegacy']=legacy[0] if legacy else None;row['status']='RESOLVED' if legacy else 'UNRESOLVED'
-  rows.append(row);print('SOURCE',json.dumps(row),flush=True);time.sleep(.2)
+  rows.append(row);print('SOURCE',json.dumps(row),flush=True);time.sleep(.1)
  out={'purpose':'Metadata-only discovery of nearest pre-NPORT legacy filing for the exact series that actually generated Production 2020-01 Universe. Registrant CIKs are exact SEC series/class identifiers; candidate filing selection uses exact seriesId continuity and report dates only. No holdings overlap, ranks, or returns used.','signalMonth':'2020-01','sourceCount':len(rows),'resolvedCount':sum(r.get('status')=='RESOLVED' for r in rows),'rows':rows}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k!='rows'}),flush=True)
 if __name__=='__main__':main()
