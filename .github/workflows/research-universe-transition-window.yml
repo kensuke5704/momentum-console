@@ -1,0 +1,26 @@
+name: Research Universe Transition Window
+
+on:
+  push:
+    branches:
+      - research/nq-npx-mapping-2006-20260903
+    paths:
+      - scripts/research-universe-transition-window.py
+      - .github/workflows/research-universe-transition-window.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Production transition window
+        run: python3 scripts/research-universe-transition-window.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: universe-transition-window
+          path: data/research/universe-transition-window.json
