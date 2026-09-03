@@ -30,6 +30,12 @@ This gate tests adapter + identity mapping + scoring mechanics only. It does not
 
 After Gate A passes, validate actual N-Q/N-CSR reconstructed ETF series against the N-Q/N-PORT transition window. No performance data may be used.
 
+### Transition source-fidelity adjacency rule
+
+Before judging source fidelity, define the comparison population without looking at holdings overlap: exact SEC `seriesId` continuity, the nearest pre-N-PORT N-Q/N-CSR/N-CSRS report selected by report date, and a report-date gap of at most 184 days for the primary transition fidelity sample. Longer-gap pairs may be reported as sensitivity diagnostics but do not determine whether a parser/source bridge is faithful, because real portfolio turnover is otherwise confounded with extraction error. Registrants and series are selected from filing metadata only; no holdings overlap, momentum, Universe rank, or strategy return may be used for inclusion.
+
+This adjacency rule does not change the final Gate B practical thresholds below.
+
 The final confirmation must include a direct or temporally adjacent Production comparison and must report:
 
 - reconstructed ETF-series coverage;
