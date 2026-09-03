@@ -8,6 +8,7 @@ ADR=re.compile(r'\b(?:ADR|GDR|AMERICAN DEPOSITARY|GLOBAL DEPOSITARY)\b',re.I)
 
 def main():
     mp=json.loads(MAP.read_text()); cache=json.loads(CACHE.read_text())
+    # Fail closed on conflicting positive PIT evidence.
     if cache.get('conflictCount'):
         raise RuntimeError(f"country evidence cache has {cache['conflictCount']} positive-evidence conflicts")
     country={(r.get('ticker'),r.get('securityId')):r for r in cache.get('rows',[])}
