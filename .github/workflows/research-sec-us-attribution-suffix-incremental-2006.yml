@@ -1,0 +1,34 @@
+name: Research SEC US Attribution Suffix Incremental 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-us-attribution-suffix-incremental-2006.py"
+      - ".github/workflows/research-sec-us-attribution-suffix-incremental-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download structural mapping and collision audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/map /tmp/audit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899299058/zip > /tmp/map.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9899425593/zip > /tmp/audit.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          unzip -q /tmp/audit.zip -d /tmp/audit
+          cp /tmp/map/nq-npx-structural-mapping-2006.json data/research/
+          cp /tmp/audit/nq-npx-suffix-match-audit-2006.json data/research/
+      - run: python3 scripts/research-sec-us-attribution-suffix-incremental-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-us-attribution-suffix-incremental-2006
+          path: data/research/sec-us-attribution-suffix-incremental-2006.json
+          if-no-files-found: warn
