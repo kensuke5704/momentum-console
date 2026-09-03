@@ -22,6 +22,7 @@ ACCESSIONS={
 SID_RE=re.compile(r'<SERIES-ID>\s*([^<\r\n]+)',re.I)
 REPORT_RE=re.compile(r'(?:Period of Report|CONFORMED PERIOD OF REPORT[:\s]+)\s*(\d{4}[-/]?\d{2}[-/]?\d{2}|\d{8})',re.I)
 FILING_RE=re.compile(r'(?:Filing Date|FILED AS OF DATE[:\s]+)\s*(\d{4}[-/]?\d{2}[-/]?\d{2}|\d{8})',re.I)
+NQ_FILE_RE=re.compile(r'<TYPE>N-Q\b.*?<FILENAME>\s*([^<\r\n]+)',re.I|re.S)
 
 def get(url,timeout=20):
  last=None
@@ -37,26 +38,26 @@ def normdate(x):
  x=re.sub(r'\D','',x)
  return f'{x[:4]}-{x[4:6]}-{x[6:8]}' if len(x)>=8 else None
 
-def base_url(cik,acc):
- return f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc.replace("-","")}'
+def base_url(cik,acc): return f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc.replace("-","")}'
 
 def parse_index(cik,acc):
- base=base_url(cik,acc)
- header_url=f'{base}/{acc}-index-headers.html'
- index_url=f'{base}/{acc}-index.htm'
+ base=base_url(cik,acc);header_url=f'{base}/{acc}-index-headers.html';index_url=f'{base}/{acc}-index.htm'
  htext,htransport,hn=get(header_url)
  sids=list(dict.fromkeys(x.strip() for x in SID_RE.findall(htext)))
- report=REPORT_RE.search(htext); filed=FILING_RE.search(htext)
- files=[]; index_transport=None; index_bytes=0
- try:
-  text,index_transport,index_bytes=get(index_url)
-  for m in re.finditer(r'\[([^\]]+)\]\((https?://www\.sec\.gov/Archives/edgar/data/[^\)]+)\)',text,re.I):
-   label,url=m.group(1),m.group(2)
-   if re.search(r'cert',label,re.I):continue
-   if re.search(r'\.(?:htm|html|txt)(?:$|\?)',url,re.I):files.append(url)
- except Exception:
-  pass
- return {'accession':acc,'headerUrl':header_url,'indexUrl':index_url,'headerTransport':htransport,'headerBytes':hn,'indexTransport':index_transport,'indexBytes':index_bytes,'seriesIds':sids,'documentCandidates':list(dict.fromkeys(files))[:8],'reportDate':normdate(report.group(1)) if report else None,'filingDate':normdate(filed.group(1)) if filed else None,'headerSnippet':' '.join(htext.split())[:900]}
+ report=REPORT_RE.search(htext);filed=FILING_RE.search(htext)
+ files=[]
+ for f in NQ_FILE_RE.findall(htext):
+  f=f.strip()
+  if f:files.append(f'{base}/{f}')
+ index_transport=None;index_bytes=0
+ if not files:
+  try:
+   text,index_transport,index_bytes=get(index_url)
+   for m in re.finditer(r'\[([^\]]+)\]\((https?://www\.sec\.gov/Archives/edgar/data/[^\)]+)\)',text,re.I):
+    label,url=m.group(1),m.group(2)
+    if not re.search(r'cert',label,re.I) and re.search(r'\.(?:htm|html|txt)(?:$|\?)',url,re.I):files.append(url)
+  except Exception:pass
+ return {'accession':acc,'headerUrl':header_url,'indexUrl':index_url,'headerTransport':htransport,'headerBytes':hn,'indexTransport':index_transport,'indexBytes':index_bytes,'seriesIds':sids,'documentCandidates':list(dict.fromkeys(files))[:8],'reportDate':normdate(report.group(1)) if report else None,'filingDate':normdate(filed.group(1)) if filed else None}
 
 def main():
  resolved={};audits=[]
@@ -65,15 +66,13 @@ def main():
   for acc in ACCESSIONS[cik]:
    try:info=parse_index(cik,acc)
    except Exception as e:info={'accession':acc,'error':repr(e),'seriesIds':[],'documentCandidates':[]}
-   hits=sorted(unresolved & set(info.get('seriesIds',[])))
-   info['targetHits']=hits;audits.append({'cik':cik,**info})
-   print(cik,acc,'hits',hits,'sids',len(info.get('seriesIds',[])),'docs',info.get('documentCandidates',[])[:2],flush=True)
-   for sid in hits:
-    resolved[sid]={'cik':cik,**info};unresolved.discard(sid)
+   hits=sorted(unresolved & set(info.get('seriesIds',[])));info['targetHits']=hits;audits.append({'cik':cik,**info})
+   print(cik,acc,'hits',hits,'docs',info.get('documentCandidates',[])[:1],flush=True)
+   for sid in hits:resolved[sid]={'cik':cik,**info};unresolved.discard(sid)
    if not unresolved:break
    time.sleep(.12)
  alltargets=set(sum(TARGETS.values(),[]))
- out={'purpose':'Resolve latest pre-2020 N-Q containing each fixed transition series using SEC index-header series metadata only; holdings and Universe outcomes are not used for selection.','targetSeries':len(alltargets),'resolvedSeries':len(resolved),'unresolvedSeries':sorted(alltargets-set(resolved)),'resolved':resolved,'audits':audits}
+ out={'purpose':'Resolve latest pre-2020 N-Q and its primary N-Q document for each fixed transition series using SEC SGML metadata only.','targetSeries':len(alltargets),'resolvedSeries':len(resolved),'unresolvedSeries':sorted(alltargets-set(resolved)),'resolved':resolved,'audits':audits}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
  print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('resolved','audits')}),flush=True)
 if __name__=='__main__':main()
