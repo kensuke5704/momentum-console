@@ -1,0 +1,27 @@
+name: Research Transition Nearest Fidelity Structural 2019
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-transition-nearest-fidelity-structural-2019.py"
+      - ".github/workflows/research-transition-nearest-fidelity-structural-2019.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fidelity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run structural nearest fidelity
+        run: python3 scripts/research-transition-nearest-fidelity-structural-2019.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transition-nearest-fidelity-structural-2019
+          path: data/research/transition-nearest-fidelity-structural-2019.json
+          if-no-files-found: warn
