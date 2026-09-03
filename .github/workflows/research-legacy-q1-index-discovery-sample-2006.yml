@@ -1,0 +1,21 @@
+name: Research Legacy Q1 Index Discovery Sample 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-legacy-q1-index-discovery-sample-2006.py"
+      - ".github/workflows/research-legacy-q1-index-discovery-sample-2006.yml"
+permissions:
+  contents: read
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-legacy-q1-index-discovery-sample-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-q1-index-discovery-sample-2006
+          path: data/research/legacy-q1-index-discovery-sample-2006.json
