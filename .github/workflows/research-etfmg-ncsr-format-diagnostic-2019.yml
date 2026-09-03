@@ -1,0 +1,17 @@
+name: Research ETFMG NCSR Format Diagnostic 2019
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-etfmg-ncsr-format-diagnostic-2019.py
+      - .github/workflows/research-etfmg-ncsr-format-diagnostic-2019.yml
+  workflow_dispatch:
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-etfmg-ncsr-format-diagnostic-2019.py
