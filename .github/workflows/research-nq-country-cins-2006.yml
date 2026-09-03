@@ -1,0 +1,35 @@
+name: Research NQ Country CINS 2006
+
+on:
+  push:
+    paths:
+      - 'scripts/research-nq-country-cins-2006.py'
+      - '.github/workflows/research-nq-country-cins-2006.yml'
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download EC-filtered PIT and mapping artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/pit /tmp/map
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/map.zip
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/pit/nq-pit-holdings-2006-ec-filtered.json data/research/
+          cp /tmp/map/nq-npx-mapping-2006.json data/research/
+      - name: Run direct country and CINS diagnostic
+        run: python3 scripts/research-nq-country-cins-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-country-cins-2006
+          path: data/research/nq-country-cins-2006.json
