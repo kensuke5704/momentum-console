@@ -1,0 +1,23 @@
+name: Research Gate B Transition Source Coverage 2020
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-gate-b-transition-source-coverage-2020.py"
+      - ".github/workflows/research-gate-b-transition-source-coverage-2020.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-gate-b-transition-source-coverage-2020.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gate-b-transition-source-coverage-2020
+          path: data/research/gate-b-transition-source-coverage-2020.json
