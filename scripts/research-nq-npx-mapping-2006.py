@@ -20,9 +20,6 @@ def norm(raw: str) -> str:
     s = re.sub(r"\b(CORPORATION|CORPORA?TION)\b", "CORP", s)
     s = re.sub(r"\bCOMPANY\b", "CO", s)
     s = re.sub(r"\bLIMITED\b", "LTD", s)
-    # Collision-tested structural abbreviations only. On the frozen 2006 merged
-    # master these transformations do not create any additional issuer-identity
-    # ambiguity; broader/fuzzy abbreviation expansion remains prohibited.
     s = re.sub(r"\bHLDGS\b", "HOLDINGS", s)
     s = re.sub(r"\bPHARMACEUTICALS\b", "PHARMACEUTICAL", s)
     return " ".join(re.sub(r"[^A-Z0-9]+", " ", s).split())
@@ -48,6 +45,24 @@ def aliases(raw: str) -> list[str]:
             if n and n not in out:
                 out.append(n)
     return out
+
+
+def unique_adr_base_alias(raw: str, by_issuer: dict[str, set[tuple[str, str]]]) -> tuple[str | None, list[tuple[str, str]]]:
+    """Resolve ADR -> base issuer only when the base has exactly one valid identity.
+
+    This intentionally does not collapse ADRs when a base issuer has multiple
+    identities (for example a U.S. ADR plus ordinary/foreign lines).
+    """
+    stripped = re.sub(r"\s+ADR\s*$", "", raw, flags=re.I).strip()
+    if stripped == raw.strip():
+        return None, []
+    for a in aliases(stripped):
+        found = sorted(by_issuer.get(a, set()))
+        if len(found) == 1:
+            return a, found
+        if len(found) > 1:
+            return None, []
+    return None, []
 
 
 def artifact(raw: str) -> bool:
@@ -92,6 +107,7 @@ def main() -> None:
             desc, weight = h["description"], float(h.get("weight") or 0)
             total_c += 1; total_w += weight; rc += 1; rw += weight
             ids, matched_alias = [], None
+            match_method = None
             if artifact(desc):
                 status = "PARSER_ARTIFACT"; art_c += 1; art_w += weight; pc += 1; pw += weight
             else:
@@ -100,7 +116,13 @@ def main() -> None:
                     found = by_issuer.get(a, set())
                     if found:
                         ids, matched_alias = sorted(found), a
+                        match_method = "EXACT_NORMALIZED_ISSUER"
                         break
+                if not ids:
+                    adr_alias, adr_ids = unique_adr_base_alias(desc, by_issuer)
+                    if adr_ids:
+                        ids, matched_alias = adr_ids, adr_alias
+                        match_method = "ADR_BASE_UNIQUE_ONLY"
                 if len(ids) == 1:
                     status = "MATCHED_UNIQUE"; matched_c += 1; matched_w += weight; mc += 1; mw += weight
                 elif len(ids) > 1:
@@ -110,6 +132,8 @@ def main() -> None:
             d = {"seriesId": record.get("seriesId"), "fundTickers": record.get("fundTickers", []), "reportDate": record.get("reportDate"), "description": desc, "weight": weight, "normalizedAliases": aliases(desc), "status": status}
             if matched_alias:
                 d["matchedAlias"] = matched_alias
+            if match_method:
+                d["matchMethod"] = match_method
             if ids:
                 d["identities"] = [{"ticker": t, "securityId": s} for t, s in ids]
             elif status == "UNMAPPED":
@@ -120,11 +144,12 @@ def main() -> None:
         series.append({"seriesId": record.get("seriesId"), "seriesName": record.get("seriesName"), "fundTickers": record.get("fundTickers", []), "reportDate": record.get("reportDate"), "holdingCount": int(rc), "eligibleHoldingCount": int(dc), "parserArtifactCount": int(pc), "uniqueMatchedCount": int(mc), "uniqueMatchedCountRate": ratio(mc, dc), "uniqueMatchedWeight": mw, "uniqueMatchedWeightRate": ratio(mw, dw), "ambiguousCount": int(ac), "ambiguousWeight": aw})
 
     unmapped = [d for d in details if d["status"] == "UNMAPPED"]
+    adr_unique_matches = [d for d in details if d.get("matchMethod") == "ADR_BASE_UNIQUE_ONLY"]
     out = {
         "year": 2006,
         "purpose": "Structural validation of N-Q holdings issuer descriptions against deterministic N-PX issuer/ticker/security-id master. No return/performance data used.",
-        "mappingRule": "Unique exact match after conservative issuer normalization, trailing N-Q footnote-marker removal, leading/trailing THE normalization, and collision-tested HLDGS/HOLDINGS plus PHARMACEUTICALS/PHARMACEUTICAL normalization. Fuzzy candidates are diagnostic only and never accepted automatically.",
-        "identityQualityRule": "Reject obvious placeholder/invalid N-PX ticker tokens before issuer matching; security ID must be 8-14 alphanumeric characters.",
+        "mappingRule": "Unique exact match after conservative issuer normalization, trailing N-Q footnote-marker removal, leading/trailing THE normalization, collision-tested HLDGS/HOLDINGS plus PHARMACEUTICALS/PHARMACEUTICAL normalization, and ADR suffix removal only when the base issuer resolves to exactly one valid identity. Fuzzy candidates are diagnostic only and never accepted automatically.",
+        "identityQualityRule": "Reject obvious placeholder/invalid N-PX ticker tokens before issuer matching; security ID must be 8-14 alphanumeric characters. ADR base mapping is prohibited when the base issuer has multiple identities.",
         "npxSampleRule": npx.get("sampleRule"),
         "npxPairedRecords": npx.get("pairedRecords"),
         "npxUniqueNormalizedIssuers": npx.get("uniqueNormalizedIssuers"),
@@ -139,6 +164,8 @@ def main() -> None:
         "uniqueMatchedCountRate": ratio(matched_c, eligible_c),
         "uniqueMatchedWeight": matched_w,
         "uniqueMatchedWeightRate": ratio(matched_w, eligible_w),
+        "adrBaseUniqueMatchCount": len(adr_unique_matches),
+        "adrBaseUniqueMatchWeight": sum(float(d.get("weight") or 0) for d in adr_unique_matches),
         "ambiguousCount": int(amb_c),
         "ambiguousWeight": amb_w,
         "unmappedCount": len(unmapped),
