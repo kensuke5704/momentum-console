@@ -1,0 +1,27 @@
+name: Research FirstTrust Schedule Boundary Diagnostic 2019
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-firsttrust-schedule-boundary-diagnostic-2019.py"
+      - ".github/workflows/research-firsttrust-schedule-boundary-diagnostic-2019.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose schedule boundaries
+        run: python3 scripts/research-firsttrust-schedule-boundary-diagnostic-2019.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: firsttrust-schedule-boundary-diagnostic-2019
+          path: data/research/firsttrust-schedule-boundary-diagnostic-2019.json
+          if-no-files-found: warn
