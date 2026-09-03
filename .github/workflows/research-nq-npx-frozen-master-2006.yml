@@ -1,0 +1,42 @@
+name: Research NQ N-PX Frozen Master 2006
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-npx-mapping-2006.py"
+      - "scripts/research-nq-unmapped-diagnostics-2006.py"
+      - ".github/workflows/research-nq-npx-frozen-master-2006.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  frozen-remap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen best 2006 merged master and N-Q PIT holdings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/frozen /tmp/nq
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/frozen.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9854510485/zip > /tmp/nq.zip
+          unzip -q /tmp/frozen.zip -d /tmp/frozen
+          unzip -q /tmp/nq.zip -d /tmp/nq
+          cp /tmp/frozen/npx-security-master-2006.json data/research/
+          cp /tmp/nq/nq-pit-holdings-2006.json data/research/
+      - name: Run structural mapping on frozen master
+        run: python3 scripts/research-nq-npx-mapping-2006.py
+      - name: Diagnose remaining unmapped holdings
+        run: python3 scripts/research-nq-unmapped-diagnostics-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nq-npx-frozen-master-2006
+          path: |
+            data/research/nq-npx-mapping-2006.json
+            data/research/nq-npx-unmapped-diagnostics-2006.json
