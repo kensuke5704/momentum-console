@@ -8,16 +8,21 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-IDX = ROOT / "data/research/nq-index-2006.json"
 OUT = ROOT / "data/research/nq-asset-section-2006.json"
 
 sspec = importlib.util.spec_from_file_location("seg", ROOT / "scripts/research-nq-series-segmentation-2006.py")
 seg = importlib.util.module_from_spec(sspec)
 sspec.loader.exec_module(seg)
 
-TARGET = re.compile(r"SELECT SECTOR SPDR|STREETTRACKS|POWERSHARES EXCHANGE TRADED|RYDEX ETF TRUST|PROSHARES", re.I)
-TAIL_RE = re.compile(r"^(.*?)(\d[\d,]*(?:\.\d+)?)\s+(?:([A-Z]{3})\s+)?\$?\s*(\d[\d,]*(?:\.\d+)?)\s*$")
+# Exact frozen source filings underlying the current nine-series PIT sample.
+# This removes dependency on a transient nq-index artifact and prevents sample drift.
+SOURCES = [
+    {"company": "SELECT SECTOR SPDR TRUST", "cik": "1064641", "filename": "edgar/data/1064641/0000950135-06-001225.txt"},
+    {"company": "RYDEX ETF TRUST", "cik": "1208211", "filename": "edgar/data/1208211/0000950135-06-001815.txt"},
+    {"company": "STREETTRACKS SERIES TRUST", "cik": "1064642", "filename": "edgar/data/1064642/0000950135-06-003650.txt"},
+]
 
+TAIL_RE = re.compile(r"^(.*?)(\d[\d,]*(?:\.\d+)?)\s+(?:([A-Z]{3})\s+)?\$?\s*(\d[\d,]*(?:\.\d+)?)\s*$")
 SECTION_RULES = [
     ("COMMON_EQUITY", re.compile(r"^\s*(?:TOTAL\s+)?COMMON\s+(?:STOCKS?|SHARES?)\b", re.I)),
     ("PREFERRED", re.compile(r"^\s*(?:TOTAL\s+)?PREFERRED\s+(?:STOCKS?|SHARES?|SECURITIES)\b", re.I)),
@@ -56,8 +61,6 @@ def clean_desc(s: str) -> str:
 
 
 def section_from_line(line: str) -> str | None:
-    # Section transitions must be explicit left-edge schedule headings. Company
-    # names containing words such as International are never used as headings.
     for section, pat in SECTION_RULES:
         if pat.search(line):
             return section
@@ -122,7 +125,6 @@ def parse_plain_with_sections(text: str) -> list[dict]:
         elif re.search(r"\b(?:LONG TERM INVESTMENTS|TOTAL)\b", up):
             pending = ""
 
-    # Keep the same dedupe key as the production-independent parser pilot.
     out = []
     seen = set()
     for h in holdings:
@@ -134,18 +136,9 @@ def parse_plain_with_sections(text: str) -> list[dict]:
 
 
 def main() -> None:
-    idx = json.loads(IDX.read_text())
-    filings = [x for x in idx["filings"] if x.get("form") == "N-Q" and TARGET.search(str(x.get("company") or ""))]
-    chosen = []
-    seen = set()
-    for x in filings:
-        if x["cik"] in seen:
-            continue
-        seen.add(x["cik"])
-        chosen.append(x)
-
     series_rows = []
-    for x in chosen:
+    source_results = []
+    for x in SOURCES:
         try:
             _, submission = seg.meta.fetch_prefix(seg.meta.sec_url(x["filename"]))
             series = seg.meta.parse_series_contracts(submission, x["company"])
@@ -174,12 +167,14 @@ def main() -> None:
                 if current is None or candidate[:2] > current[:2]:
                     mapped[s["seriesId"]] = candidate
 
+            retained = 0
             for s in etf:
                 if s.get("seriesId") not in mapped:
                     continue
                 count, score, holdings, usable = mapped[s["seriesId"]]
                 if not usable:
                     continue
+                retained += 1
                 section_count: dict[str, int] = {}
                 section_weight: dict[str, float] = {}
                 for h in holdings:
@@ -189,6 +184,7 @@ def main() -> None:
                 attributed_count = sum(v for k, v in section_count.items() if k != "UNKNOWN")
                 attributed_weight = sum(v for k, v in section_weight.items() if k != "UNKNOWN")
                 row = {
+                    "sourceFilename": x["filename"],
                     "seriesId": s.get("seriesId"),
                     "seriesName": s.get("seriesName"),
                     "fundTickers": s.get("etfTickers", []),
@@ -204,20 +200,26 @@ def main() -> None:
                 }
                 series_rows.append(row)
                 print("SERIES", json.dumps(row), flush=True)
+            source_results.append({"company": x["company"], "filename": x["filename"], "registeredEtfSeries": len(etf), "retainedSeries": retained})
         except Exception as e:
+            source_results.append({"company": x["company"], "filename": x["filename"], "error": repr(e)})
             print("FAIL", x.get("company"), repr(e), flush=True)
 
     total_count = sum(r["holdingCount"] for r in series_rows)
     common_count = sum(r["commonEquityCount"] for r in series_rows)
-    # Series weights each normalize to 100, so this aggregate is diagnostic only.
     common_weight = sum(r["commonEquityWeight"] for r in series_rows)
+    attributed_count = sum(round(r["attributedCountRate"] * r["holdingCount"]) for r in series_rows if r["attributedCountRate"] is not None)
     out = {
         "year": 2006,
         "purpose": "Structural pilot attributing parsed N-Q holdings to explicit schedule asset-class sections, as a candidate legacy analogue for N-PORT ASSET_CAT=EC. No return/performance data used.",
+        "sourceRule": "Exactly the three accession files underlying the frozen nine-series 2006 PIT sample; no index lookup or dynamic sampling.",
         "rule": "Carry forward only explicit left-edge schedule headings: COMMON STOCK(S/SHARES), PREFERRED, SHORT-TERM/MONEY MARKET, or DEBT. Unknown remains unknown; no issuer-name inference.",
         "status": "Diagnostic only; does not yet filter historical universe inputs.",
+        "sourceResults": source_results,
         "seriesCount": len(series_rows),
         "holdingCount": total_count,
+        "attributedCount": attributed_count,
+        "attributedCountRate": attributed_count / total_count if total_count else None,
         "commonEquityCount": common_count,
         "commonEquityCountRate": common_count / total_count if total_count else None,
         "meanCommonEquityWeightAcrossSeries": common_weight / len(series_rows) if series_rows else None,
@@ -225,7 +227,7 @@ def main() -> None:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, indent=2) + "\n")
-    print("SUMMARY", json.dumps({k: v for k, v in out.items() if k != "series"}), flush=True)
+    print("SUMMARY", json.dumps({k: v for k, v in out.items() if k not in {"series", "sourceResults"}}), flush=True)
 
 
 if __name__ == "__main__":
