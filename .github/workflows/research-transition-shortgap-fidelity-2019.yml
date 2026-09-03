@@ -1,0 +1,24 @@
+name: Research Transition ShortGap Fidelity 2019
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-transition-shortgap-fidelity-2019.py
+      - scripts/research-transition-nearest-fidelity-2019.py
+      - .github/workflows/research-transition-shortgap-fidelity-2019.yml
+  workflow_dispatch:
+jobs:
+  fidelity:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-transition-shortgap-fidelity-2019.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transition-shortgap-fidelity-2019
+          path: data/research/transition-shortgap-fidelity-2019.json
+          if-no-files-found: warn
