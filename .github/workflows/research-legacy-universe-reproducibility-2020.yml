@@ -17,7 +17,9 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Full Gate B enumerates the frozen 2020 master-index target set and may fetch
+    # many shareholder reports. Keep this separate from the small fixed-fixture Gate A.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Validate paired-series universe reproducibility
