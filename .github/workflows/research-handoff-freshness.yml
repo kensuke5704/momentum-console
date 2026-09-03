@@ -1,0 +1,29 @@
+name: Research Handoff Freshness
+
+on:
+  push:
+    branches: ["research/cagr40-new-alpha-20260901"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve comparison base
+        id: base
+        shell: bash
+        run: |
+          BASE="${{ github.event.before }}"
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            BASE="$(git rev-parse HEAD^)"
+          fi
+          echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+      - name: Require canonical handoff update for material research changes
+        run: python3 scripts/check-handoff-freshness.py "${{ steps.base.outputs.sha }}" "$GITHUB_SHA"
