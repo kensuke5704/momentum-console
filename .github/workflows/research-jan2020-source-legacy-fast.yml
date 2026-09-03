@@ -1,0 +1,26 @@
+name: Research Jan2020 Source Legacy Fast
+
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-jan2020-source-legacy-fast.py"
+      - ".github/workflows/research-jan2020-source-legacy-fast.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-jan2020-source-legacy-fast.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jan2020-source-legacy-fast
+          path: data/research/jan2020-source-legacy-fast.json
+          if-no-files-found: warn
