@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "research" / "sec-issuer-country-pilot-2006.json"
-UA = {"User-Agent": "momentum-console research kensuke5704@users.noreply.github.com", "Accept": "text/plain,text/html,application/atom+xml,*/*"}
+UA = {"User-Agent": "momentum-console research kensuke5704@users.noreply.github.com", "Accept": "text/plain,text/html,*/*"}
 
 ISSUERS = [
     {"name": "Exxon Mobil Corp", "expectedClass": "US"},
@@ -62,17 +62,19 @@ def state_codes(text: str) -> list[str]:
     return list(dict.fromkeys(vals))
 
 
+def sec_query(params: dict[str, str]) -> str:
+    return "https://www.sec.gov/cgi-bin/browse-edgar?" + urllib.parse.urlencode(params)
+
+
 def search_company(name: str) -> dict:
-    q = urllib.parse.urlencode({
+    url = sec_query({
         "action": "getcompany",
         "company": name,
         "type": "",
         "dateb": "20061231",
         "owner": "exclude",
         "count": "40",
-        "output": "atom",
     })
-    url = "https://www.sec.gov/cgi-bin/browse-edgar?" + q
     text, transport, nbytes = get(url)
     return {
         "queryUrl": url,
@@ -87,16 +89,14 @@ def search_company(name: str) -> dict:
 
 
 def filings_by_cik(cik: str) -> dict:
-    q = urllib.parse.urlencode({
+    url = sec_query({
         "action": "getcompany",
         "CIK": cik,
         "type": "",
         "dateb": "20061231",
         "owner": "exclude",
         "count": "40",
-        "output": "atom",
     })
-    url = "https://www.sec.gov/cgi-bin/browse-edgar?" + q
     text, transport, nbytes = get(url)
     return {
         "queryUrl": url,
@@ -141,6 +141,8 @@ def main() -> None:
                     time.sleep(0.25)
                 row["filingIndexAttempts"] = attempts
                 codes = [c for a in attempts for c in a.get("stateCodes", [])]
+                if not codes:
+                    codes = filings.get("stateCodesInLookup", [])
                 if codes:
                     row["resolvedStateCode"] = codes[0]
                     row["resolvedClass"] = "US" if codes[0] in US_CODES else "FOREIGN_OR_NONSTATE"
@@ -152,12 +154,12 @@ def main() -> None:
 
     summary = {
         "year": 2006,
-        "purpose": "Transport/structure pilot only: test whether issuer name -> SEC CIK -> filing dated no later than 2006-12-31 -> filing-page state-of-incorporation can provide a point-in-time issuer-organization-country signal. Fixed US/foreign examples; no returns or universe outcomes used.",
+        "purpose": "Transport/structure pilot only: test whether issuer name -> SEC CIK -> filing dated no later than 2006-12-31 -> state-of-incorporation can provide a point-in-time issuer-organization-country signal. Fixed US/foreign examples; no returns or universe outcomes used.",
         "issuerCount": len(results),
         "lookupWithCik": sum(1 for r in results if r.get("companyLookup", {}).get("ciks")),
         "withArchiveUrl": sum(1 for r in results if r.get("filingLookup", {}).get("archiveUrls")),
         "withHistoricalStateCode": sum(1 for r in results if r.get("resolvedStateCode")),
-        "classificationCorrect": sum(1 for r in results if r.get("resolvedClass") == r.get("expectedClass")),
+        "classificationCorrect": sum(1 for r in results if (r.get("resolvedClass") == r.get("expectedClass") or (r.get("expectedClass") == "FOREIGN" and r.get("resolvedClass") == "FOREIGN_OR_NONSTATE"))),
         "results": results,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
