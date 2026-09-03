@@ -14,7 +14,7 @@ def base_name(s):
 
 def main():
     mp=json.loads(MAP.read_text()); master=json.loads(NPX.read_text())
-    # Build all valid identities grouped by issuer stem, retaining every ticker/securityId seen in the frozen N-PX master.
+    # Structural-only collision audit; no fuzzy similarity and no return/rank information.
     bystem=defaultdict(set)
     for r in master.get('records',[]):
         t=(r.get('ticker') or '').strip().upper(); sid=(r.get('securityId') or '').strip().upper()
@@ -27,12 +27,7 @@ def main():
         ident=(d['identities'][0]['ticker'],d['identities'][0]['securityId'])
         stem=base_name(d.get('matchedAlias') or d.get('description') or '')
         pool=sorted(bystem.get(stem,set()))
-        rows.append({
-          'description':d.get('description'),'weight':d.get('weight'),'seriesId':d.get('seriesId'),
-          'matchedIdentity':{'ticker':ident[0],'securityId':ident[1]},'issuerStem':stem,
-          'masterIdentityPool':[{'ticker':t,'securityId':s} for t,s in pool],
-          'poolIdentityCount':len(pool),'collisionFree':len(pool)==1 and pool[0]==ident,
-        })
+        rows.append({'description':d.get('description'),'weight':d.get('weight'),'seriesId':d.get('seriesId'),'matchedIdentity':{'ticker':ident[0],'securityId':ident[1]},'issuerStem':stem,'masterIdentityPool':[{'ticker':t,'securityId':s} for t,s in pool],'poolIdentityCount':len(pool),'collisionFree':len(pool)==1 and pool[0]==ident})
     summary={'suffixMatchCount':len(rows),'suffixMatchWeight':sum(float(r['weight'] or 0) for r in rows),'collisionFreeCount':sum(r['collisionFree'] for r in rows),'collisionFreeWeight':sum(float(r['weight'] or 0) for r in rows if r['collisionFree']),'collisionRows':sum(not r['collisionFree'] for r in rows)}
     print('SUMMARY',json.dumps(summary),flush=True)
     for r in rows:
