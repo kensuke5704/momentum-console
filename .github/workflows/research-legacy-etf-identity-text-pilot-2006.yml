@@ -1,0 +1,21 @@
+name: Research Legacy ETF Identity Text Pilot 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-legacy-etf-identity-text-pilot-2006.py"
+      - ".github/workflows/research-legacy-etf-identity-text-pilot-2006.yml"
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/research-legacy-etf-identity-text-pilot-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-etf-identity-text-pilot-2006
+          path: data/research/legacy-etf-identity-text-pilot-2006.json
