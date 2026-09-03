@@ -21,7 +21,8 @@ def get(url):
  raise RuntimeError('fetch failed '+url)
 def masters():
  rows=[]
- for y in (2005,2006):
+ # 2006 only: this transport is already confirmed on the prior legacy-series pilot.
+ for y in (2006,):
   for q in (1,2,3,4):
    url=f'https://www.sec.gov/Archives/edgar/full-index/{y}/QTR{q}/master.zip'; b,t=get(url)
    z=zipfile.ZipFile(io.BytesIO(b)); txt=z.read('master.idx').decode('latin1','replace')
@@ -37,8 +38,7 @@ def main():
  for row in unknown:
   q=issuer_base(row['issuer']); cands=by.get(q,[]); ciks=sorted(set(c['cik'] for c in cands)); rec={k:row.get(k) for k in ['ticker','securityId','issuer','aggregateWeight']};rec['normalizedIssuer']=q;rec['masterCandidateCiks']=ciks;rec['masterCandidateCount']=len(cands);rec['classification']='UNKNOWN'
   if len(ciks)==1:
-   # latest filing no later than asOfReportDate if possible, else earliest 2006 filing; all are historical and <=2006.
-   cand=sorted(cands,key=lambda x:x['date'],reverse=True)[0]; url='https://www.sec.gov/Archives/'+cand['path']
+   cand=sorted(cands,key=lambda x:x['date'])[0]; url='https://www.sec.gov/Archives/'+cand['path']
    try:
     b,t=get(url); text=b.decode('utf-8','replace');m=STATE_RE.search(text)
     if m:
@@ -46,6 +46,6 @@ def main():
    except Exception as e: rec['error']=type(e).__name__
   out.append(rec);print('PILOT',json.dumps(rec),flush=True)
  resolved=[r for r in out if r['classification']!='UNKNOWN']
- summary={'purpose':'PIT country resolver pilot using only 2005-2006 official SEC master indexes: unique exact normalized issuer company-name -> CIK, then historical 10-K SGML STATE-OF-INCORPORATION. No current metadata, returns, or ranks used.','sampleCount':len(out),'uniqueMasterCikCount':sum(len(r['masterCandidateCiks'])==1 for r in out),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r['aggregateWeight']) for r in resolved),'sampleWeight':sum(float(r['aggregateWeight']) for r in out),'rows':out}
+ summary={'purpose':'PIT country resolver pilot using official 2006 SEC master indexes only: unique exact normalized issuer company-name -> CIK, then historical 10-K SGML STATE-OF-INCORPORATION. No current metadata, returns, or ranks used.','sampleCount':len(out),'uniqueMasterCikCount':sum(len(r['masterCandidateCiks'])==1 for r in out),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r['aggregateWeight']) for r in resolved),'sampleWeight':sum(float(r['aggregateWeight']) for r in out),'rows':out}
  OUT.write_text(json.dumps(summary,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in summary.items() if k!='rows'}),flush=True)
 if __name__=='__main__':main()
