@@ -14,3 +14,4 @@ for s0 in man['sources']:
  s=dict(s0);s['filingDate']=agg.filing_date(s);text,tr=agg.fetch(s['sourceDocumentUrl']);src,m=agg.source_from_legacy(s,text,master,asof);m['transport']=tr;rows.append(m);print('STRUCTURE',json.dumps(m),flush=True)
 out={'asOf':asof,'rows':rows,'purpose':'Structural-only diagnostic before aggregate Universe scoring. No Production overlap/rank metrics are computed.'}
 q=ROOT/'data/research/gate-b-aggregate-structure-diagnostic-2020.json';q.parent.mkdir(parents=True,exist_ok=True);q.write_text(json.dumps(out,indent=2)+'\n')
+# trigger marker: 2026-09-03
