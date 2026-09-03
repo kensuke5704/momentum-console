@@ -1,0 +1,24 @@
+name: Research Country Full Input Audit 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-full-input-audit-2006.py"
+      - ".github/workflows/research-country-full-input-audit-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download EC mapping artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/map
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/map.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/map/nq-npx-mapping-2006.json data/research/
+      - run: python3 scripts/research-country-full-input-audit-2006.py
