@@ -5,6 +5,7 @@ on:
     paths:
       - "scripts/research-nq-npx-structural-mapping-2006.py"
       - ".github/workflows/research-nq-npx-structural-mapping-2006.yml"
+  workflow_dispatch:
 permissions:
   actions: read
   contents: read
