@@ -4,18 +4,16 @@ from __future__ import annotations
 import html
 import json
 import re
-import tempfile
 import time
 import urllib.request
-import zipfile
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "research" / "npx-security-master-pilot-2006.json"
-DRIVE = "https://drive.usercontent.google.com/download?id=1yfQxR45DZ_vM5pkFvgyexc10NNqbxpFN&export=download&confirm=t"
 UA = {"User-Agent": "momentum-console research kensuke5704@users.noreply.github.com", "Accept": "text/plain,text/html,*/*"}
 TARGET_FORMS = {"N-PX", "N-PX/A"}
+INDEX_BASE = "https://www.sec.gov/Archives/edgar/full-index/2006/QTR{q}/master.idx"
 TICKER_RE = re.compile(r"\bTICKER\s*:?\s*([A-Z0-9.\-/]+)", re.I)
 SECURITY_RE = re.compile(r"\bSECURITY\s+ID\s*:?\s*(?:CUSIP9\s+)?([A-Z0-9]{6,14})", re.I)
 MEETING_RE = re.compile(r"\bMEETING\s+DATE\s*:?\s*([^|]{6,30}?)(?=\s+(?:TICKER|SECURITY\s+ID|MEETING\s+TYPE|MEETING\s+STATUS|RECORD\s+DATE|$))", re.I)
@@ -24,50 +22,41 @@ BAD_ISSUER = re.compile(r"^(?:TICKER|SECURITY ID|MEETING DATE|MEETING STATUS|MEE
 BAD_TICKERS = {"N/A", "NA", "NONE", "NULL", "SECURITY", "TICKER", "--", "-"}
 
 
-def download(url: str, path: Path, attempts: int = 4) -> None:
+def fetch_index_text(url: str, attempts: int = 4) -> str:
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            if path.exists():
-                path.unlink()
             req = urllib.request.Request(url, headers=UA)
-            with urllib.request.urlopen(req, timeout=600) as r, open(path, "wb") as f:
-                while True:
-                    b = r.read(1024 * 1024)
-                    if not b:
-                        break
-                    f.write(b)
-            size = path.stat().st_size
-            if size < 1_000_000 or not zipfile.is_zipfile(path):
-                raise ValueError(f"historical index response is not the expected ZIP: bytes={size:,}")
-            print(f"index archive bytes={size:,} attempt={attempt}", flush=True)
-            return
+            with urllib.request.urlopen(req, timeout=120) as r:
+                data = r.read()
+            if len(data) < 100_000:
+                raise ValueError(f"index response too small: bytes={len(data):,}")
+            text = data.decode("latin-1", "replace")
+            if "CIK|Company Name|Form Type|Date Filed|Filename" not in text:
+                raise ValueError("unexpected SEC master.idx format")
+            print(f"index {url} bytes={len(data):,} attempt={attempt}", flush=True)
+            return text
         except Exception as e:
             last_error = e
-            print(f"index download attempt {attempt}/{attempts} failed: {e!r}", flush=True)
+            print(f"index fetch attempt {attempt}/{attempts} failed for {url}: {e!r}", flush=True)
             if attempt < attempts:
-                time.sleep(3.0 * attempt)
-    raise RuntimeError(f"unable to download valid historical index ZIP after {attempts} attempts") from last_error
+                time.sleep(2.0 * attempt)
+    raise RuntimeError(f"unable to fetch SEC master index: {url}") from last_error
 
 
 def filing_index_2006() -> list[dict]:
-    with tempfile.TemporaryDirectory() as td:
-        zp = Path(td) / "master.zip"
-        download(DRIVE, zp)
-        hits = []
-        with zipfile.ZipFile(zp) as z:
-            qfiles = sorted(n for n in z.namelist() if re.search(r"master_2006_QTR[1-4]\.idx$", n))
-            for name in qfiles:
-                text = z.read(name).decode("latin-1", "replace")
-                for line in text.splitlines():
-                    p = line.split("|")
-                    if len(p) < 5:
-                        continue
-                    cik, company, form, date_filed, filename = [x.strip() for x in p[:5]]
-                    if form.upper() in TARGET_FORMS and date_filed.startswith("2006"):
-                        hits.append({"cik": cik, "company": company, "form": form.upper(), "dateFiled": date_filed, "filename": filename})
-        uniq = {(x["cik"], x["form"], x["dateFiled"], x["filename"]): x for x in hits}
-        return sorted(uniq.values(), key=lambda x: (x["dateFiled"], x["cik"], x["filename"]))
+    hits = []
+    for q in range(1, 5):
+        text = fetch_index_text(INDEX_BASE.format(q=q))
+        for line in text.splitlines():
+            p = line.split("|")
+            if len(p) < 5:
+                continue
+            cik, company, form, date_filed, filename = [x.strip() for x in p[:5]]
+            if form.upper() in TARGET_FORMS and date_filed.startswith("2006"):
+                hits.append({"cik": cik, "company": company, "form": form.upper(), "dateFiled": date_filed, "filename": filename})
+    uniq = {(x["cik"], x["form"], x["dateFiled"], x["filename"]): x for x in hits}
+    return sorted(uniq.values(), key=lambda x: (x["dateFiled"], x["cik"], x["filename"]))
 
 
 def choose_samples(filings: list[dict]) -> list[dict]:
@@ -171,7 +160,7 @@ def main() -> None:
     filings = filing_index_2006()
     form_counts = Counter(x["form"] for x in filings)
     month_counts = Counter(x["dateFiled"][:7] for x in filings)
-    print("INDEX", json.dumps({"filings": len(filings), "forms": dict(form_counts), "months": dict(month_counts)}), flush=True)
+    print("INDEX", json.dumps({"source": "SEC full-index", "filings": len(filings), "forms": dict(form_counts), "months": dict(month_counts)}), flush=True)
     samples = choose_samples(filings)
     print(f"samples={len(samples)}", flush=True)
     results = []
@@ -200,6 +189,7 @@ def main() -> None:
         return sum(1 for r in ok if pred(r)) / len(ok) if ok else None
     summary = {
         "year": 2006,
+        "indexSource": "Official SEC EDGAR quarterly full-index master.idx",
         "allNpxFilings": len(filings),
         "formCounts": dict(form_counts),
         "monthCounts": dict(month_counts),
