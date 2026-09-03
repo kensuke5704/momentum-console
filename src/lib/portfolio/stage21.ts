@@ -84,7 +84,7 @@ function simulateNextOpen(histories:Record<string,PricePoint[]>,snaps:FixedSnap[
   if(monthly||changed){pending={fixed:snap.target,regime:row.regime};if(lastRegime&&row.regime!==lastRegime)events.push({date,type:"REGIME_CHANGE_CLOSE",symbols:[],reason:`${lastRegime} -> ${row.regime}`});lastMonth=month;lastRegime=row.regime;lastFixed=fixedKey}
  }
  const finalEquity=curve.at(-1)?.equity??0;
- const holdings=[...positions].map(([symbol,shares]):PortfolioHolding=>({symbol,entryPrice:entryPrices.get(symbol)??lastClose.get(symbol)??0,currentPrice:lastClose.get(symbol)??null,targetWeight:finalEquity>0?(shares*(lastClose.get(symbol)??0))/finalEquity:0,role:symbol==="GLDM"?"DIVERSIFIER":"FIXED60"}));
+ const holdings=[...positions].map(([symbol,shares]):PortfolioHolding=>({symbol,entryPrice:entryPrices.get(symbol)??lastClose.get(symbol)??0,currentPrice:lastClose.get(symbol)??null,stopLevel:null,targetWeight:finalEquity>0?(shares*(lastClose.get(symbol)??0))/finalEquity:0,role:symbol==="GLDM"?"DIVERSIFIER":"FIXED60"}));
  return{backtest:{strategyId:PRODUCTION_PORTFOLIO.strategyId,equityCurve:curve,stats:performanceStats(curve),benchmark:null,events},holdings};
 }
 
@@ -97,8 +97,8 @@ export function buildStage21Portfolio(histories:Record<string,PricePoint[]>,univ
  const firstOosDate=latestDate===PRODUCTION_PORTFOLIO.oosStartDate,monthly=latestDate.slice(0,7)!==previous.date.slice(0,7),changed=regime.regime!==previousRegime?.regime||targetKey(latest.target)!==targetKey(previous.target),eligible=latestDate>=PRODUCTION_PORTFOLIO.oosStartDate;
  const rebalance=eligible&&(firstOosDate||monthly||changed),executionDate=rebalance?nextUsTradingSession(latestDate):null;
  const reason=!eligible?`Stage21 OOS starts ${PRODUCTION_PORTFOLIO.oosStartDate}`:firstOosDate?"Initial frozen Stage21 allocation":regime.regime!==previousRegime?.regime?`Regime changed ${previousRegime?.regime??"—"} -> ${regime.regime}`:targetKey(latest.target)!==targetKey(previous.target)?"Fixed60 funded target changed":monthly?"Monthly Stage21 rebalance":"Target unchanged";
- const fixedEntryPrices=new Map(innerState.currentPositions.map(position=>[position.symbol,position.entryPrice]));
- const holdings=simulation.holdings.map(holding=>fixedEntryPrices.has(holding.symbol)?{...holding,entryPrice:fixedEntryPrices.get(holding.symbol)!}:holding);
+ const fixedPositions=new Map(innerState.currentPositions.map(position=>[position.symbol,position]));
+ const holdings=simulation.holdings.map(holding=>{const fixed=fixedPositions.get(holding.symbol);return fixed?{...holding,entryPrice:fixed.entryPrice,stopLevel:fixed.stopLevel}:holding});
  const portfolioState:PortfolioLiveState={strategyId:PRODUCTION_PORTFOLIO.strategyId,asOf:latestDate,regime:regime.regime,cftc:regime.cftc,m3:regime.m3,fixed60:{strategyId:PRODUCTION_STRATEGY.strategyId,riskState:innerState.state,symbols:latest.target.symbols,innerWeights:latest.target.weights},targets,holdings,nextAction:{type:rebalance?"REBALANCE_NEXT_OPEN":"HOLD",executionDate,targets,reason}};
  return{backtest,portfolioState,innerState};
 }

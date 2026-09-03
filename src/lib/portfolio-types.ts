@@ -1,6 +1,6 @@
 export type PortfolioRegime = "NORMAL"|"YELLOW"|"DEEP";
 export type PortfolioTarget = { symbol:string; weight:number; role:"FIXED60"|"DIVERSIFIER"|"CASH" };
-export type PortfolioHolding = { symbol:string; entryPrice:number; currentPrice:number|null; targetWeight:number; role:"FIXED60"|"DIVERSIFIER" };
+export type PortfolioHolding = { symbol:string; entryPrice:number; currentPrice:number|null; stopLevel:number|null; targetWeight:number; role:"FIXED60"|"DIVERSIFIER" };
 export type PortfolioNextAction = {
   type:"REBALANCE_NEXT_OPEN"|"HOLD";
   executionDate:string|null;

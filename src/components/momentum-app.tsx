@@ -110,6 +110,16 @@ const usCloseJst = (date: string) => {
 const targetText = (targets: PortfolioTarget[]) =>
   targets.map((target) => `${target.symbol} ${pct(target.weight, 1)}`).join(" / ") || "—";
 
+const fixedRiskLabel = (state: string) => ({
+  INVESTED: "INVESTED",
+  LOCKED_MARKET: "MARKET LOCK",
+  LOCKED_STOP: "STOP LOCK",
+  LOCKED_CIRCUIT: "CIRCUIT LOCK",
+  WAITING_RECOVERY: "RECOVERY",
+  READY_NEXT_OPEN: "READY",
+  CASH: "CASH",
+}[state] ?? state);
+
 function Metric({ label, value, nowrap = false }: { label: string; value: string; nowrap?: boolean }) {
   const density = value.length > 16 ? " metric-value-dense" : value.length > 10 ? " metric-value-compact" : "";
   return <div className={`dynamic-metric${nowrap ? " metric-nowrap" : ""}`}><span>{label}</span><strong className={density.trim()} title={value}>{value}</strong></div>;
@@ -229,7 +239,7 @@ const asOfLabel = (value: string) => {
 function Portfolio({ data }: { data: DashboardPayload }) {
   const positions = [...data.portfolioState.holdings, ...data.portfolioState.targets
     .filter((target) => target.symbol !== "CASH" && !data.portfolioState.holdings.some((holding) => holding.symbol === target.symbol))
-    .map((target) => ({ symbol: target.symbol, entryPrice: null, currentPrice: null, targetWeight: target.weight, role: target.role }))]
+    .map((target) => ({ symbol: target.symbol, entryPrice: null, currentPrice: null, stopLevel: null, targetWeight: target.weight, role: target.role }))]
     .map((holding) => {
       const latest = data.latestPrices?.[holding.symbol];
       const currentPrice = latest?.price ?? holding.currentPrice;
@@ -239,11 +249,12 @@ function Portfolio({ data }: { data: DashboardPayload }) {
 
   return <div className="dynamic-stack"><Section title="Current Positions" asOf={asOfLabel(latestAsOf)}>
     <div className="table-scroll portfolio-table">
-      {positions.length ? <table className="dynamic-table positions-table"><thead><tr><th>Ticker</th><th>Entry Price</th><th>Current Price</th><th>P/L</th></tr></thead>
+      {positions.length ? <table className="dynamic-table positions-table"><thead><tr><th>Ticker</th><th>Entry Price</th><th>Current Price</th><th>Stop</th><th>P/L</th></tr></thead>
         <tbody>{positions.map((position) => <tr key={position.symbol}>
           <td className="ticker-data" data-label="Ticker"><strong>{position.symbol}</strong></td>
           <td data-label="Entry Price">{price(position.entryPrice)}</td>
           <td data-label="Current Price">{price(position.currentPrice)}</td>
+          <td data-label="Stop">{price(position.stopLevel)}</td>
           <td data-label="P/L"><strong className={position.pnl != null && position.pnl < 0 ? "tone-bad" : "tone-good"}>{pct(position.pnl, 2)}</strong></td>
         </tr>)}</tbody></table> : <div className="empty-state">No open positions</div>}
     </div>
@@ -276,7 +287,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     return () => window.removeEventListener("keydown", close);
   }, [detail]);
 
-  const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "nport" ? "N-PORT Deadline" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "fixed60" ? "Inner Fixed60" : "OOS Gate";
+  const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "nport" ? "N-PORT Deadline" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "fixed60" ? "Fixed60" : "OOS Gate";
 
   return <div className="dynamic-stack">
     <Section title="Next Action">
@@ -296,7 +307,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     <div className="dynamic-metric-grid four overview-status-grid">
       <StatusMetric label="CFTC" value={portfolio.cftc.yellow ? "YELLOW" : "CLEAR"} onClick={() => setDetail("cftc")} />
       <StatusMetric label="M3 Deep" value={portfolio.m3.deep ? "ON" : "OFF"} onClick={() => setDetail("m3")} />
-      <StatusMetric label="Inner Fixed60" value={portfolio.fixed60.riskState} onClick={() => setDetail("fixed60")} />
+      <StatusMetric label="Fixed60" value={fixedRiskLabel(portfolio.fixed60.riskState)} onClick={() => setDetail("fixed60")} />
       <StatusMetric label="OOS Gate" value={gate.level} onClick={() => setDetail("oos")} />
     </div>
 
