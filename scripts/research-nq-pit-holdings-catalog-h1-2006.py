@@ -88,8 +88,16 @@ def main() -> None:
         request = requested[key]
         inv = inv_by_key.get(key)
         if inv is None:
-            filing_audit.append({**request, "months": sorted(request["months"]), "error": "INVENTORY_ROW_NOT_FOUND"})
+            filing_audit.append({
+                "cik": request["cik"],
+                "accession": request["accession"],
+                "registrant": request["registrant"],
+                "targetSeriesIds": sorted(request["series"]),
+                "months": sorted(request["months"]),
+                "error": "INVENTORY_ROW_NOT_FOUND",
+            })
             continue
+
         target_ids = set(request["series"])
         audit_row = {
             "cik": request["cik"],
@@ -108,9 +116,9 @@ def main() -> None:
             audit_row["reportDate"] = iso8(report_m.group(1) if report_m else None)
             audit_row["headerFilingDate"] = iso8(filed_m.group(1) if filed_m else None)
 
-            # Parse every filing-time registered series for boundary assignment. Do not use
-            # the old registrant-name ETF heuristic; the strict catalog alone determines
-            # which Series IDs may be retained.
+            # All filing-time registered series participate in boundary assignment.
+            # The strict source catalog alone determines which Series IDs are retained.
+            # Do not use the old registrant-name ETF heuristic for source selection.
             all_series = seg.meta.parse_series_contracts(submission, request["registrant"])
             all_by_id = {s.get("seriesId"): s for s in all_series if s.get("seriesId")}
             primary, text = seg.embedded_primary_nq(submission)
@@ -141,8 +149,7 @@ def main() -> None:
                         "sourceFilename": inv["filename"],
                         "primaryDocument": primary,
                         "schedulePages": 0,
-                        "eligible": False,
-                        "eligibilityReason": "NO_GROUPED_SCHEDULE",
+                        "parseStatus": "NO_GROUPED_SCHEDULE",
                         "holdings": [],
                     }
                     continue
@@ -150,19 +157,6 @@ def main() -> None:
                 method, holdings, total = corrected.parsed_holdings("\n".join(blocks))
                 count = len(holdings)
                 top10 = sum(h.get("weight", 0.0) for h in holdings[:10]) if holdings else 0.0
-                name_ok = seg.eligible_name(name)
-                eligible = bool(name_ok and 10 <= count <= 120 and total > 0 and top10 >= 25.0)
-                reasons = []
-                if not name_ok:
-                    reasons.append("NAME_EXCLUSION")
-                if count < 10:
-                    reasons.append("HOLDING_COUNT_LT_10")
-                if count > 120:
-                    reasons.append("HOLDING_COUNT_GT_120")
-                if total <= 0:
-                    reasons.append("NONPOSITIVE_PARSED_VALUE")
-                if top10 < 25.0:
-                    reasons.append("TOP10_LT_25")
                 by_series[sid] = {
                     "seriesId": sid,
                     "seriesName": name,
@@ -176,29 +170,24 @@ def main() -> None:
                     "assignmentRule": "EXPLICIT_SERIES_BOUNDARY_GROUP_ALL_REGISTERED_SERIES",
                     "schedulePages": len(blocks),
                     "parseMethod": method,
+                    "parseStatus": "PARSED" if holdings else "PARSED_ZERO_HOLDINGS",
                     "parsedHoldingCount": count,
                     "parsedMarketValueTotal": total,
-                    "top10Weight": top10,
-                    "eligibleByName": name_ok,
-                    "eligible": eligible,
-                    "eligibilityReason": "ELIGIBLE" if eligible else "+".join(reasons),
+                    "rawTop10WeightDiagnostic": top10,
                     "holdings": holdings,
                 }
             parsed[key] = by_series
-            audit_row["parsedTargetSeriesCount"] = len(by_series)
-            audit_row["eligibleTargetSeriesCount"] = sum(bool(x["eligible"]) for x in by_series.values())
+            audit_row["parsedTargetSeriesCount"] = sum(x.get("parseStatus") == "PARSED" for x in by_series.values())
             print(
                 "FILING",
-                json.dumps(
-                    {
-                        "index": i,
-                        "total": len(requested),
-                        "accession": request["accession"],
-                        "targets": len(target_ids),
-                        "groupedTargets": len(target_ids & set(grouped)),
-                        "eligibleTargets": audit_row["eligibleTargetSeriesCount"],
-                    }
-                ),
+                json.dumps({
+                    "index": i,
+                    "total": len(requested),
+                    "accession": request["accession"],
+                    "targets": len(target_ids),
+                    "groupedTargets": len(target_ids & set(grouped)),
+                    "parsedTargets": audit_row["parsedTargetSeriesCount"],
+                }),
                 flush=True,
             )
         except Exception as exc:
@@ -210,8 +199,7 @@ def main() -> None:
 
     snapshots = []
     for snap in catalog["monthSnapshots"]:
-        all_records = []
-        eligible_records = []
+        records = []
         missing = []
         for source in snap["sourceFilings"]:
             key = source_key(source)
@@ -219,51 +207,51 @@ def main() -> None:
             if record is None:
                 missing.append({"seriesId": source["seriesId"], "accession": source["accession"]})
                 continue
-            all_records.append(record)
-            if record["eligible"]:
-                eligible_records.append(record)
-        snapshots.append(
-            {
-                "signalMonth": snap["signalMonth"],
-                "asOf": snap["asOf"],
-                "catalogSourceSeriesCount": snap["sourceSeriesCount"],
-                "parsedSourceSeriesCount": len(all_records),
-                "eligibleSourceSeriesCount": len(eligible_records),
-                "missingParsedSeries": missing,
-                "sourceFilings": all_records,
-                "eligibleSourceFilings": eligible_records,
-            }
-        )
+            records.append(record)
+        snapshots.append({
+            "signalMonth": snap["signalMonth"],
+            "asOf": snap["asOf"],
+            "catalogSourceSeriesCount": snap["sourceSeriesCount"],
+            "parsedSourceSeriesCount": sum(x.get("parseStatus") == "PARSED" for x in records),
+            "missingParsedSeries": missing,
+            "sourceFilings": records,
+        })
         print(
             "MONTH",
-            json.dumps(
-                {
-                    "signalMonth": snap["signalMonth"],
-                    "catalog": snap["sourceSeriesCount"],
-                    "parsed": len(all_records),
-                    "eligible": len(eligible_records),
-                    "missing": len(missing),
-                }
-            ),
+            json.dumps({
+                "signalMonth": snap["signalMonth"],
+                "catalog": snap["sourceSeriesCount"],
+                "records": len(records),
+                "parsed": sum(x.get("parseStatus") == "PARSED" for x in records),
+                "missing": len(missing),
+            }),
             flush=True,
         )
 
     out = {
         "purpose": (
-            "Catalog-driven H1 2006 N-Q holdings extraction. Source selection comes exclusively from the "
-            "strict historical ETF Series-ID PIT catalog. Every filing-time registered series is used only "
-            "for explicit schedule-boundary assignment; only catalog-positive Series IDs are retained. "
-            "For each monthly snapshot the catalog has already selected the latest N-Q/N-Q-A public by the "
-            "month end, after which Production-style source-filing eligibility is applied. No known "
-            "registrant regex, holdings-based source discovery, ranks, returns, or strategy outcomes are used."
+            "Catalog-driven H1 2006 raw N-Q holdings extraction. Source selection comes exclusively from "
+            "the strict historical ETF Series-ID PIT catalog. Every filing-time registered series is used "
+            "only for explicit schedule-boundary assignment; only catalog-positive Series IDs are retained. "
+            "The catalog has already selected the latest N-Q/N-Q-A public by each month end. No source ETF "
+            "eligibility is applied at this raw stage because Production applies name/count/concentration "
+            "eligibility after EC+US+CORP holding filters. No known registrant regex, holdings-based source "
+            "discovery, ranks, returns, or strategy outcomes are used."
         ),
         "sourceCatalogRunId": 33898993220,
         "sourceInventoryArtifactId": 9946255797,
         "uniqueSourceFilingCount": len(requested),
         "filingFetchSuccessCount": sum("error" not in x for x in filing_audit),
         "filingFetchErrorCount": sum("error" in x for x in filing_audit),
-        "assignmentRule": "Exact filing-time registered series title around each schedule marker; all registered series participate in boundary assignment, but only strict-catalog Series IDs are retained.",
-        "eligibilityRule": "After latest public filing selection per Series ID: Production name exclusions, 10-120 positive parsed holdings, positive parsed market value, normalized top-10 weight >=25%. Weights remain parser-relative until later EC/identity validation.",
+        "assignmentRule": (
+            "Exact filing-time registered series title around each schedule marker; all registered series "
+            "participate in boundary assignment, but only strict-catalog Series IDs are retained."
+        ),
+        "eligibilityStatus": (
+            "DEFERRED. Production quarterly ingestion first keeps EC+US+CORP holdings and latestPublicFilings "
+            "then applies source-filing name/count/top10 eligibility. Historical reconstruction therefore "
+            "must defer the analogous eligibility until after EC and conservative issuer-country mapping."
+        ),
         "filingAudit": filing_audit,
         "monthSnapshots": snapshots,
     }
@@ -271,13 +259,11 @@ def main() -> None:
     OUT.write_text(json.dumps(out, indent=2) + "\n")
     print(
         "SUMMARY",
-        json.dumps(
-            {
-                "uniqueSourceFilingCount": out["uniqueSourceFilingCount"],
-                "filingFetchSuccessCount": out["filingFetchSuccessCount"],
-                "filingFetchErrorCount": out["filingFetchErrorCount"],
-            }
-        ),
+        json.dumps({
+            "uniqueSourceFilingCount": out["uniqueSourceFilingCount"],
+            "filingFetchSuccessCount": out["filingFetchSuccessCount"],
+            "filingFetchErrorCount": out["filingFetchErrorCount"],
+        }),
         flush=True,
     )
 
