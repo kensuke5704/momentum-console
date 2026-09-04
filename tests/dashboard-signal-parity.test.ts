@@ -47,12 +47,15 @@ test("Stage21 carries the last confirmed close across an isolated held-asset dat
 });
 
 test("OOS keeps the current daily simulation when the displayed backtest is frozen",()=>{
- const qqq=[point("2026-08-28",100),point("2026-08-31",101),point("2026-09-01",102)],gldm=[point("2026-08-28",50),point("2026-08-31",50.3),point("2026-09-01",50.4)];
+ const qqq=[point("2026-08-28",100),point("2026-08-31",101),point("2026-09-01",102),point("2026-09-02",103)],gldm=[point("2026-08-28",50),point("2026-08-31",50.3),point("2026-09-01",50.4),point("2026-09-02",50.5)];
  const live=buildDashboardPayload({QQQ:qqq,GLDM:gldm},[universe],cftc);
  const frozen={...live.backtest,equityCurve:live.backtest.equityCurve.slice(0,1)};
  const dashboard=buildDashboardPayload({QQQ:qqq,GLDM:gldm},[universe],cftc,"live",{frozenBacktest:frozen});
  assert.equal(dashboard.backtest.equityCurve.length,1);
  assert.ok(dashboard.oosBacktest.equityCurve.length>dashboard.backtest.equityCurve.length);
+ assert.equal(dashboard.portfolioState.nextAction.type,"REBALANCE_NEXT_OPEN");
+ assert.equal(dashboard.portfolioState.nextAction.executionDate,"2026-09-03");
+ assert.equal(dashboard.portfolioState.nextAction.reason,"Initial frozen Stage21 allocation");
 });
 
 test("Stage21 keeps its GLDM/Cash sleeve when the shared Fixed60 circuit exits",()=>{
