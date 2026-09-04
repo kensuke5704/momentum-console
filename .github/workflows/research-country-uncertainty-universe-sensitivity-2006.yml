@@ -6,6 +6,7 @@ on:
       - "scripts/research-country-uncertainty-universe-sensitivity-2006.py"
       - ".github/workflows/research-country-uncertainty-universe-sensitivity-2006.yml"
 permissions:
+  actions: read
   contents: read
 jobs:
   sensitivity:
@@ -21,7 +22,7 @@ jobs:
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
           unzip -q /tmp/pit.zip -d /tmp/pit
           cp /tmp/pit/nq-pit-holdings-2006-ec-filtered.json data/research/
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9925684884/zip > /tmp/country.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9938416132/zip > /tmp/country.zip
           unzip -q /tmp/country.zip -d /tmp/country
           cp /tmp/country/country-final-structural-merge-2006.json data/research/
       - run: python3 scripts/research-country-uncertainty-universe-sensitivity-2006.py
