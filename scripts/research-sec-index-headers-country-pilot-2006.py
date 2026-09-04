@@ -14,6 +14,7 @@ ENTITY_RE=re.compile(r'(?m)^\s*(?:[-*]\s*)?([^\n\r|]{2,140}?)\s+\((Filer|Issuer|
 JURIS_RE=re.compile(r'\s*/[A-Z0-9]{2,3}/?\s*$',re.I)
 FORM_PRIORITY={'10-K':0,'10-K/A':1,'10-Q':2,'10-Q/A':3,'8-K':4,'8-K/A':5,'DEF 14A':6,'DEFA14A':7,'PRE 14A':8,'11-K':9,'S-8':10,'S-8 POS':11}
 ISSUER_FORMS=set(FORM_PRIORITY)
+SGML_BLOCK_RE=re.compile(r'<COMPANY-DATA>(.*?)(?=</COMPANY-DATA>|<FILING-VALUES>|<BUSINESS-ADDRESS>|<MAIL-ADDRESS>|<FORMER-COMPANY>|</FILER>|</ISSUER>|</REPORTING-OWNER>|$)',re.I|re.S)
 
 def normalize_company(s):
  return old.normalize_name(JURIS_RE.sub('',s or ''))
@@ -22,8 +23,7 @@ def filing_sort_key(r):
  return (FORM_PRIORITY.get(r['form'],50),-int(r['dateFiled'].replace('-','')),r['filename'])
 
 def get_master(year,q):
- base=f'https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{q}'
- zurl=base+'/master.zip'
+ base=f'https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{q}';zurl=base+'/master.zip'
  try:
   req=urllib.request.Request(zurl,headers=UA)
   with urllib.request.urlopen(req,timeout=45) as r:data=r.read(20_000_000)
@@ -31,8 +31,7 @@ def get_master(year,q):
    name=next(n for n in z.namelist() if n.lower().endswith('master.idx'))
    return z.read(name).decode('latin-1','replace'),zurl
  except Exception as ze:
-  text,tr=old.get(base+'/master.idx',timeout=60)
-  return text,tr+' | zip_error='+type(ze).__name__
+  text,tr=old.get(base+'/master.idx',timeout=60);return text,tr+' | zip_error='+type(ze).__name__
 
 def load_master(years):
  rows=[];transports={}
@@ -47,18 +46,34 @@ def load_master(years):
     rows.append({'cik':cik.zfill(10),'company':company,'normalizedCompany':normalize_company(company),'form':form,'dateFiled':date,'filename':filename})
  return rows,transports
 
+def submission_prefix(filename,limit=131072):
+ url='https://www.sec.gov/Archives/'+filename.lstrip('/')
+ headers={**UA,'Range':f'bytes=0-{limit-1}'}
+ req=urllib.request.Request(url,headers=headers)
+ with urllib.request.urlopen(req,timeout=18) as r:
+  return r.read(limit).decode('latin-1','replace'),url,getattr(r,'status',None)
+
+def sgml_entity_state(target,cik,text):
+ nt=normalize_company(target);zcik=str(cik).zfill(10)
+ for block in SGML_BLOCK_RE.findall(text):
+  nm=re.search(r'<CONFORMED-NAME>\s*([^\r\n<]+)',block,re.I)
+  ck=re.search(r'<CIK>\s*(\d{1,10})',block,re.I)
+  st=re.search(r'<STATE-OF-INCORPORATION>\s*([A-Z0-9]{2,3})',block,re.I)
+  if not nm or not ck:continue
+  name=nm.group(1).strip();mcik=ck.group(1).zfill(10)
+  if mcik==zcik and normalize_company(name)==nt and st:return st.group(1).upper(),name
+ return None,None
+
 def accession_parts(filename):
  m=re.search(r'edgar/data/(\d+)/(\d{10}-\d{2}-\d{6})\.txt$',filename,re.I)
  if not m:return None
- cik=str(int(m.group(1)));acc=m.group(2);ad=acc.replace('-','')
- return cik,acc,ad
+ cik=str(int(m.group(1)));acc=m.group(2);return cik,acc,acc.replace('-','')
 
 def filing_index_urls_from_filename(filename):
  parts=accession_parts(filename)
  if not parts:return []
- cik,acc,ad=parts
- # SEC documents the post-2000 filing index as <accession>-index.html.
- return [f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index.html']
+ cik,acc,ad=parts;base=f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index'
+ return [base+'.htm',base+'.html']
 
 def entity_state(target,cik,text):
  matches=list(ENTITY_RE.finditer(text));nt=normalize_company(target);zcik=str(cik).zfill(10)
@@ -66,16 +81,14 @@ def entity_state(target,cik,text):
   name,role,mcik=m.group(1).strip(),m.group(2).upper(),m.group(3).zfill(10)
   if mcik!=zcik or normalize_company(name)!=nt:continue
   end=matches[i+1].start() if i+1<len(matches) else min(len(text),m.end()+3000)
-  block=text[m.start():end]
-  states=list(dict.fromkeys(x.upper() for x in old.STATE_RE.findall(block)))
+  states=list(dict.fromkeys(x.upper() for x in old.STATE_RE.findall(text[m.start():end])))
   if states:return states[0],name,role
  return None,None,None
 
 def resolve_from_rows(row,master_rows):
  target=normalize_company(row.get('issuer') or '');dateb=row['asOfReportDate'];rec={k:row.get(k) for k in ['ticker','securityId','issuer','aggregateWeight','asOfReportDate']};rec['classification']='UNKNOWN'
  issuer_rows=[r for r in master_rows if r['form'] in ISSUER_FORMS and r['dateFiled']<=dateb]
- exact=[r for r in issuer_rows if r['normalizedCompany']==target]
- by_cik=defaultdict(list)
+ exact=[r for r in issuer_rows if r['normalizedCompany']==target];by_cik=defaultdict(list)
  for r in exact:by_cik[r['cik']].append(r)
  seed=None;source=None;candidates=[]
  if len(by_cik)==1:
@@ -87,30 +100,34 @@ def resolve_from_rows(row,master_rows):
  rec['historicalExactCikCount']=len(by_cik);rec['historicalExactCiks']=sorted(by_cik)[:6]
  if not seed:return rec
  rec['seedCik']=seed;rec['seedSource']=source;rec['filingCandidateCount']=len(candidates)
- seen=set()
+ # Primary route: only the beginning of the official complete submission. The SGML header binds name, CIK and state in one COMPANY-DATA block.
  for fr in candidates[:6]:
+  try:
+   text,url,status=submission_prefix(fr['filename']);st,name=sgml_entity_state(row['issuer'],seed,text)
+   rec.setdefault('attempts',[]).append({'route':'SUBMISSION_RANGE','form':fr['form'],'dateFiled':fr['dateFiled'],'submissionUrl':url,'httpStatus':status,'historicalEntityName':name,'stateCode':st})
+   if st:
+    rec.update({'classification':'US' if st in old.US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_SUBMISSION_SGML_ENTITY_STATE_RANGE','submissionUrl':url,'historicalEntityName':name,'evidenceForm':fr['form'],'evidenceDateFiled':fr['dateFiled']});return rec
+  except Exception as e:rec.setdefault('attempts',[]).append({'route':'SUBMISSION_RANGE','form':fr['form'],'dateFiled':fr['dateFiled'],'error':type(e).__name__})
+  time.sleep(.03)
+ # Secondary diagnostic fallback: filing-index rendering. This does not relax identity or PIT requirements.
+ for fr in candidates[:3]:
   for iu in filing_index_urls_from_filename(fr['filename']):
-   if iu in seen:continue
-   seen.add(iu)
    try:
-    text,tr=old.get(iu,timeout=9);st,name,role=entity_state(row['issuer'],seed,text)
-    rec.setdefault('attempts',[]).append({'form':fr['form'],'dateFiled':fr['dateFiled'],'indexUrl':iu,'transport':tr,'entityName':name,'entityRole':role,'stateCode':st})
+    text,tr=old.get(iu,timeout=7);st,name,role=entity_state(row['issuer'],seed,text)
+    rec.setdefault('attempts',[]).append({'route':'FILING_INDEX','form':fr['form'],'dateFiled':fr['dateFiled'],'indexUrl':iu,'transport':tr,'entityName':name,'entityRole':role,'stateCode':st})
     if st:
      rec.update({'classification':'US' if st in old.US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_FILING_INDEX_ENTITY_STATE','indexUrl':iu,'historicalEntityName':name,'historicalEntityRole':role,'evidenceForm':fr['form'],'evidenceDateFiled':fr['dateFiled']});return rec
-   except Exception as e:rec.setdefault('attempts',[]).append({'form':fr['form'],'dateFiled':fr['dateFiled'],'indexUrl':iu,'error':type(e).__name__})
-   time.sleep(.03)
+   except Exception as e:rec.setdefault('attempts',[]).append({'route':'FILING_INDEX','form':fr['form'],'dateFiled':fr['dateFiled'],'indexUrl':iu,'error':type(e).__name__})
  return rec
 
 def main():
- data=json.loads(SRC.read_text())
- unknown=sorted([r for r in data['identityRows'] if r.get('classification')=='UNKNOWN'],key=lambda r:float(r.get('aggregateWeight') or 0),reverse=True)[:10]
- years=sorted({int(r['asOfReportDate'][:4]) for r in unknown})
- master_rows,master_transports=load_master(years)
+ data=json.loads(SRC.read_text());unknown=sorted([r for r in data['identityRows'] if r.get('classification')=='UNKNOWN'],key=lambda r:float(r.get('aggregateWeight') or 0),reverse=True)[:10]
+ years=sorted({int(r['asOfReportDate'][:4]) for r in unknown});master_rows,master_transports=load_master(years)
  print('MASTER',json.dumps({'years':years,'rows':len(master_rows),'issuerFormRows':sum(r['form'] in ISSUER_FORMS for r in master_rows),'transports':master_transports}),flush=True)
  results=[]
  for row in unknown:
-  rec=resolve_from_rows(row,master_rows);results.append(rec);print('INDEX',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','filingCandidateCount','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
+  rec=resolve_from_rows(row,master_rows);results.append(rec);print('COUNTRY',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
- out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year. Historical CIK seeding is restricted to issuer-bearing periodic/current/proxy forms, eliminating NO ACT and other non-issuer name collisions. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Filing retrieval prioritizes 10-K, 10-Q and 8-K and uses SEC standard post-2000 <accession>-index.html paths. Classification still requires a historical filing-index entity block with the same CIK, matching normalized issuer name, and State of Incorp. SEC trailing jurisdiction annotations are normalized. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
+ out={'purpose':'Fast top-10 UNKNOWN PIT country pilot. Historical CIK seeding uses only issuer-bearing forms in official 2005 SEC master indexes. Primary country evidence is the first 128 KiB of the official complete-submission SGML fetched with HTTP Range; classification requires one COMPANY-DATA block with the same seeded historical CIK, matching normalized historical issuer name, and STATE-OF-INCORPORATION. Filing-index parsing is diagnostic fallback only. This reopens the formerly rejected complete-submission route because historical master indexes now supply the correct PIT issuer CIK and exact filing path and Range avoids full-file transport. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('results','masterIndexTransports')}),flush=True)
 if __name__=='__main__':main()
