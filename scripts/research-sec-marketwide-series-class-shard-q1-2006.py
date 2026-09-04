@@ -13,6 +13,7 @@ SRC = ROOT / 'data/research/sec-marketwide-nq-inventory-q1-2006.json'
 SHARD_INDEX = int(os.environ.get('SHARD_INDEX', '0'))
 SHARD_COUNT = int(os.environ.get('SHARD_COUNT', '1'))
 OUT = ROOT / f'data/research/sec-marketwide-series-class-q1-2006-shard-{SHARD_INDEX:02d}.json'
+INVENTORY_ARTIFACT_ID = 9945162305
 UA = {
     'User-Agent': 'Kensuke Kawamura kensuke5704@gmail.com momentum-console research',
     'Accept': 'text/html,text/plain,*/*',
@@ -23,17 +24,11 @@ CID_RE = re.compile(r'\b(C\d{9})\b', re.I)
 TICKER_RE = re.compile(r'^[A-Z][A-Z0-9.\-]{0,9}$')
 
 
-def fetch(url: str, timeout: int = 18):
-    errors = []
-    for candidate in (url, 'https://r.jina.ai/' + url):
-        try:
-            req = urllib.request.Request(candidate, headers=UA)
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                payload = response.read(1_500_000)
-            return payload.decode('utf-8', 'replace'), candidate, errors
-        except Exception as exc:
-            errors.append({'transport': candidate, 'error': type(exc).__name__})
-    raise RuntimeError(json.dumps(errors))
+def fetch_one(url: str, timeout: int = 12):
+    req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        payload = response.read(1_500_000)
+    return payload.decode('utf-8', 'replace')
 
 
 def after_markdown_link(line: str, ident: str):
@@ -57,8 +52,6 @@ def parse_pairs(text: str):
             continue
         sid = sm.group(1).upper()
         series_name = after_markdown_link(line, sid)
-        # SEC rendered filing-index output places Class/Contract immediately after Series.
-        # Keep class rows even if a ticker was not assigned historically.
         for nxt in lines[index + 1:index + 6]:
             if 'Series' in nxt and SID_RE.search(nxt):
                 break
@@ -74,7 +67,7 @@ def parse_pairs(text: str):
             class_name = tail
             if tokens:
                 token = tokens[-1].upper()
-                # Some inactive historical classes render a literal placeholder `ETF`.
+                # Some not-yet-active historical classes render a literal placeholder `ETF`.
                 if token != 'ETF' and TICKER_RE.fullmatch(token):
                     ticker = token
                     class_name = ' '.join(tokens[:-1])
@@ -97,6 +90,25 @@ def parse_pairs(text: str):
     return dedup
 
 
+def fetch_and_parse(url: str):
+    attempts = []
+    successful_zero = None
+    for candidate in (url, 'https://r.jina.ai/' + url):
+        try:
+            text = fetch_one(candidate)
+            pairs = parse_pairs(text)
+            attempts.append({'transport': candidate, 'status': 'SUCCESS', 'pairCount': len(pairs)})
+            if pairs:
+                return pairs, candidate, attempts
+            successful_zero = (pairs, candidate)
+        except Exception as exc:
+            attempts.append({'transport': candidate, 'status': 'ERROR', 'error': type(exc).__name__})
+    if successful_zero is not None:
+        pairs, candidate = successful_zero
+        return pairs, candidate, attempts
+    raise RuntimeError('all filing-index transports failed')
+
+
 def filing_key(row):
     return (row['dateFiled'], row['cik'], row['accession'], row['form'])
 
@@ -111,12 +123,11 @@ def main():
     for i, row in enumerate(selected, 1):
         rec = {**row, 'pairs': []}
         try:
-            text, transport, prior_errors = fetch(row['indexUrl'])
-            pairs = parse_pairs(text)
+            pairs, transport, attempts = fetch_and_parse(row['indexUrl'])
             rec.update({
                 'fetchStatus': 'SUCCESS',
                 'transport': transport,
-                'priorTransportErrors': prior_errors,
+                'transportAttempts': attempts,
                 'seriesClassCount': len(pairs),
                 'uniqueSeriesCount': len({p['seriesId'] for p in pairs}),
                 'tickerClassCount': sum(bool(p['ticker']) for p in pairs),
@@ -147,9 +158,11 @@ def main():
             'Shard of the fixed 2006-Q1 market-wide N-Q/N-Q-A inventory. Every accession is assigned '
             'by deterministic inventory position modulo SHARD_COUNT. Filing-index Series/Class metadata '
             'is parsed without using known Production registrants, holdings content, ranks or returns. '
-            'Classes without tickers are retained; literal placeholder ETF is treated as no ticker.'
+            'Classes without tickers are retained; literal placeholder ETF is treated as no ticker. '
+            'If native SEC returns a parseable page with zero pairs, r.jina is still tried to avoid '
+            'mistaking raw-HTML formatting for genuine absence of Series/Class metadata.'
         ),
-        'inventoryArtifactId': None,
+        'inventoryArtifactId': INVENTORY_ARTIFACT_ID,
         'shardIndex': SHARD_INDEX,
         'shardCount': SHARD_COUNT,
         'fullInventoryCount': len(inventory),
