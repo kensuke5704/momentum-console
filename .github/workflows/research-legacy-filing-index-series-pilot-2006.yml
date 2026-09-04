@@ -19,4 +19,4 @@ jobs:
         with:
           name: legacy-filing-index-series-pilot-2006
           path: data/research/legacy-filing-index-series-pilot-2006.json
-# rerun marker: rendered SEC filing-index grammar fix
+# rerun marker: exact rendered SEC Series/Class row parser
