@@ -27,7 +27,7 @@ import {
 import { contrastingTextColor } from "@/lib/color-contrast";
 import { latestCompletedUsTradingSession } from "@/lib/latest-session";
 import { evaluateOosActionGate } from "@/lib/oos-action-gate";
-import type { PortfolioTarget } from "@/lib/portfolio-types";
+import type { PortfolioConfigView, PortfolioTarget } from "@/lib/portfolio-types";
 import type { DashboardPayload, EquityPoint, MomentumCandidate, UniverseMember } from "@/lib/types";
 
 type Tab = "overview" | "universe" | "portfolio" | "oos" | "backtest" | "schedule";
@@ -165,13 +165,23 @@ function AllocationBand({ targets, compact = false }: { targets: PortfolioTarget
   </div>;
 }
 
-function currentAllocation(holdings: DashboardPayload["portfolioState"]["holdings"]): PortfolioTarget[] {
-  const invested = holdings
-    .filter((holding) => holding.targetWeight > 0)
-    .map(({ symbol, targetWeight, role }) => ({ symbol, weight: targetWeight, role }));
-  const investedWeight = invested.reduce((total, target) => total + target.weight, 0);
+function currentOperationalAllocation(
+  holdings: DashboardPayload["portfolioState"]["holdings"],
+  portfolioConfig: PortfolioConfigView,
+): PortfolioTarget[] {
+  const actualDiversifierWeight = holdings.filter((holding) => holding.role === "DIVERSIFIER")
+    .reduce((total, holding) => total + holding.targetWeight, 0);
+  const configured = Object.values(portfolioConfig.weights)
+    .toSorted((left, right) => Math.abs(left.gldm - actualDiversifierWeight) - Math.abs(right.gldm - actualDiversifierWeight))[0];
+  const fixedHoldings = holdings.filter((holding) => holding.role === "FIXED60" && holding.targetWeight > 0);
+  const fixedActualWeight = fixedHoldings.reduce((total, holding) => total + holding.targetWeight, 0);
+  const fixedTargets = fixedActualWeight > 0
+    ? fixedHoldings.map(({ symbol, targetWeight }) => ({ symbol, weight: configured.fixed60 * targetWeight / fixedActualWeight, role: "FIXED60" as const }))
+    : [];
+  const diversifierTargets = configured.gldm > 0 ? [{ symbol: "GLDM", weight: configured.gldm, role: "DIVERSIFIER" as const }] : [];
+  const investedWeight = [...fixedTargets, ...diversifierTargets].reduce((total, target) => total + target.weight, 0);
   const cashWeight = Math.max(0, 1 - investedWeight);
-  return cashWeight > 1e-9 ? [...invested, { symbol: "CASH", weight: cashWeight, role: "CASH" }] : invested;
+  return cashWeight > 1e-9 ? [...fixedTargets, ...diversifierTargets, { symbol: "CASH", weight: cashWeight, role: "CASH" }] : [...fixedTargets, ...diversifierTargets];
 }
 
 function EquityChart({ curve }: { curve: EquityPoint[] }) {
@@ -280,7 +290,10 @@ function Overview({ data }: { data: DashboardPayload }) {
   const execution = action.executionDate ? usOpenJst(action.executionDate) : "NO ORDER";
   const executionState = action.executionDate ? "NEXT OPEN" : "NO ORDER";
   const hasScheduledExecution = action.type === "REBALANCE_NEXT_OPEN" && action.executionDate != null;
-  const beforeExecutionTargets = useMemo(() => currentAllocation(portfolio.holdings), [portfolio.holdings]);
+  const beforeExecutionTargets = useMemo(
+    () => currentOperationalAllocation(portfolio.holdings, data.portfolioConfig),
+    [data.portfolioConfig, portfolio.holdings],
+  );
   const nportDeadline = data.nportOperations?.nextImportDeadlineAt ? updatedAt(data.nportOperations.nextImportDeadlineAt) : "NOT SET";
   const nonLatestClose = latestCompletedSession != null && (!portfolio.asOf || portfolio.asOf < latestCompletedSession);
 
