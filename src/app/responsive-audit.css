@@ -20,8 +20,14 @@
   grid-template-rows: none !important;
 }
 
-.next-action-primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.next-action-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.next-action-primary {
+  grid-auto-rows: 112px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.next-action-secondary {
+  grid-auto-rows: 112px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 
 .next-action-cell {
   align-content: center;
@@ -34,7 +40,8 @@
   color: var(--text);
   display: grid;
   gap: 6px;
-  min-height: 96px;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
   padding: 12px 20px;
   text-align: left;
@@ -349,7 +356,7 @@
 @media (max-width: 520px) {
   /* Keep both rows of the two-stage action grid as one continuous matrix. */
   .next-action-primary,
-  .next-action-secondary { grid-auto-rows: 92px; }
+  .next-action-secondary { grid-auto-rows: 82px; }
 
   .next-action-primary {
     grid-template-columns: minmax(0, 1.075fr) minmax(0, 1.075fr) minmax(0, 1.7fr) !important;
@@ -418,7 +425,7 @@
     min-height: 0;
     padding: 8px 7px;
   }
-  .next-action-cell.target-cell { padding: 7px 10px 9px; }
+  .next-action-cell.target-cell { padding: 4px 10px; }
   .next-action-cell > span { font-size: 9px; line-height: 1.2; }
   .next-action-cell > strong,
   .next-action-cell.execution-cell > strong,
@@ -428,7 +435,7 @@
   .action-value-line > .close-basis-warning { font-size: 7px; padding: 3px; }
 
   .allocation-band { min-height: 108px; }
-  .allocation-band.compact { min-height: 54px; }
+  .allocation-band.compact { min-height: 48px; }
   .allocation-segment { gap: 4px; padding: 7px 3px; }
   .allocation-segment strong { font-size: 10px; }
   .allocation-segment span { font-size: 9px; }
