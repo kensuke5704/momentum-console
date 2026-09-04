@@ -12,13 +12,13 @@ old=cur.old
 UA={'User-Agent':'Kensuke Kawamura kensuke5704@gmail.com momentum-console research','Accept':'text/plain,text/html,application/zip,*/*','Accept-Encoding':'identity'}
 ENTITY_RE=re.compile(r'(?m)^\s*(?:[-*]\s*)?([^\n\r|]{2,140}?)\s+\((Filer|Issuer|Reporting|Filed by|Subject)\)\s+CIK:\s*(?:\*\*)?(?:\[)?(\d{10})',re.I)
 JURIS_RE=re.compile(r'\s*/[A-Z0-9]{2,3}/?\s*$',re.I)
-FORM_PRIORITY={'10-K':0,'10-K/A':1,'10-Q':2,'10-Q/A':3,'8-K':4,'8-K/A':5,'DEF 14A':6,'S-8':7}
+FORM_PRIORITY={'10-K':0,'10-K/A':1,'10-Q':2,'10-Q/A':3,'8-K':4,'8-K/A':5,'DEF 14A':6,'DEFA14A':7,'PRE 14A':8,'11-K':9,'S-8':10,'S-8 POS':11}
+ISSUER_FORMS=set(FORM_PRIORITY)
 
 def normalize_company(s):
  return old.normalize_name(JURIS_RE.sub('',s or ''))
 
 def filing_sort_key(r):
- # Prefer issuer periodic/current reports because their filing-index metadata consistently carries State of Incorp.
  return (FORM_PRIORITY.get(r['form'],50),-int(r['dateFiled'].replace('-','')),r['filename'])
 
 def get_master(year,q):
@@ -42,9 +42,9 @@ def load_master(years):
    for line in text.splitlines():
     p=line.split('|')
     if len(p)<5 or not p[0].strip().isdigit():continue
-    cik,company,form,date,filename=[x.strip() for x in p[:5]]
+    cik,company,form,date,filename=[x.strip() for x in p[:5]];form=form.upper()
     if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',date):continue
-    rows.append({'cik':cik.zfill(10),'company':company,'normalizedCompany':normalize_company(company),'form':form.upper(),'dateFiled':date,'filename':filename})
+    rows.append({'cik':cik.zfill(10),'company':company,'normalizedCompany':normalize_company(company),'form':form,'dateFiled':date,'filename':filename})
  return rows,transports
 
 def accession_parts(filename):
@@ -72,17 +72,17 @@ def entity_state(target,cik,text):
 
 def resolve_from_rows(row,master_rows):
  target=normalize_company(row.get('issuer') or '');dateb=row['asOfReportDate'];rec={k:row.get(k) for k in ['ticker','securityId','issuer','aggregateWeight','asOfReportDate']};rec['classification']='UNKNOWN'
- exact=[r for r in master_rows if r['dateFiled']<=dateb and r['normalizedCompany']==target]
+ issuer_rows=[r for r in master_rows if r['form'] in ISSUER_FORMS and r['dateFiled']<=dateb]
+ exact=[r for r in issuer_rows if r['normalizedCompany']==target]
  by_cik=defaultdict(list)
  for r in exact:by_cik[r['cik']].append(r)
- seed=None;source=None
+ seed=None;source=None;candidates=[]
  if len(by_cik)==1:
-  seed=next(iter(by_cik));source='HISTORICAL_MASTER_EXACT_NAME';candidates=sorted(by_cik[seed],key=filing_sort_key)
+  seed=next(iter(by_cik));source='HISTORICAL_MASTER_ISSUER_FORM_EXACT_NAME';candidates=sorted(by_cik[seed],key=filing_sort_key)
  else:
   cm=cur.CM.get((row.get('ticker') or '').upper(),[]);current_exact=[x for x in cm if normalize_company(x.get('title') or '')==target]
   if len(current_exact)==1:
-   seed=current_exact[0]['cik'];source='CURRENT_TICKER_EXACT_NAME';candidates=sorted([r for r in master_rows if r['dateFiled']<=dateb and r['cik']==seed],key=filing_sort_key)
-  else:candidates=[]
+   seed=current_exact[0]['cik'];source='CURRENT_TICKER_EXACT_NAME';candidates=sorted([r for r in issuer_rows if r['cik']==seed],key=filing_sort_key)
  rec['historicalExactCikCount']=len(by_cik);rec['historicalExactCiks']=sorted(by_cik)[:6]
  if not seed:return rec
  rec['seedCik']=seed;rec['seedSource']=source;rec['filingCandidateCount']=len(candidates)
@@ -105,11 +105,11 @@ def main():
  unknown=sorted([r for r in data['identityRows'] if r.get('classification')=='UNKNOWN'],key=lambda r:float(r.get('aggregateWeight') or 0),reverse=True)[:10]
  years=sorted({int(r['asOfReportDate'][:4]) for r in unknown})
  master_rows,master_transports=load_master(years)
- print('MASTER',json.dumps({'years':years,'rows':len(master_rows),'transports':master_transports}),flush=True)
+ print('MASTER',json.dumps({'years':years,'rows':len(master_rows),'issuerFormRows':sum(r['form'] in ISSUER_FORMS for r in master_rows),'transports':master_transports}),flush=True)
  results=[]
  for row in unknown:
   rec=resolve_from_rows(row,master_rows);results.append(rec);print('INDEX',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','filingCandidateCount','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
- out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year to resolve filing-time company name -> CIK -> filing path directly, avoiding browse-edgar transport. SEC trailing jurisdiction annotations are normalized with or without a closing slash. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Filing retrieval prioritizes 10-K, 10-Q and 8-K index pages because issuer filing-index metadata carries State of Incorp.; evidence still requires the same historical CIK and matching normalized issuer entity block. Entity roles Filer, Issuer, Reporting, Filed by, and Subject are parsed. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
+ out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year. Historical CIK seeding is restricted to issuer-bearing periodic/current/proxy forms, eliminating NO ACT and other non-issuer name collisions. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Filing retrieval prioritizes 10-K, 10-Q and 8-K. Classification still requires a historical filing-index entity block with the same CIK, matching normalized issuer name, and State of Incorp. SEC trailing jurisdiction annotations are normalized. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('results','masterIndexTransports')}),flush=True)
 if __name__=='__main__':main()
