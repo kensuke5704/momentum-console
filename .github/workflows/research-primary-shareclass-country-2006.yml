@@ -1,0 +1,32 @@
+name: Research Primary Share-Class Country 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-primary-shareclass-country-2006.py"
+      - ".github/workflows/research-primary-shareclass-country-2006.yml"
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download primary mapping and canonical country artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/add /tmp/country
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9930471807/zip > /tmp/add.zip
+          unzip -q /tmp/add.zip -d /tmp/add
+          cp /tmp/add/nq-npx-primary-shareclass-mapping-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9930418142/zip > /tmp/country.zip
+          unzip -q /tmp/country.zip -d /tmp/country
+          cp /tmp/country/country-full-coverage-canonical-merge-2006.json data/research/
+      - run: python3 scripts/research-primary-shareclass-country-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: primary-shareclass-country-2006
+          path: data/research/primary-shareclass-country-2006.json
