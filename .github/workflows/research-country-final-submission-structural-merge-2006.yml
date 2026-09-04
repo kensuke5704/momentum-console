@@ -1,0 +1,37 @@
+name: Research Country Final Submission Structural Merge 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-final-submission-structural-merge-2006.py"
+      - ".github/workflows/research-country-final-submission-structural-merge-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen country and structural artifacts
+        run: |
+          mkdir -p data/research /tmp/base /tmp/sm /tmp/snew
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9900708609/zip > /tmp/sm.zip
+          unzip -q /tmp/sm.zip -d /tmp/sm
+          cp /tmp/sm/nq-npx-structural-mapping-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/snew.zip
+          unzip -q /tmp/snew.zip -d /tmp/snew
+          cp /tmp/snew/structural-new-matches-submission-header-country-2006.json data/research/
+      - name: Merge on frozen 936-holding denominator
+        run: python3 scripts/research-country-final-submission-structural-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: country-final-submission-structural-merge-2006
+          path: data/research/country-final-submission-structural-merge-2006.json
