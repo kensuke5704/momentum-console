@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,8 +55,6 @@ def main() -> None:
             nq[(row["seriesId"], row["accession"])] = row
     nq_rows = list(nq.values())
     positive_ids = set(first)
-    # A shard only emits N-Q rows for Series IDs with positive evidence in the same CIK.
-    # Retain only globally accepted positive IDs as an additional merge guard.
     nq_rows = [row for row in nq_rows if row["seriesId"] in positive_ids]
 
     snapshots = []
@@ -65,6 +64,9 @@ def main() -> None:
             evidence_row = first.get(row["seriesId"])
             if not evidence_row:
                 continue
+            # evidenceDateFiled is the PIT binding-public date. For N-Q fallback bindings it
+            # is max(operational prospectus date, Series metadata N-Q date), preventing a
+            # later Series/Class table from being backfilled into an earlier month.
             if evidence_row["evidenceDateFiled"] > asof or row["dateFiled"] > asof:
                 continue
             current = latest.get(row["seriesId"])
@@ -84,6 +86,8 @@ def main() -> None:
                     "registrant": row["company"],
                     "filingDate": row["dateFiled"],
                     "evidenceDateFiled": first[row["seriesId"]]["evidenceDateFiled"],
+                    "operationalEvidenceDateFiled": first[row["seriesId"]].get("operationalEvidenceDateFiled"),
+                    "seriesMetadataDateFiled": first[row["seriesId"]].get("seriesMetadataDateFiled"),
                     "evidenceForm": first[row["seriesId"]]["evidenceForm"],
                     "evidenceFilename": first[row["seriesId"]]["evidenceFilename"],
                     "binding": first[row["seriesId"]]["binding"],
@@ -94,25 +98,30 @@ def main() -> None:
 
     prospectus_diagnostics = [x for shard in shards for x in shard["prospectusDiagnostics"]]
     nq_diagnostics = [x for shard in shards for x in shard["nqDiagnostics"]]
+    binding_counts = Counter(row["binding"] for row in positive_series)
     out = {
         "purpose": (
             "Source-complete sharded H1 2006 historical ETF Series-ID PIT catalog. Candidate registrants "
             "come only from the market-wide H1 operational prefilter. Every core 485/N-1A filing through "
-            "2006-06-30 plus the latest 497 supplement in each filing month is inspected. Positive Series IDs "
-            "require the validated issuer-own Creation Unit plus exchange-listing/trading conjunction and "
-            "structural filing-index binding. Monthly source snapshots use only evidence and N-Q/N-Q-A filings "
-            "public by month end, selecting the latest public N-Q filing per Series ID. No known source list, "
-            "holdings outcomes, ranks, returns, or strategy results are used for selection."
+            "2006-06-30 plus the latest 497 available at each H1 month end is inspected. Positive Series IDs "
+            "require validated issuer-own Creation Unit plus exchange-listing/trading evidence. When an older "
+            "prospectus index has no Series/Class table, contemporaneously public N-Q metadata may bind only an "
+            "explicit ETF/VIPER class or an exact Series name present in the local operational-evidence context; "
+            "the PIT binding date is the later filing date. Monthly snapshots then select the latest public N-Q "
+            "per Series ID. No known source list, holdings outcomes, ranks, returns, or strategy results are used."
         ),
         "inventoryArtifactId": 9946255797,
         "prefilterSourceRunId": 33897558123,
         "candidateRegistrantCount": candidate_count,
         "positiveRegistrantCount": len({row["cik"] for row in positive_series}),
         "positiveSeriesCount": len(positive_series),
+        "bindingCounts": dict(binding_counts),
         "positiveSeries": positive_series,
         "prospectusInspectedCount": sum(row["prospectusInspectedCount"] for row in shards),
         "prospectusErrorCount": sum(row["prospectusErrorCount"] for row in shards),
-        "prospectusEvidenceRecordCount": sum(row["prospectusEvidenceRecordCount"] for row in shards),
+        "prospectusDirectEvidenceRecordCount": sum(row["prospectusDirectEvidenceRecordCount"] for row in shards),
+        "issuerOwnOperationalFilingCount": sum(row["issuerOwnOperationalFilingCount"] for row in shards),
+        "nqFallbackPositiveSeriesCount": sum(row["nqFallbackPositiveSeriesCount"] for row in shards),
         "nqPositiveSeriesFilingCount": len(nq_rows),
         "nqIndexErrorCount": sum(row["nqIndexErrorCount"] for row in shards),
         "monthSnapshots": snapshots,
@@ -121,7 +130,8 @@ def main() -> None:
         "shardSummaries": [
             {k: row[k] for k in (
                 "shardIndex", "selectedRegistrantCount", "prospectusInspectedCount",
-                "prospectusErrorCount", "positiveSeriesCount", "nqPositiveSeriesFilingCount", "nqIndexErrorCount"
+                "prospectusErrorCount", "issuerOwnOperationalFilingCount", "positiveSeriesCount",
+                "nqFallbackPositiveSeriesCount", "nqPositiveSeriesFilingCount", "nqIndexErrorCount"
             )}
             for row in shards
         ],
@@ -132,8 +142,11 @@ def main() -> None:
         "candidateRegistrantCount": out["candidateRegistrantCount"],
         "positiveRegistrantCount": out["positiveRegistrantCount"],
         "positiveSeriesCount": out["positiveSeriesCount"],
+        "bindingCounts": out["bindingCounts"],
         "prospectusInspectedCount": out["prospectusInspectedCount"],
         "prospectusErrorCount": out["prospectusErrorCount"],
+        "issuerOwnOperationalFilingCount": out["issuerOwnOperationalFilingCount"],
+        "nqFallbackPositiveSeriesCount": out["nqFallbackPositiveSeriesCount"],
         "nqPositiveSeriesFilingCount": out["nqPositiveSeriesFilingCount"],
         "nqIndexErrorCount": out["nqIndexErrorCount"],
     }), flush=True)
