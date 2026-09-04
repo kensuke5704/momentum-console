@@ -27,4 +27,4 @@ jobs:
         with:
           name: sec-filing-index-country-pilot-2006
           path: data/research/sec-filing-index-country-pilot-2006.json
-# rerun marker: PIT filing-index state metadata 2026-09-04
+# rerun marker: PIT filing-index state metadata 2026-09-04 v2
