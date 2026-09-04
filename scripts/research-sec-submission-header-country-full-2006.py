@@ -22,7 +22,9 @@ def main():
     master_rows,transports=pilot.base.load_master(years)
     results=[]
     for i,row in enumerate(selected,1):
-        rec=pilot.resolve(row,master_rows);results.append(rec)
+        rec=pilot.resolve(row,master_rows)
+        rec['occurrenceCount']=int(row.get('occurrenceCount') or 0)
+        results.append(rec)
         print(f'{i}/{len(selected)}',json.dumps({k:rec.get(k) for k in ['ticker','securityId','issuer','aggregateWeight','occurrenceCount','seedCik','seedSource','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
         time.sleep(.05)
     resolved=[r for r in results if r.get('classification') in ('US','NON_US')]
