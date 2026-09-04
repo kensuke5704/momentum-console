@@ -369,26 +369,21 @@
   }
 
   .dynamic-card > header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 6px 10px;
-    padding-bottom: 10px;
-    padding-top: 10px;
-  }
-
-  .next-action-section > header {
     align-items: center;
+    flex-wrap: nowrap;
+    gap: 10px;
     min-height: 58px;
     padding-bottom: 0;
     padding-top: 0;
   }
 
   .dynamic-card > header .section-asof {
-    flex-basis: 100%;
-    line-height: 1.35;
+    flex: 0 1 auto;
+    line-height: 1.2;
     min-width: 0;
-    overflow-wrap: anywhere;
-    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .monthly-return-distribution {
