@@ -32,4 +32,4 @@ jobs:
         with:
           name: legacy-series-coverage-2006
           path: data/research/legacy-series-coverage-2006.json
-# rerun marker: current PIT records schema
+# rerun marker: current PIT records schema v2
