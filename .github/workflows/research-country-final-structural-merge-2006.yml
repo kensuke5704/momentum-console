@@ -6,18 +6,19 @@ on:
       - "scripts/research-country-final-structural-merge-2006.py"
       - ".github/workflows/research-country-final-structural-merge-2006.yml"
 permissions:
+  actions: read
   contents: read
 jobs:
   merge:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Download fixed source artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p data/research /tmp/sm /tmp/base /tmp/snew /tmp/shards
+          mkdir -p data/research /tmp/sm /tmp/base /tmp/snew /tmp/fi /tmp/hdr
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9900708609/zip > /tmp/sm.zip
           unzip -q /tmp/sm.zip -d /tmp/sm
           cp /tmp/sm/nq-npx-structural-mapping-2006.json data/research/
@@ -27,15 +28,17 @@ jobs:
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903255442/zip > /tmp/snew.zip
           unzip -q /tmp/snew.zip -d /tmp/snew
           cp /tmp/snew/structural-new-matches-country-2006.json data/research/
-          for pair in \
-            0:9925584495 1:9925562155 2:9925568365 3:9925553177 \
-            4:9925577391 5:9925553079 6:9925566458 7:9925619395 \
-            8:9925608866 9:9925557401 10:9925560034 11:9925554913; do
-            shard=${pair%%:*}; id=${pair##*:}
-            mkdir -p /tmp/shards/$shard
-            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/shard-$shard.zip
-            unzip -q /tmp/shard-$shard.zip -d /tmp/shards/$shard
-            cp /tmp/shards/$shard/sec-filing-index-country-shard-$shard-2006.json data/research/
+          for pair in 0:9925584495 1:9925562155 2:9925568365 3:9925553177 4:9925577391 5:9925553079 6:9925566458 7:9925619395 8:9925608866 9:9925557401 10:9925560034 11:9925554913; do
+            shard=${pair%%:*}; id=${pair##*:}; mkdir -p /tmp/fi/$shard
+            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/fi-$shard.zip
+            unzip -q /tmp/fi-$shard.zip -d /tmp/fi/$shard
+            cp /tmp/fi/$shard/sec-filing-index-country-shard-$shard-2006.json data/research/
+          done
+          for pair in 0:9937574390 1:9937632818 2:9937600795 3:9937629319 4:9937585450 5:9937652676 6:9937599762 7:9937600249 8:9937611936 9:9937604905 10:9937617676 11:9937630054; do
+            shard=${pair%%:*}; id=${pair##*:}; mkdir -p /tmp/hdr/$shard
+            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/hdr-$shard.zip
+            unzip -q /tmp/hdr-$shard.zip -d /tmp/hdr/$shard
+            cp /tmp/hdr/$shard/sec-hdr-country-shard-*-2006.json data/research/
           done
       - run: python3 scripts/research-country-final-structural-merge-2006.py
       - uses: actions/upload-artifact@v4
