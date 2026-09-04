@@ -298,7 +298,7 @@ function Overview({ data }: { data: DashboardPayload }) {
           <button type="button" className="next-action-cell execution-cell" onClick={() => setDetail("execution")}><span>Execution (JST)</span><strong>{execution}</strong></button>
         </div>
         <div className="next-action-secondary">
-          <button type="button" className="next-action-cell nport-deadline-cell" onClick={() => setDetail("nport")}><span>N-PORT Deadline (JST)</span><strong>{nportDeadline}</strong></button>
+          <button type="button" className="next-action-cell nport-deadline-cell" onClick={() => setDetail("nport")}><span>N-PORT Due</span><strong>{nportDeadline}</strong></button>
           <button type="button" className="next-action-cell target-cell" onClick={() => setDetail("target")}><span>Target</span><AllocationBand targets={action.targets} compact /></button>
         </div>
       </div>

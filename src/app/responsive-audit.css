@@ -351,7 +351,7 @@
     grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.4fr) minmax(0, 1.7fr) !important;
   }
 
-  .next-action-secondary { grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.4fr) minmax(0, 1.7fr); }
+  .next-action-secondary { grid-template-columns: minmax(0, 1.7fr) minmax(0, 0.75fr) minmax(0, 1.4fr); }
 
   .sidebar nav button {
     scroll-margin-inline: 12px;
