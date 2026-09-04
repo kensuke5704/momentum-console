@@ -349,10 +349,10 @@
 @media (max-width: 520px) {
   /* Keep both rows of the two-stage action grid as one continuous matrix. */
   .next-action-primary,
-  .next-action-secondary { grid-auto-rows: 108px; }
+  .next-action-secondary { grid-auto-rows: 92px; }
 
   .next-action-primary {
-    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.4fr) minmax(0, 1.7fr) !important;
+    grid-template-columns: minmax(0, 1.075fr) minmax(0, 1.075fr) minmax(0, 1.7fr) !important;
   }
 
   .next-action-secondary { grid-template-columns: minmax(0, 1.7fr) minmax(0, 0.75fr) minmax(0, 1.4fr); }
@@ -374,6 +374,13 @@
     gap: 6px 10px;
     padding-bottom: 10px;
     padding-top: 10px;
+  }
+
+  .next-action-section > header {
+    align-items: center;
+    min-height: 58px;
+    padding-bottom: 0;
+    padding-top: 0;
   }
 
   .dynamic-card > header .section-asof {
@@ -411,12 +418,12 @@
   .rules-grid:not(.execution-grid) > div:nth-last-child(-n + 2) { border-bottom: 0; }
 
   .next-action-cell {
-    gap: 7px;
+    gap: 5px;
     height: 100%;
     min-height: 0;
-    padding: 12px 7px;
+    padding: 8px 7px;
   }
-  .next-action-cell.target-cell { padding: 11px 10px 13px; }
+  .next-action-cell.target-cell { padding: 7px 10px 9px; }
   .next-action-cell > span { font-size: 9px; line-height: 1.2; }
   .next-action-cell > strong,
   .next-action-cell.execution-cell > strong,
@@ -426,7 +433,7 @@
   .action-value-line > .close-basis-warning { font-size: 7px; padding: 3px; }
 
   .allocation-band { min-height: 108px; }
-  .allocation-band.compact { min-height: 64px; }
+  .allocation-band.compact { min-height: 54px; }
   .allocation-segment { gap: 4px; padding: 7px 3px; }
   .allocation-segment strong { font-size: 10px; }
   .allocation-segment span { font-size: 9px; }
@@ -444,7 +451,9 @@
   .overview-input-grid > .dynamic-metric:nth-child(2n) { border-right: 0; }
   .overview-status-grid > .dynamic-metric:nth-last-child(-n + 2),
   .overview-input-grid > .dynamic-metric:nth-last-child(-n + 2) { border-bottom: 0; }
-  .dynamic-metric { min-width: 0; padding: 14px 12px !important; }
+  .overview-status-grid .dynamic-metric,
+  .overview-input-grid .dynamic-metric { min-height: 82px; padding: 10px 12px !important; }
+  .dynamic-metric { min-width: 0; padding: 10px 12px !important; }
   .dynamic-metric strong { font-size: 16px !important; overflow-wrap: anywhere; }
   .dynamic-metric strong.metric-value-compact { font-size: 14px !important; }
   .dynamic-metric strong.metric-value-dense { font-size: 12px !important; }

@@ -290,7 +290,7 @@ function Overview({ data }: { data: DashboardPayload }) {
   const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "nport" ? "N-PORT Deadline" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "fixed60" ? "Fixed60" : "OOS Gate";
 
   return <div className="dynamic-stack">
-    <Section title="Next Action">
+    <Section title="Next Action" className="next-action-section">
       <div className="next-action next-action-stage21">
         <div className="next-action-primary">
           <button type="button" className="next-action-cell" onClick={() => setDetail("regime")}><span>Regime</span><strong>{portfolio.regime}</strong></button>
