@@ -3,15 +3,21 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import time
 import urllib.request
+from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ROOT / "data/research/sec-historical-etf-series-source-catalog-h1-2006.json"
+CATALOG = Path(os.environ.get(
+    "CATALOG_PATH",
+    str(ROOT / "data/research/sec-historical-etf-series-source-catalog-complete-h1-2006.json"),
+))
 INVENTORY = ROOT / "data/research/sec-marketwide-nq-inventory-h1-2006.json"
 OUT = ROOT / "data/research/nq-pit-holdings-catalog-h1-2006.json"
+SOURCE_CATALOG_RUN_ID = os.environ.get("SOURCE_CATALOG_RUN_ID")
 UA = {
     "User-Agent": "Kensuke Kawamura kensuke5704@gmail.com momentum-console research",
     "Accept": "text/plain,text/html,*/*",
@@ -32,6 +38,7 @@ def load_module(name: str, path: Path):
 
 seg = load_module("seg", ROOT / "scripts/research-nq-series-segmentation-2006.py")
 corrected = load_module("corrected", ROOT / "scripts/research-nq-pit-holdings-2006-corrected.py")
+ec = load_module("ec", ROOT / "scripts/research-nq-per-holding-ec-2006.py")
 
 
 def iso8(raw: str | None) -> str | None:
@@ -58,6 +65,22 @@ def fetch_submission(filename: str) -> tuple[str, str, list[dict]]:
 
 def source_key(row: dict) -> tuple[str, str]:
     return str(row["cik"]).zfill(10), row["accession"]
+
+
+def annotate_sections(holdings: list[dict], combined: str) -> tuple[list[dict], dict, dict]:
+    vis = seg.visible(combined)
+    counts = Counter()
+    weights = defaultdict(float)
+    out = []
+    for holding in holdings:
+        section, alias = ec.locate_section(vis, holding["description"])
+        row = {**holding, "legacyAssetSection": section}
+        if alias:
+            row["matchedSourceAlias"] = alias
+        counts[section] += 1
+        weights[section] += float(holding.get("weight") or 0.0)
+        out.append(row)
+    return out, dict(counts), dict(weights)
 
 
 def main() -> None:
@@ -118,7 +141,6 @@ def main() -> None:
 
             # All filing-time registered series participate in boundary assignment.
             # The strict source catalog alone determines which Series IDs are retained.
-            # Do not use the old registrant-name ETF heuristic for source selection.
             all_series = seg.meta.parse_series_contracts(submission, request["registrant"])
             all_by_id = {s.get("seriesId"): s for s in all_series if s.get("seriesId")}
             primary, text = seg.embedded_primary_nq(submission)
@@ -154,7 +176,9 @@ def main() -> None:
                     }
                     continue
 
-                method, holdings, total = corrected.parsed_holdings("\n".join(blocks))
+                combined = "\n".join(blocks)
+                method, holdings, total = corrected.parsed_holdings(combined)
+                holdings, section_count, section_weight = annotate_sections(holdings, combined)
                 count = len(holdings)
                 top10 = sum(h.get("weight", 0.0) for h in holdings[:10]) if holdings else 0.0
                 by_series[sid] = {
@@ -174,6 +198,8 @@ def main() -> None:
                     "parsedHoldingCount": count,
                     "parsedMarketValueTotal": total,
                     "rawTop10WeightDiagnostic": top10,
+                    "legacyAssetSectionCount": section_count,
+                    "legacyAssetSectionWeight": section_weight,
                     "holdings": holdings,
                 }
             parsed[key] = by_series
@@ -228,17 +254,26 @@ def main() -> None:
             flush=True,
         )
 
+    all_unique_records = [row for values in parsed.values() for row in values.values()]
+    all_holdings = [h for row in all_unique_records for h in row.get("holdings", [])]
+    section_counts = Counter(h.get("legacyAssetSection", "UNKNOWN") for h in all_holdings)
+    section_weights = defaultdict(float)
+    for h in all_holdings:
+        section_weights[h.get("legacyAssetSection", "UNKNOWN")] += float(h.get("weight") or 0.0)
+
     out = {
         "purpose": (
             "Catalog-driven H1 2006 raw N-Q holdings extraction. Source selection comes exclusively from "
             "the strict historical ETF Series-ID PIT catalog. Every filing-time registered series is used "
             "only for explicit schedule-boundary assignment; only catalog-positive Series IDs are retained. "
-            "The catalog has already selected the latest N-Q/N-Q-A public by each month end. No source ETF "
-            "eligibility is applied at this raw stage because Production applies name/count/concentration "
-            "eligibility after EC+US+CORP holding filters. No known registrant regex, holdings-based source "
-            "discovery, ranks, returns, or strategy outcomes are used."
+            "Each parsed holding is additionally annotated with the already accepted explicit legacy asset "
+            "section rule, but no holding is filtered at this raw stage. The catalog has already selected the "
+            "latest N-Q/N-Q-A public by each month end. Source ETF eligibility is deferred because Production "
+            "applies name/count/concentration eligibility after EC+US+CORP holding filters. No known registrant "
+            "regex, holdings-based source discovery, ranks, returns, or strategy outcomes are used."
         ),
-        "sourceCatalogRunId": 33898993220,
+        "sourceCatalogPath": str(CATALOG.relative_to(ROOT)) if CATALOG.is_relative_to(ROOT) else str(CATALOG),
+        "sourceCatalogRunId": int(SOURCE_CATALOG_RUN_ID) if SOURCE_CATALOG_RUN_ID else None,
         "sourceInventoryArtifactId": 9946255797,
         "uniqueSourceFilingCount": len(requested),
         "filingFetchSuccessCount": sum("error" not in x for x in filing_audit),
@@ -247,10 +282,17 @@ def main() -> None:
             "Exact filing-time registered series title around each schedule marker; all registered series "
             "participate in boundary assignment, but only strict-catalog Series IDs are retained."
         ),
+        "legacyAssetSectionRule": (
+            "Locate each already-parsed holding in its corrected explicit-Series schedule and inherit only "
+            "the nearest preceding explicit COMMON/PREFERRED/SHORT-TERM/DEBT heading; otherwise UNKNOWN."
+        ),
+        "uniqueParsedHoldingCount": len(all_holdings),
+        "legacyAssetSectionCounts": dict(section_counts),
+        "legacyAssetSectionWeights": dict(section_weights),
         "eligibilityStatus": (
             "DEFERRED. Production quarterly ingestion first keeps EC+US+CORP holdings and latestPublicFilings "
             "then applies source-filing name/count/top10 eligibility. Historical reconstruction therefore "
-            "must defer the analogous eligibility until after EC and conservative issuer-country mapping."
+            "must defer the analogous eligibility until after COMMON_EQUITY and conservative issuer-country mapping."
         ),
         "filingAudit": filing_audit,
         "monthSnapshots": snapshots,
@@ -263,6 +305,8 @@ def main() -> None:
             "uniqueSourceFilingCount": out["uniqueSourceFilingCount"],
             "filingFetchSuccessCount": out["filingFetchSuccessCount"],
             "filingFetchErrorCount": out["filingFetchErrorCount"],
+            "uniqueParsedHoldingCount": out["uniqueParsedHoldingCount"],
+            "legacyAssetSectionCounts": out["legacyAssetSectionCounts"],
         }),
         flush=True,
     )
