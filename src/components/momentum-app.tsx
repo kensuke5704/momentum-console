@@ -165,6 +165,15 @@ function AllocationBand({ targets, compact = false }: { targets: PortfolioTarget
   </div>;
 }
 
+function currentAllocation(holdings: DashboardPayload["portfolioState"]["holdings"]): PortfolioTarget[] {
+  const invested = holdings
+    .filter((holding) => holding.targetWeight > 0)
+    .map(({ symbol, targetWeight, role }) => ({ symbol, weight: targetWeight, role }));
+  const investedWeight = invested.reduce((total, target) => total + target.weight, 0);
+  const cashWeight = Math.max(0, 1 - investedWeight);
+  return cashWeight > 1e-9 ? [...invested, { symbol: "CASH", weight: cashWeight, role: "CASH" }] : invested;
+}
+
 function EquityChart({ curve }: { curve: EquityPoint[] }) {
   const chart = useMemo(() => curve.filter((point) => point.equity > 0).map((point) => ({ date: point.date, equity: point.equity })), [curve]);
   const domain = useMemo<[number, number]>(() => {
@@ -270,6 +279,8 @@ function Overview({ data }: { data: DashboardPayload }) {
   const actionLabel = action.type === "REBALANCE_NEXT_OPEN" ? "REBALANCE" : action.type === "HOLD" ? "HOLD" : "REVIEW";
   const execution = action.executionDate ? usOpenJst(action.executionDate) : "NO ORDER";
   const executionState = action.executionDate ? "NEXT OPEN" : "NO ORDER";
+  const hasScheduledExecution = action.type === "REBALANCE_NEXT_OPEN" && action.executionDate != null;
+  const beforeExecutionTargets = useMemo(() => currentAllocation(portfolio.holdings), [portfolio.holdings]);
   const nportDeadline = data.nportOperations?.nextImportDeadlineAt ? updatedAt(data.nportOperations.nextImportDeadlineAt) : "NOT SET";
   const nonLatestClose = latestCompletedSession != null && (!portfolio.asOf || portfolio.asOf < latestCompletedSession);
 
@@ -339,7 +350,13 @@ function Overview({ data }: { data: DashboardPayload }) {
             { name: nportDeadline, meaning: "Complete the next quarterly N-PORT import before this cutoff." },
             { name: "FALLBACK", meaning: "If the deadline is missed or import validation fails, the prior valid Universe remains active." },
           ]} />}
-          {detail === "target" && <><AllocationBand targets={action.targets} /><p>100% total / no leverage</p></>}
+          {detail === "target" && (hasScheduledExecution ? <div className="target-execution-comparison">
+            <p className="target-execution-note">Scheduled for {execution}</p>
+            <div className="target-execution-charts">
+              <div><span>Before execution</span><AllocationBand targets={beforeExecutionTargets} /></div>
+              <div><span>After execution</span><AllocationBand targets={action.targets} /></div>
+            </div>
+          </div> : <><AllocationBand targets={action.targets} /><p>100% total / no leverage</p></>)}
           {detail === "cftc" && <DefinitionList current={portfolio.cftc.yellow ? "YELLOW" : "CLEAR"} items={[
             { name: "CLEAR", meaning: "The latest PIT-eligible Asset Manager net position is not below the report from four releases earlier." },
             { name: "YELLOW", meaning: "The latest PIT-eligible net position is below the report from four releases earlier." },
