@@ -1,0 +1,31 @@
+name: Research Structural New Matches Submission Header Country 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-structural-new-matches-submission-header-country-2006.py"
+      - ".github/workflows/research-structural-new-matches-submission-header-country-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  country:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen structural-country artifact
+        run: |
+          mkdir -p data/research /tmp/src
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903255442/zip > /tmp/src.zip
+          unzip -q /tmp/src.zip -d /tmp/src
+          cp /tmp/src/structural-new-matches-country-2006.json data/research/
+      - name: Refresh prior UNKNOWN structural identities
+        run: python3 scripts/research-structural-new-matches-submission-header-country-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: structural-new-matches-submission-header-country-2006
+          path: data/research/structural-new-matches-submission-header-country-2006.json
