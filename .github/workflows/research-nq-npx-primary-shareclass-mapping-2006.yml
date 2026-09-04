@@ -1,0 +1,32 @@
+name: Research NQ NPX Primary Share-Class Mapping 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-nq-npx-primary-shareclass-mapping-2006.py"
+      - ".github/workflows/research-nq-npx-primary-shareclass-mapping-2006.yml"
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen baseline mapping and N-PX master
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/map /tmp/master
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878201336/zip > /tmp/map.zip
+          unzip -q /tmp/map.zip -d /tmp/map
+          cp /tmp/map/nq-npx-mapping-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/master.zip
+          unzip -q /tmp/master.zip -d /tmp/master
+          cp /tmp/master/npx-security-master-2006.json data/research/
+      - run: python3 scripts/research-nq-npx-primary-shareclass-mapping-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-npx-primary-shareclass-mapping-2006
+          path: data/research/nq-npx-primary-shareclass-mapping-2006.json
