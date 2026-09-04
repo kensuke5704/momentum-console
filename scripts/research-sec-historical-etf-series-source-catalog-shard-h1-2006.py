@@ -29,19 +29,16 @@ def complete_prospectus_set(rows: list[dict]) -> list[dict]:
     """Source-complete deterministic prospectus set without outcome-based selection.
 
     Every core registration/prospectus filing is retained because mixed trusts may file
-    separate core amendments for different Series in the same month. For 497 supplements,
-    retain the latest public filing per month because supplements are high-volume and the
-    validated operational structure should ordinarily be present in core filings.
+    separate core amendments for different Series in the same month. For high-volume 497
+    supplements, retain the latest filing available at each H1 month end; deduplication
+    naturally carries a late-2005 supplement into January when it is still the latest.
     """
     chosen: dict[str, dict] = {}
     for row in rows:
         if row["form"] in base.CORE:
             chosen[row["filename"]] = row
-    for month, asof in base.MONTHS:
-        avail = [
-            row for row in rows
-            if row["form"] in base.SUPP and row["dateFiled"] <= asof and row["dateFiled"].startswith(month)
-        ]
+    for _, asof in base.MONTHS:
+        avail = [row for row in rows if row["form"] in base.SUPP and row["dateFiled"] <= asof]
         if avail:
             latest = max(avail, key=lambda row: (row["dateFiled"], row["form"], row["filename"]))
             chosen[latest["filename"]] = latest
@@ -171,7 +168,7 @@ def main() -> None:
         "purpose": (
             "Shard of the source-complete H1 2006 strict ETF Series-ID evidence scan. Candidate CIKs are "
             "partitioned deterministically. Every core 485/N-1A prospectus/registration filing through "
-            "2006-06-30 plus the latest 497 supplement in each filing month is inspected. Final Series-ID "
+            "2006-06-30 plus the latest 497 available at each H1 month end is inspected. Final Series-ID "
             "binding still requires validated issuer-own Creation Unit plus exchange evidence and structural "
             "filing-index binding. No holdings outcomes, ranks, returns, or strategy results are used."
         ),
