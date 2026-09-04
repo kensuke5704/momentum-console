@@ -20,8 +20,8 @@ jobs:
           mkdir -p data/research /tmp/pit /tmp/idx
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
           unzip -q /tmp/pit.zip -d /tmp/pit
-          cp /tmp/pit/* data/research/
-          f=$(find data/research -maxdepth 1 -type f -name '*ec*filtered*2006*.json' | head -1)
+          f=$(find /tmp/pit -type f -name '*.json' | head -1)
+          test -n "$f"
           cp "$f" data/research/nq-pit-ec-filtered-2006.json
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9925317298/zip > /tmp/idx.zip
           unzip -q /tmp/idx.zip -d /tmp/idx
