@@ -416,6 +416,8 @@
   .next-action-cell > strong,
   .next-action-cell.execution-cell > strong,
   .next-action-cell.nport-deadline-cell > strong { font-size: 15px; line-height: 1.2; white-space: nowrap; }
+  .next-action-cell.nport-deadline-cell { padding-inline: 6px; }
+  .next-action-cell.nport-deadline-cell > strong { font-size: 10px; letter-spacing: -0.04em; }
   .action-value-line { gap: 5px; }
   .action-value-line > strong { font-size: 15px; line-height: 1.2; }
   .action-value-line > .close-basis-warning { font-size: 7px; padding: 3px; }
