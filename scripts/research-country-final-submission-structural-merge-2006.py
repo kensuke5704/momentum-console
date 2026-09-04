@@ -68,12 +68,15 @@ def main():
     rows = []
     matched_count = 0
     matched_weight = 0.0
+    matched_resolved_count = 0
+    matched_resolved_weight = 0.0
     for detail in sm.get('details', []):
         weight = float(detail.get('weight') or 0)
         cls = 'UNKNOWN'
         method = 'UNRESOLVED'
         identities = detail.get('identities') or []
-        if detail.get('status') == 'MATCHED_UNIQUE' and len(identities) == 1:
+        is_matched = detail.get('status') == 'MATCHED_UNIQUE' and len(identities) == 1
+        if is_matched:
             matched_count += 1
             matched_weight += weight
             k = key(identities[0])
@@ -83,6 +86,9 @@ def main():
         if cls == 'UNKNOWN' and ADR_RE.search(str(detail.get('description') or '')):
             cls = 'NON_US'
             method = 'EXPLICIT_ADR_GDR'
+        if is_matched and cls in {'US', 'NON_US'}:
+            matched_resolved_count += 1
+            matched_resolved_weight += weight
         counts[cls] += 1
         weights[cls] += weight
         methods[method] += 1
@@ -107,6 +113,8 @@ def main():
     base_weight_rate = float(base_after['allEcResolvedWeightRate'])
     resolved_count_rate = resolved_count / total_count if total_count else 0.0
     resolved_weight_rate = resolved_weight / total_weight if total_weight else 0.0
+    matched_resolved_count_rate = matched_resolved_count / matched_count if matched_count else 0.0
+    matched_resolved_weight_rate = matched_resolved_weight / matched_weight if matched_weight else 0.0
 
     if total_count != 936:
         raise RuntimeError(f'unexpected EC holding denominator: {total_count}')
@@ -144,6 +152,10 @@ def main():
         'totalHoldingWeight': total_weight,
         'matchedHoldingCount': matched_count,
         'matchedHoldingWeight': matched_weight,
+        'matchedResolvedCount': matched_resolved_count,
+        'matchedResolvedWeight': matched_resolved_weight,
+        'matchedResolvedCountRate': matched_resolved_count_rate,
+        'matchedResolvedWeightRate': matched_resolved_weight_rate,
         'classificationCounts': dict(counts),
         'classificationWeights': dict(weights),
         'resolvedCount': resolved_count,
