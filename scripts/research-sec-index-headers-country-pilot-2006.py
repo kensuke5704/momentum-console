@@ -56,8 +56,9 @@ def accession_parts(filename):
 def filing_index_urls_from_filename(filename):
  parts=accession_parts(filename)
  if not parts:return []
- cik,acc,ad=parts;base=f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index'
- return [base+'.htm',base+'.html']
+ cik,acc,ad=parts
+ # SEC documents the post-2000 filing index as <accession>-index.html.
+ return [f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index.html']
 
 def entity_state(target,cik,text):
  matches=list(ENTITY_RE.finditer(text));nt=normalize_company(target);zcik=str(cik).zfill(10)
@@ -110,6 +111,6 @@ def main():
  for row in unknown:
   rec=resolve_from_rows(row,master_rows);results.append(rec);print('INDEX',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','filingCandidateCount','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
- out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year. Historical CIK seeding is restricted to issuer-bearing periodic/current/proxy forms, eliminating NO ACT and other non-issuer name collisions. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Filing retrieval prioritizes 10-K, 10-Q and 8-K. Classification still requires a historical filing-index entity block with the same CIK, matching normalized issuer name, and State of Incorp. SEC trailing jurisdiction annotations are normalized. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
+ out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year. Historical CIK seeding is restricted to issuer-bearing periodic/current/proxy forms, eliminating NO ACT and other non-issuer name collisions. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Filing retrieval prioritizes 10-K, 10-Q and 8-K and uses SEC standard post-2000 <accession>-index.html paths. Classification still requires a historical filing-index entity block with the same CIK, matching normalized issuer name, and State of Incorp. SEC trailing jurisdiction annotations are normalized. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('results','masterIndexTransports')}),flush=True)
 if __name__=='__main__':main()
