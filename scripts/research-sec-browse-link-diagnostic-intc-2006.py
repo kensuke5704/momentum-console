@@ -12,8 +12,8 @@ def inspect(url,mode):
  try:
   req=urllib.request.Request(target,headers=old.UA)
   with urllib.request.urlopen(req,timeout=20) as r:text=r.read(2_000_000).decode('utf-8','replace')
-  state_lines=[x.strip() for x in text.splitlines() if re.search(r'State\s+of\s+Incorp|STATE.OF.INCORPORATION|INTEL CORP|CIK',x,re.I)][:50]
-  return {'target':target,'ok':True,'length':len(text),'stateLines':state_lines,'rawStateMatches':re.findall(r'(?:State\s+of\s+Incorp\.?|STATE\s+OF\s+INCORPORATION)[^\r\n<]{0,100}',text,re.I)[:20]}
+  state_lines=[x.strip() for x in text.splitlines() if re.search(r'State\s+of\s+Incorp|STATE.OF.INCORPORATION|INTEL CORP|COMPANY.CONFORMED.NAME|CIK',x,re.I)][:50]
+  return {'target':target,'ok':True,'length':len(text),'stateLines':state_lines,'rawStateMatches':re.findall(r'(?:State\s+of\s+Incorp\.?|STATE[- ]OF[- ]INCORPORATION)[^\r\n<]{0,100}',text,re.I)[:20]}
  except Exception as e:return {'target':target,'ok':False,'error':repr(e)}
 def main():
  url=old.sec_url({'action':'getcompany','CIK':'0000050863','type':'10-K','dateb':'20060228','owner':'exclude','count':'10'})
@@ -22,8 +22,11 @@ def main():
  first=abs_urls[0] if abs_urls else ''
  variants=[]
  if first:
+  m=re.search(r'(.*/)(\d{10}-\d{2}-\d{6})-index\.html?$',first,re.I)
+  hdr=(m.group(1)+m.group(2)+'.hdr.sgml') if m else ''
   urls=[first,first+'?output=1']
   if first.endswith('.htm'):urls.append(first[:-4]+'.html')
+  if hdr:urls.append(hdr)
   for u in urls:
    for mode in ('native','jina'):variants.append(inspect(u,mode))
  out={'browseUrl':url,'browseTransport':tr,'firstIndexUrl':first,'variants':variants}
