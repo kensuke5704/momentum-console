@@ -347,6 +347,10 @@
 }
 
 @media (max-width: 520px) {
+  /* Keep both rows of the two-stage action grid as one continuous matrix. */
+  .next-action-primary,
+  .next-action-secondary { grid-auto-rows: 108px; }
+
   .next-action-primary {
     grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.4fr) minmax(0, 1.7fr) !important;
   }
@@ -408,10 +412,11 @@
 
   .next-action-cell {
     gap: 7px;
-    min-height: 94px;
+    height: 100%;
+    min-height: 0;
     padding: 12px 7px;
   }
-  .next-action-cell.target-cell { min-height: 104px; padding: 11px 10px 13px; }
+  .next-action-cell.target-cell { padding: 11px 10px 13px; }
   .next-action-cell > span { font-size: 9px; line-height: 1.2; }
   .next-action-cell > strong,
   .next-action-cell.execution-cell > strong,
@@ -428,6 +433,17 @@
 
   .dynamic-metric-grid,
   .dynamic-metric-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .overview-status-grid,
+  .overview-input-grid {
+    border: 1px solid var(--line-strong);
+    overflow: hidden;
+  }
+  .overview-status-grid > .dynamic-metric,
+  .overview-input-grid > .dynamic-metric { border-bottom: 1px solid var(--line); }
+  .overview-status-grid > .dynamic-metric:nth-child(2n),
+  .overview-input-grid > .dynamic-metric:nth-child(2n) { border-right: 0; }
+  .overview-status-grid > .dynamic-metric:nth-last-child(-n + 2),
+  .overview-input-grid > .dynamic-metric:nth-last-child(-n + 2) { border-bottom: 0; }
   .dynamic-metric { min-width: 0; padding: 14px 12px !important; }
   .dynamic-metric strong { font-size: 16px !important; overflow-wrap: anywhere; }
   .dynamic-metric strong.metric-value-compact { font-size: 14px !important; }
