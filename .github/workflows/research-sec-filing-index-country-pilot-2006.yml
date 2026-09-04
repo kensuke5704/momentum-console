@@ -27,3 +27,4 @@ jobs:
         with:
           name: sec-filing-index-country-pilot-2006
           path: data/research/sec-filing-index-country-pilot-2006.json
+# rerun marker: start PIT filing-index country resolver
