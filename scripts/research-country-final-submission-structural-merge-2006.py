@@ -135,7 +135,7 @@ def main():
         'inputArtifacts': {
             'baselineSubmissionHeaderCountryArtifactId': 9944538015,
             'structuralMappingArtifactId': 9900708609,
-            'structuralSubmissionHeaderCountryArtifactId': None,
+            'structuralSubmissionHeaderCountryArtifactId': 9944797581,
         },
         'structuralCountryOverlapWithBaselineIdentityCount': overlap_count,
         'conflictCount': len(conflicts),
