@@ -7,7 +7,7 @@ SRC=ROOT/'data/research/country-full-coverage-unknown-retry-2006.json'
 OUT=ROOT/'data/research/sec-filing-index-country-pilot-2006.json'
 SPEC=importlib.util.spec_from_file_location('cur',ROOT/'scripts'/'research-sec-us-attribution-current-ticker-sample-2006.py')
 cur=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(cur)
-STATE_RE=re.compile(r'(?:State\s+of\s+Incorp\.?|STATE\s+OF\s+INCORPORATION)\s*:?\s*([A-Z0-9]{2,3})',re.I)
+STATE_RE=re.compile(r'(?:State\s+of\s+Incorp\.?|STATE\s+OF\s+INCORPORATION)\s*:?\s*(?:\*\*)?([A-Z0-9]{2,3})(?:\*\*)?',re.I)
 ARCH_RE=re.compile(r'/Archives/edgar/data/(\d+)/(\d{18})/',re.I)
 
 def index_urls(doc_url:str):
@@ -42,6 +42,6 @@ def main():
     if rec['classification']!='UNKNOWN':break
   rows.append(rec);print('PILOT',json.dumps(rec),flush=True);time.sleep(.06)
  resolved=[r for r in rows if r['classification']!='UNKNOWN']
- out={'purpose':'UNKNOWN-only PIT country pilot. Current ticker metadata may seed a CIK only on unique exact normalized ticker+issuer-name match. Country classification is taken only from historical SEC filing index State of Incorp. metadata available by the legacy report date. No current state, returns, or ranks used.','sampleCount':len(rows),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in rows),'rows':rows}
+ out={'purpose':'UNKNOWN-only PIT country pilot. Current ticker metadata may seed a CIK only on unique exact normalized ticker+issuer-name match. Country classification is taken only from historical SEC filing index State of Incorp. metadata available by the legacy report date. Markdown emphasis around SEC state codes is presentation-only and ignored. No current state, returns, or ranks used.','sampleCount':len(rows),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in rows),'rows':rows}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k!='rows'}),flush=True)
 if __name__=='__main__':main()
