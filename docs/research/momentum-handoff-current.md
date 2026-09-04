@@ -147,9 +147,9 @@ Structural result:
 
 Examples include Comcast Class A, UPS Class B, Broadcom Class A, Viacom Class B and Lennar Class A.
 
-This structural mapping rule is promising but should remain a research rule until the historical bridge is frozen.
+This deterministic structural mapping rule is the active research rule. Do not broaden it with fuzzy/edit-distance auto-matching merely to improve coverage.
 
-## 9. 2006 PIT issuer-country bridge — main blocker
+## 9. 2006 PIT issuer-country bridge — materially resolved within mapped population
 
 Conservative hierarchy remains:
 - alphabetic CINS prefix => NON_US
@@ -164,26 +164,80 @@ Never infer US from:
 - absence of ADR/GDR
 - legacy country headings unless source semantics explicitly define issuer domicile/organization
 
-Full 12-shard deterministic country run over the 439 baseline mapped identities completed successfully. UNKNOWN-only historical 10-K retry resolved **53 additional identities**.
+### Superseded pre-correction state
 
-After retry, baseline-mapping country coverage:
-- mapped holdings resolved: **59.17% count / 62.68% weight**
-- all 936 EC holdings, including conservative explicit ADR/GDR on unmapped rows: **42.95% count / 50.97% weight**
+Before the corrected submission-header route:
+- baseline mapped holdings resolved: **59.17% count / 62.68% weight**
+- all 936 EC holdings resolved: **42.95% count / 50.97% weight**
+- structural-new identities: US 7 / NON_US 2 / UNKNOWN 18
+- approximate combined all-EC resolved-weight coverage: **52.35%**
 
-Country attribution on newly recovered structural mapping identities:
-- 27 unique new identities
-- US 7 / NON_US 2 / UNKNOWN 18
-- resolved added weight: **27.53**
+The old generic complete-submission `.txt` pilot resolved 0/30 because it did not first establish the correct historical issuer identity and filing path. Do not interpret that pilot as evidence that complete-submission headers are unusable.
 
-Combined all-EC resolved-weight coverage is approximately **52.35%**. This remains insufficient for implementation.
+### Corrected deterministic flat-header route
 
-Rejected/low-value country routes:
-- current-ticker CIK seed + historical `COMPANY CONFORMED NAME` validation on top 50 UNKNOWN: **0/50 resolved**
-- deterministic complete-submission `.txt` pilot on top 30 UNKNOWN: **0/30 resolved**, sample weight 288.74
+The accepted country evidence route now is:
+1. official historical SEC master index, issuer-bearing forms only, filing date `<=` legacy report date;
+2. exact normalized historical issuer name must resolve to one CIK; current ticker metadata is exact-name CIK fallback only;
+3. fetch the correct complete-submission filing;
+4. parse the 2005/2006 flat `COMPANY DATA:` SEC header;
+5. require matching historical company name, the same CIK, and `STATE OF INCORPORATION` in the same block;
+6. classify only from that filing-time code.
 
-Important new lead: historical SEC **filing index pages** can expose `State of Incorp.` directly (e.g. Intel 2005 10-K). A filing-index-based PIT country resolver is the next route to validate. It must still use historical filing-time metadata and keep current ticker data seed-only.
+Top-10 high-weight UNKNOWN pilot resolved **9/10 identities**, representing **93.67%** of sample weight.
 
-## 10. 2006 source-series discovery — major correction and progress
+Full baseline-mapped UNKNOWN expansion:
+- commit `03dd6dfe7c26b37b1639b9fe28fdd93bf0097132`
+- run `33892546597`
+- artifact `9944538015`
+- prior mapped UNKNOWN identities: 180
+- newly resolved: **160**
+- newly resolved US 159 / NON_US 1
+- remaining mapped UNKNOWN identities: 20
+- baseline mapped holdings country resolved: **95.41% count / 96.23% weight**
+- all 936 EC before structural +37 integration: **68.27% count / 77.43% weight**
+
+The one newly resolved NON_US identity was Tyco International Ltd., supported by the same historical CIK/name block and filing-time state code `D0` in its 2005 10-K.
+
+### Structural-new identity refresh
+
+The 27 unique identities introduced by the accepted structural mapping were then re-audited. Existing US/NON_US classifications were frozen; only the 18 old UNKNOWN identities could be promoted.
+
+Issuer-name reconciliation reused only the already accepted trailing N-Q footnote/share-class/jurisdiction cleanup. It did **not** add fuzzy/edit-distance matching. Every promotion still required exact historical issuer-form name -> unique CIK and same-name/same-CIK filing-time state evidence.
+
+Result:
+- commit `a50e89046f01f20173659d6e9b0d47ee2fb50b96`
+- run `33893452312`
+- artifact `9944797581`
+- 18 prior structural UNKNOWN -> **16 promoted**
+- promoted holding occurrences: 21
+- promoted aggregate weight: **38.22**
+- structural identity total: **US 23 / NON_US 2 / UNKNOWN 2**
+- structural resolved aggregate weight: **65.75**
+- remaining structural-new UNKNOWN identities: News Corp. and E.W. Scripps
+
+### Final 936-holding merge
+
+Final conservative holding-level merge:
+- commit `99ffda186350b3d07f8f04ae986dbede9a1872d4`
+- run `33893804443`
+- artifact `9944902929`
+- denominator: **936 EC holdings**, unchanged
+- total weight: **1992.55834288257**, unchanged
+- classification conflicts: **0**
+- US 641 / NON_US 33 / UNKNOWN 262
+- all-EC resolved: **674/936 = 72.01% count**
+- all-EC resolved weight: **80.85%**
+- deterministic unique mapped holdings: 691
+- mapped holdings with resolved country: **658/691 = 95.22% count**
+- mapped-holding resolved weight: **96.14%**
+
+Interpretation:
+- country evidence is no longer the principal blocker **inside the deterministic mapped population**;
+- residual full-EC unresolved weight is now dominated by unmapped/ambiguous identity rows rather than lack of country evidence on mapped identities;
+- keep residual UNKNOWN conservative; do not revive a default-US rule.
+
+## 10. 2006 source-series discovery — corrected and materially improved
 
 Earlier wording that r.jina omitted historical Series/Class metadata was incorrect.
 
@@ -209,12 +263,16 @@ Examples recovered directly from filing-index metadata:
 
 Direct comparison against the corrected 20-series PIT set confirms **20/20 = 100% source-series coverage** within these fixed source submissions.
 
-Interpretation:
-- series identity within a known historical filing is now reproducibly discoverable without holdings content or Production ranks;
-- prior zero-series runs were parser defects, not data absence or transport absence;
-- this materially strengthens the historical source-discovery bridge.
+SEC daily form indexes can be acquired with bounded HTTP Range reads instead of blocked full quarterly downloads. Source-discovery transport pilot:
+- commit `2be4218a5753b5ca5e5eae682e7aa31dd8272c43`
+- run `33878671009`
+- workflow `Research SEC Daily Index N-Q Pilot 2006`
+- conclusion: success
 
-Remaining source-discovery caveat: the three source submissions/registrants were themselves fixed from the existing 2006 pilot. A scalable market-wide process still needs to discover the relevant historical fund filings/registrants without starting from a Production-known list.
+Interpretation:
+- series identity within a known historical filing is reproducibly discoverable without holdings content or Production ranks;
+- market-wide historical N-Q filing inventory has a viable SEC daily-index transport path;
+- the remaining major source blocker is combining those pieces into a **market-wide, Production-independent registrant/filing discovery process**. The fixed three source submissions were inherited from the original pilot and are not sufficient.
 
 ## 11. Reproduction gate status
 
@@ -226,25 +284,27 @@ Remaining source-discovery caveat: the three source submissions/registrants were
 - 2020-01 direct aggregate shadow: exceeds practical overlap/rank/Top2 thresholds
 - transition CORP redundancy after EC+US: 226/226
 - filing-index series extraction within fixed 2006 source submissions: 20/20 corrected PIT series covered
+- PIT country attribution within deterministic mapped 2006 holdings: **95.22% count / 96.14% weight**
 
 ### Not yet passed
-- conservative 2006 issuer-country resolved-weight coverage: only ~52.35%
-- market-wide Production-independent historical source-filing discovery
+- deterministic security mapping itself covers only **73.90% count / 82.49% weight** of all EC holdings; do not fill the remainder with fuzzy matching
+- market-wide Production-independent historical source-filing/registrant discovery
 - full historical aggregate Universe reconstruction from independently discovered sources
 
 Therefore **Universe reconstruction is not yet confirmed**.
 
-## 12. Current next actions
+## 12. Current active gate and next actions
 
-Proceed in this order:
-1. validate a filing-index-based historical `State of Incorp.` resolver on remaining high-weight UNKNOWN issuers;
-2. if effective, shard it across the remaining mapped UNKNOWN population and recompute count/weight coverage;
-3. incorporate structural mapping additions only under deterministic unique-identity rules;
-4. design a scalable historical fund-filing discovery route using SEC filing-index Series/Class metadata rather than holdings-content matching;
-5. construct a full legacy aggregate Universe from independently discovered historical sources;
-6. rerun Gate B Top-K/Top80 overlap, common-name rank correlation and Production Top2 retention;
-7. only after Gate B passes explicitly state `Universe reconstruction is confirmed` and implement the historical builder;
-8. still do not immediately run broad 2006–2018 Stage21 performance; first freeze the bridge and expose older history in staged windows.
+The active gate has shifted away from country resolution. Proceed in this order:
+1. freeze the corrected PIT submission-header country rule and keep residual mapped UNKNOWN conservative;
+2. preserve the current deterministic structural identity rules; do not tune identity coverage from strategy outcomes;
+3. build a scalable market-wide historical fund-filing discovery route using SEC daily form indexes plus filing-index Series/Class metadata;
+4. identify active historical series/tickers from independently discovered filings without holdings-content or Production-rank seeding;
+5. construct a full legacy aggregate Universe from those independently discovered sources;
+6. explicitly quantify sensitivity to residual unmapped/UNKNOWN holdings without changing reconstruction rules from return outcomes;
+7. rerun Gate B Top-K/Top80 overlap, common-name rank correlation and Production Top2 retention;
+8. only after Gate B passes explicitly state `Universe reconstruction is confirmed` and implement the historical builder;
+9. still do not immediately run broad 2006–2018 Stage21 performance; first freeze the bridge and expose older history in staged windows.
 
 ## 13. Rejected paths — do not revive without new evidence
 
@@ -259,8 +319,8 @@ Proceed in this order:
 - current SEC state as PIT country evidence
 - accession first ten digits as issuer CIK
 - raw quarterly N-PORT ZIP transport failure as semantic evidence
-- current-ticker + historical-name validation route after 0/50 pilot
-- complete-submission `.txt` country route after 0/30 pilot
+- current-ticker + historical-name validation route after 0/50 pilot, when used without the corrected historical-master identity route
+- old generic complete-submission `.txt` probe after 0/30, when used without first fixing the historical issuer CIK and filing path
 
 ## 14. Key artifacts / runs
 
@@ -272,5 +332,9 @@ Proceed in this order:
 - current-ticker PIT country sample: run `33731427179`, artifact `9884212384`
 - unresolved country audit: run `33733665015`
 - corrected filing-index series parser: run `33842315528`, artifact `9925317298`
+- SEC daily N-Q index Range transport: run `33878671009`, commit `2be4218a5753b5ca5e5eae682e7aa31dd8272c43`
+- full submission-header mapped-UNKNOWN country run: run `33892546597`, artifact `9944538015`, commit `03dd6dfe7c26b37b1639b9fe28fdd93bf0097132`
+- structural-new submission-header country refresh: run `33893452312`, artifact `9944797581`, commit `a50e89046f01f20173659d6e9b0d47ee2fb50b96`
+- final 936-holding country merge: run `33893804443`, artifact `9944902929`, commit `99ffda186350b3d07f8f04ae986dbede9a1872d4`
 
 When resuming, update this file after any material gate change.
