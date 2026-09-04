@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,6 +46,17 @@ def complete_prospectus_set(rows: list[dict]) -> list[dict]:
     return sorted(chosen.values(), key=lambda row: (row["dateFiled"], row["form"], row["filename"]))
 
 
+def evidence_sort_key(row: dict) -> tuple[str, str, str]:
+    return row["evidenceDateFiled"], row["seriesId"], row["evidenceFilename"]
+
+
+def maybe_keep_earlier(target: dict[str, dict], candidate: dict) -> None:
+    sid = candidate["seriesId"]
+    current = target.get(sid)
+    if current is None or evidence_sort_key(candidate) < evidence_sort_key(current):
+        target[sid] = candidate
+
+
 def main() -> None:
     if SHARD_COUNT < 1 or not 0 <= SHARD_INDEX < SHARD_COUNT:
         raise ValueError("invalid shard configuration")
@@ -54,7 +66,8 @@ def main() -> None:
     selected = [cik for i, cik in enumerate(all_ciks) if i % SHARD_COUNT == SHARD_INDEX]
     pros, master_transports = base.load_prospectus(set(selected))
 
-    evidence = []
+    directly_bound_evidence = []
+    operational_by_cik: dict[str, list[dict]] = defaultdict(list)
     prospectus_diagnostics = []
     for cik in selected:
         rows = complete_prospectus_set(pros.get(cik, []))
@@ -79,6 +92,13 @@ def main() -> None:
                 ctxnorm = base.norm(base.context(text, creation, exchange))
                 positive = []
                 if creation and exchange:
+                    operational_by_cik[cik].append({
+                        "dateFiled": filing["dateFiled"],
+                        "form": filing["form"],
+                        "filename": filing["filename"],
+                        "contextNorm": ctxnorm,
+                        "prospectusIndexSeriesCount": len(series),
+                    })
                     for series_row in series:
                         explicit = any(
                             base.EXPLICIT_ETF_CLASS.search(x.get("className") or "")
@@ -97,16 +117,18 @@ def main() -> None:
                             "seriesId": series_row["seriesId"],
                             "seriesName": series_row["seriesName"],
                             "evidenceDateFiled": filing["dateFiled"],
+                            "operationalEvidenceDateFiled": filing["dateFiled"],
+                            "seriesMetadataDateFiled": filing["dateFiled"],
                             "evidenceForm": filing["form"],
                             "evidenceFilename": filing["filename"],
                             "binding": (
-                                "SINGLE_SERIES_FILING" if single
-                                else "LOCAL_SERIES_NAME" if local
-                                else "EXPLICIT_ETF_CLASS"
+                                "PROSPECTUS_SINGLE_SERIES" if single
+                                else "PROSPECTUS_LOCAL_SERIES_NAME" if local
+                                else "PROSPECTUS_EXPLICIT_ETF_CLASS"
                             ),
                         })
                 rec["positiveSeriesCount"] = len(positive)
-                evidence.extend(positive)
+                directly_bound_evidence.extend(positive)
             except Exception as exc:
                 rec["error"] = type(exc).__name__
                 rec["errorDetail"] = str(exc)[:900]
@@ -127,15 +149,20 @@ def main() -> None:
                 flush=True,
             )
 
-    first = {}
-    for row in sorted(evidence, key=lambda x: (x["evidenceDateFiled"], x["seriesId"], x["evidenceFilename"])):
-        if row["seriesId"] not in first:
-            first[row["seriesId"]] = row
-    positive_series = list(first.values())
-    positive_ids = set(first)
+    first: dict[str, dict] = {}
+    for row in sorted(directly_bound_evidence, key=evidence_sort_key):
+        maybe_keep_earlier(first, row)
 
-    nq_rows = []
+    # Some pre-2006 SEC prospectus index pages expose no Series/Class table even though the
+    # filing itself contains issuer-own Creation Unit + exchange evidence. In that case,
+    # bind only when contemporaneously public N-Q index metadata supplies either:
+    #   (a) an explicit ETF/VIPER class for the Series, or
+    #   (b) the exact normalized Series name inside the local operational-evidence context.
+    # The binding becomes public only when BOTH ingredients are public, so the effective
+    # evidenceDateFiled is max(prospectus date, N-Q metadata filing date). This prevents
+    # later Series metadata from being backfilled into an earlier PIT month.
     nq_diagnostics = []
+    parsed_nq = []
     selected_set = set(selected)
     for row in [x for x in inv["rows"] if x["cik"] in selected_set]:
         rec = {k: row[k] for k in ("cik", "company", "form", "dateFiled", "filename", "accession", "indexUrl")}
@@ -144,33 +171,92 @@ def main() -> None:
             rec["transport"] = transport
             rec["priorErrors"] = prior
             rec["seriesCount"] = len(series)
-            rec["positiveSeriesIds"] = [s["seriesId"] for s in series if s["seriesId"] in positive_ids]
+            parsed_nq.append((row, series))
+
+            fallback_ids = []
+            ops = sorted(
+                operational_by_cik.get(row["cik"], []),
+                key=lambda x: (x["dateFiled"], x["filename"]),
+            )
             for series_row in series:
-                if series_row["seriesId"] not in positive_ids:
-                    continue
-                nq_rows.append({
-                    **row,
-                    "seriesId": series_row["seriesId"],
-                    "seriesName": series_row["seriesName"] or first[series_row["seriesId"]]["seriesName"],
-                })
+                sid = series_row["seriesId"]
+                sname = series_row.get("seriesName") or ""
+                sname_norm = base.norm(sname)
+                explicit_class = any(
+                    base.EXPLICIT_ETF_CLASS.search(x.get("className") or "")
+                    for x in series_row.get("classes", [])
+                )
+                candidates = []
+                for op in ops:
+                    local_name = bool(sname_norm and sname_norm in op["contextNorm"])
+                    if not explicit_class and not local_name:
+                        continue
+                    binding_public = max(op["dateFiled"], row["dateFiled"])
+                    candidates.append({
+                        "cik": row["cik"],
+                        "seriesId": sid,
+                        "seriesName": sname,
+                        "evidenceDateFiled": binding_public,
+                        "operationalEvidenceDateFiled": op["dateFiled"],
+                        "seriesMetadataDateFiled": row["dateFiled"],
+                        "evidenceForm": op["form"],
+                        "evidenceFilename": op["filename"],
+                        "binding": (
+                            "NQ_EXPLICIT_ETF_CLASS_PLUS_ISSUER_OWN_EVIDENCE"
+                            if explicit_class
+                            else "NQ_LOCAL_SERIES_NAME_PLUS_ISSUER_OWN_EVIDENCE"
+                        ),
+                    })
+                if candidates:
+                    candidate = min(candidates, key=evidence_sort_key)
+                    before = first.get(sid)
+                    maybe_keep_earlier(first, candidate)
+                    if before is None or first.get(sid) is candidate:
+                        fallback_ids.append(sid)
+            rec["fallbackBoundSeriesIds"] = sorted(set(fallback_ids))
         except Exception as exc:
             rec["error"] = type(exc).__name__
             rec["seriesCount"] = 0
-            rec["positiveSeriesIds"] = []
+            rec["fallbackBoundSeriesIds"] = []
         nq_diagnostics.append(rec)
+
+    positive_series = sorted(first.values(), key=lambda x: x["seriesId"])
+    positive_ids = set(first)
+
+    nq_rows = []
+    positive_by_accession: dict[str, list[str]] = defaultdict(list)
+    for row, series in parsed_nq:
+        for series_row in series:
+            sid = series_row["seriesId"]
+            if sid not in positive_ids:
+                continue
+            positive_by_accession[row["accession"]].append(sid)
+            nq_rows.append({
+                **row,
+                "seriesId": sid,
+                "seriesName": series_row["seriesName"] or first[sid]["seriesName"],
+            })
+    for rec in nq_diagnostics:
+        rec["positiveSeriesIds"] = sorted(set(positive_by_accession.get(rec["accession"], [])))
 
     dedup = {}
     for row in nq_rows:
         dedup[(row["seriesId"], row["accession"])] = row
     nq_rows = list(dedup.values())
 
+    fallback_count = sum(
+        row["binding"].startswith("NQ_") for row in positive_series
+    )
     out = {
         "purpose": (
             "Shard of the source-complete H1 2006 strict ETF Series-ID evidence scan. Candidate CIKs are "
             "partitioned deterministically. Every core 485/N-1A prospectus/registration filing through "
             "2006-06-30 plus the latest 497 available at each H1 month end is inspected. Final Series-ID "
-            "binding still requires validated issuer-own Creation Unit plus exchange evidence and structural "
-            "filing-index binding. No holdings outcomes, ranks, returns, or strategy results are used."
+            "binding requires validated issuer-own Creation Unit plus exchange evidence. When an older "
+            "prospectus index exposes no Series/Class table, contemporaneously public N-Q metadata may bridge "
+            "the Series only via an explicit ETF/VIPER class or exact Series name inside the local operational "
+            "evidence context; the effective binding date is the later of the two filings. No holdings outcomes, "
+            "ranks, returns, or strategy results are used."
         ),
         "shardIndex": SHARD_INDEX,
         "shardCount": SHARD_COUNT,
@@ -179,9 +265,11 @@ def main() -> None:
         "selectedCiks": selected,
         "prospectusInspectedCount": len(prospectus_diagnostics),
         "prospectusErrorCount": sum("error" in x for x in prospectus_diagnostics),
-        "prospectusEvidenceRecordCount": len(evidence),
+        "prospectusDirectEvidenceRecordCount": len(directly_bound_evidence),
+        "issuerOwnOperationalFilingCount": sum(len(x) for x in operational_by_cik.values()),
         "positiveSeriesCount": len(positive_series),
-        "positiveSeries": sorted(positive_series, key=lambda x: x["seriesId"]),
+        "nqFallbackPositiveSeriesCount": fallback_count,
+        "positiveSeries": positive_series,
         "nqPositiveSeriesFilingCount": len(nq_rows),
         "nqPositiveSeriesFilings": sorted(nq_rows, key=lambda x: (x["seriesId"], x["dateFiled"], x["accession"])),
         "nqIndexErrorCount": sum("error" in x for x in nq_diagnostics),
@@ -198,7 +286,9 @@ def main() -> None:
             "selectedRegistrantCount": len(selected),
             "prospectusInspectedCount": len(prospectus_diagnostics),
             "prospectusErrorCount": out["prospectusErrorCount"],
+            "issuerOwnOperationalFilingCount": out["issuerOwnOperationalFilingCount"],
             "positiveSeriesCount": len(positive_series),
+            "nqFallbackPositiveSeriesCount": fallback_count,
             "nqPositiveSeriesFilingCount": len(nq_rows),
             "nqIndexErrorCount": out["nqIndexErrorCount"],
         }),
