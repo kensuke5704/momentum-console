@@ -1,0 +1,57 @@
+name: Research SEC Market-wide Series Class Q1 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-marketwide-series-class-shard-q1-2006.py"
+      - "scripts/research-sec-marketwide-series-class-merge-q1-2006.py"
+      - ".github/workflows/research-sec-marketwide-series-class-q1-2006.yml"
+permissions:
+  actions: read
+  contents: read
+jobs:
+  parse:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHARD_COUNT: "12"
+      SHARD_INDEX: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed Q1 2006 market-wide N-Q inventory
+        run: |
+          mkdir -p data/research /tmp/inventory
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9945162305/zip > /tmp/inventory.zip
+          unzip -q /tmp/inventory.zip -d /tmp/inventory
+          cp /tmp/inventory/sec-marketwide-nq-inventory-q1-2006.json data/research/
+      - name: Parse filing-index Series Class metadata
+        run: python3 scripts/research-sec-marketwide-series-class-shard-q1-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-marketwide-series-class-q1-2006-shard-${{ matrix.shard }}
+          path: data/research/sec-marketwide-series-class-q1-2006-shard-*.json
+  merge:
+    needs: parse
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sec-marketwide-series-class-q1-2006-shard-*
+          path: data/research/marketwide-series-class-shards-q1-2006
+          merge-multiple: true
+      - name: Merge market-wide Series Class catalog
+        run: python3 scripts/research-sec-marketwide-series-class-merge-q1-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-marketwide-series-class-merged-q1-2006
+          path: data/research/sec-marketwide-series-class-merged-q1-2006.json
