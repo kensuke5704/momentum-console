@@ -12,17 +12,13 @@ FILINGS=[
 ]
 SID_RE=re.compile(r'\b(S\d{9})\b',re.I)
 CID_RE=re.compile(r'\b(C\d{9})\b',re.I)
+TICKER_RE=re.compile(r'^[A-Z][A-Z0-9.\-]{0,9}$')
 
-def strip_links(s):
- return re.sub(r'\[([^\]]+)\]\([^\)]+\)',r'\1',s)
-def clean_name(line,prefix_pat):
- line=strip_links(line)
- line=re.sub(prefix_pat,'',line,flags=re.I)
- parts=[p.strip() for p in line.split('|')]
- for p in reversed(parts):
-  p=' '.join(p.split())
-  if p and not re.fullmatch(r'[A-Z][A-Z0-9.\-]{0,9}',p): return p
- return ' '.join(line.split())
+def after_markdown_link(line:str, ident:str)->str:
+ m=re.search(rf'\[{re.escape(ident)}\]\([^\)]+\)(.*)$',line,re.I)
+ if m:return ' '.join(m.group(1).split())
+ pos=line.upper().find(ident.upper())
+ return ' '.join(line[pos+len(ident):].lstrip(' ]()').split()) if pos>=0 else ''
 def get(url):
  last=None
  for u in (url,'https://r.jina.ai/'+url):
@@ -35,25 +31,20 @@ def main():
  for label,cik,acc in FILINGS:
   compact=acc.replace('-','');url=f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{compact}/{acc}-index.html';text,tr=get(url)
   lines=[x.strip() for x in text.splitlines() if x.strip()]
-  diagnostic=[x for x in lines if re.search(r'S\d{9}|C\d{9}|Class/Contract|Series and Classes',x,re.I)][:40]
-  print('FORMAT',json.dumps({'label':label,'transport':tr,'lines':diagnostic}),flush=True)
   pairs=[]
   for i,line in enumerate(lines):
    if 'Series' not in line:continue
    sm=SID_RE.search(line)
    if not sm:continue
-   sid=sm.group(1).upper();sname=clean_name(line,rf'^Series\s+{sid}\s*')
+   sid=sm.group(1).upper();sname=after_markdown_link(line,sid)
    for nxt in lines[i+1:i+5]:
     if 'Class/Contract' not in nxt:continue
     cm=CID_RE.search(nxt)
     if not cm:continue
-    raw=strip_links(nxt);parts=[p.strip() for p in raw.split('|')]
-    ticker=''
-    for p in reversed(parts):
-     p=' '.join(p.split())
-     if re.fullmatch(r'[A-Z][A-Z0-9.\-]{0,9}',p):ticker=p;break
-    cname=clean_name(nxt,rf'^Class/Contract\s+{cm.group(1)}\s*')
-    if ticker:pairs.append({'seriesId':sid,'classId':cm.group(1).upper(),'seriesName':sname,'className':cname,'ticker':ticker})
+    cid=cm.group(1).upper();tail=after_markdown_link(nxt,cid)
+    toks=tail.split();ticker=toks[-1].upper() if toks and TICKER_RE.fullmatch(toks[-1].upper()) else ''
+    cname=' '.join(toks[:-1]) if ticker else tail
+    if ticker:pairs.append({'seriesId':sid,'classId':cid,'seriesName':sname,'className':cname,'ticker':ticker})
     break
   dedup=[];seen=set()
   for p in pairs:
