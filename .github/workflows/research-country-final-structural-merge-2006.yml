@@ -1,0 +1,45 @@
+name: Research Country Final Structural Merge 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-country-final-structural-merge-2006.py"
+      - ".github/workflows/research-country-final-structural-merge-2006.yml"
+permissions:
+  contents: read
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed source artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/sm /tmp/base /tmp/snew /tmp/shards
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9900708609/zip > /tmp/sm.zip
+          unzip -q /tmp/sm.zip -d /tmp/sm
+          cp /tmp/sm/nq-npx-structural-mapping-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/country-full-coverage-unknown-retry-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9903255442/zip > /tmp/snew.zip
+          unzip -q /tmp/snew.zip -d /tmp/snew
+          cp /tmp/snew/structural-new-matches-country-2006.json data/research/
+          for pair in \
+            0:9925584495 1:9925562155 2:9925568365 3:9925553177 \
+            4:9925577391 5:9925553079 6:9925566458 7:9925619395 \
+            8:9925608866 9:9925557401 10:9925560034 11:9925554913; do
+            shard=${pair%%:*}; id=${pair##*:}
+            mkdir -p /tmp/shards/$shard
+            gh api /repos/kensuke5704/momentum-console/actions/artifacts/$id/zip > /tmp/shard-$shard.zip
+            unzip -q /tmp/shard-$shard.zip -d /tmp/shards/$shard
+            cp /tmp/shards/$shard/sec-filing-index-country-shard-$shard-2006.json data/research/
+          done
+      - run: python3 scripts/research-country-final-structural-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: country-final-structural-merge-2006
+          path: data/research/country-final-structural-merge-2006.json
