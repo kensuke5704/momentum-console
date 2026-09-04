@@ -35,6 +35,8 @@ def main():
  for label,cik,acc in FILINGS:
   compact=acc.replace('-','');url=f'https://www.sec.gov/Archives/edgar/data/{int(cik)}/{compact}/{acc}-index.html';text,tr=get(url)
   lines=[x.strip() for x in text.splitlines() if x.strip()]
+  diagnostic=[x for x in lines if re.search(r'S\d{9}|C\d{9}|Class/Contract|Series and Classes',x,re.I)][:40]
+  print('FORMAT',json.dumps({'label':label,'transport':tr,'lines':diagnostic}),flush=True)
   pairs=[]
   for i,line in enumerate(lines):
    if 'Series' not in line:continue
