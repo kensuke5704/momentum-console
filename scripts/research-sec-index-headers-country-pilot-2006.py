@@ -10,8 +10,8 @@ SPEC=importlib.util.spec_from_file_location('cur',ROOT/'scripts'/'research-sec-u
 cur=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(cur)
 old=cur.old
 UA={'User-Agent':'Kensuke Kawamura kensuke5704@gmail.com momentum-console research','Accept':'text/plain,text/html,application/zip,*/*','Accept-Encoding':'identity'}
-ENTITY_RE=re.compile(r'(?m)^\s*(?:[-*]\s*)?([^\n\r|]{2,140}?)\s+\((Filer|Issuer|Reporting)\)\s+CIK:\s*(?:\*\*)?(?:\[)?(\d{10})',re.I)
-JURIS_RE=re.compile(r'\s*/[A-Z0-9]{2,3}/\s*$',re.I)
+ENTITY_RE=re.compile(r'(?m)^\s*(?:[-*]\s*)?([^\n\r|]{2,140}?)\s+\((Filer|Issuer|Reporting|Filed by|Subject)\)\s+CIK:\s*(?:\*\*)?(?:\[)?(\d{10})',re.I)
+JURIS_RE=re.compile(r'\s*/[A-Z0-9]{2,3}/?\s*$',re.I)
 
 def normalize_company(s):
  return old.normalize_name(JURIS_RE.sub('',s or ''))
@@ -107,6 +107,6 @@ def main():
  for row in unknown:
   rec=resolve_from_rows(row,master_rows);results.append(rec);print('INDEX',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','filingCandidateCount','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
- out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year to resolve filing-time company name -> CIK -> filing path directly, avoiding browse-edgar transport. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Classification still requires a historical filing index entity block with the same CIK, matching normalized issuer name, and State of Incorp. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
+ out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year to resolve filing-time company name -> CIK -> filing path directly, avoiding browse-edgar transport. SEC trailing jurisdiction annotations are normalized with or without a closing slash. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Classification still requires a historical filing index entity block with the same CIK, matching normalized issuer name, and State of Incorp. Entity roles Filer, Issuer, Reporting, Filed by, and Subject are parsed. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('results','masterIndexTransports')}),flush=True)
 if __name__=='__main__':main()
