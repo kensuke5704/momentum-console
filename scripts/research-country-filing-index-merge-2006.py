@@ -5,7 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];D=ROOT/'data/research'
 BASE=D/'country-full-coverage-unknown-retry-2006.json';MAP=D/'nq-npx-structural-mapping-2006.json';ADD=D/'structural-new-matches-country-2006.json';OUT=D/'country-filing-index-merged-2006.json'
-ROUTE_GLOBS=['sec-filing-date-country-shard-*-2006.json','sec-issuer-name-filing-date-country-shard-*-2006.json','sec-known-cik-filing-index-country-2006.json','sec-filing-date-country-fast-2006.json','sec-filing-date-country-pilot-2006.json','sec-filing-index-country-pilot-2006.json']
+ROUTE_GLOBS=['sec-hdr-country-shard-*-2006.json','sec-hdr-country-top20-2006.json','sec-filing-date-country-shard-*-2006.json','sec-issuer-name-filing-date-country-shard-*-2006.json','sec-known-cik-filing-index-country-2006.json','sec-filing-date-country-fast-2006.json','sec-filing-date-country-pilot-2006.json','sec-filing-index-country-pilot-2006.json']
 def key(r):return (str(r.get('ticker') or ''),str(r.get('securityId') or ''))
 def main():
  base=json.loads(BASE.read_text());mp=json.loads(MAP.read_text());add=json.loads(ADD.read_text())
@@ -24,7 +24,6 @@ def main():
  for k in allkeys:
   f=frozen.get(k,'UNKNOWN')
   if f in ('US','NON_US'):
-   # Frozen prior classifications may not be overwritten. Audit any contradictory later evidence.
    vals={e['classification'] for e in evidence.get(k,[])}
    if vals and any(v!=f for v in vals):conflicts.append({'ticker':k[0],'securityId':k[1],'frozen':f,'laterEvidence':evidence[k]})
    merged[k]=f;continue
@@ -42,6 +41,6 @@ def main():
  series=[]
  for sid,hs in sorted(by.items()):
   us=[w for w,s in hs if s=='US'];usw=sum(us);top10=sum(sorted(us,reverse=True)[:10]);series.append({'seriesId':sid,'confirmedUsHoldingCount':len(us),'confirmedUsWeight':usw,'confirmedUsTop10Weight':top10,'eligibleOnConfirmedUsOnly':10<=len(us)<=120 and usw>=50 and top10>=25,'resolvedCountryWeight':sum(w for w,s in hs if s in ('US','NON_US')),'totalEcWeight':sum(w for w,s in hs)})
- out={'purpose':'Merge frozen country baseline, deterministic structural mapping additions and preregistered historical filing-index country routes. Existing resolved classifications are frozen. Multiple new routes must agree; disagreements remain CONFLICT and are not counted as resolved. Explicit ADR/GDR/ADS may only add NON_US evidence when otherwise unresolved. No returns/ranks used.','inputRouteFiles':sorted(set(Path(f).name for f in files)),'conflictCount':len(conflicts),'conflicts':conflicts,'allEcClassificationCounts':dict(counts),'allEcClassificationWeights':dict(weights),'allEcResolvedCountRate':resolved_n/total_n if total_n else None,'allEcResolvedWeightRate':resolved_w/total_w if total_w else None,'eligibleSeriesConfirmedUsOnly':sum(r['eligibleOnConfirmedUsOnly'] for r in series),'seriesCount':len(series),'series':series}
+ out={'purpose':'Merge frozen country baseline, deterministic structural mapping additions and preregistered historical SEC country routes, including accession header SGML. Existing resolved classifications are frozen. Multiple new routes must agree; disagreements remain CONFLICT and are not counted as resolved. Explicit ADR/GDR/ADS may only add NON_US evidence when otherwise unresolved. No returns/ranks used.','inputRouteFiles':sorted(set(Path(f).name for f in files)),'conflictCount':len(conflicts),'conflicts':conflicts,'allEcClassificationCounts':dict(counts),'allEcClassificationWeights':dict(weights),'allEcResolvedCountRate':resolved_n/total_n if total_n else None,'allEcResolvedWeightRate':resolved_w/total_w if total_w else None,'eligibleSeriesConfirmedUsOnly':sum(r['eligibleOnConfirmedUsOnly'] for r in series),'seriesCount':len(series),'series':series}
  OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('conflicts','series')}),flush=True)
 if __name__=='__main__':main()
