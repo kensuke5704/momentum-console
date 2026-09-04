@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import importlib.util,io,json,re,time,urllib.request,zipfile
+import html,importlib.util,io,json,re,time,urllib.request,zipfile
 from collections import defaultdict
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -46,34 +46,66 @@ def load_master(years):
     rows.append({'cik':cik.zfill(10),'company':company,'normalizedCompany':normalize_company(company),'form':form,'dateFiled':date,'filename':filename})
  return rows,transports
 
-def submission_prefix(filename,limit=131072):
- url='https://www.sec.gov/Archives/'+filename.lstrip('/')
- headers={**UA,'Range':f'bytes=0-{limit-1}'}
- req=urllib.request.Request(url,headers=headers)
- with urllib.request.urlopen(req,timeout=18) as r:
-  return r.read(limit).decode('latin-1','replace'),url,getattr(r,'status',None)
-
-def sgml_entity_state(target,cik,text):
- nt=normalize_company(target);zcik=str(cik).zfill(10)
- for block in SGML_BLOCK_RE.findall(text):
-  nm=re.search(r'<CONFORMED-NAME>\s*([^\r\n<]+)',block,re.I)
-  ck=re.search(r'<CIK>\s*(\d{1,10})',block,re.I)
-  st=re.search(r'<STATE-OF-INCORPORATION>\s*([A-Z0-9]{2,3})',block,re.I)
-  if not nm or not ck:continue
-  name=nm.group(1).strip();mcik=ck.group(1).zfill(10)
-  if mcik==zcik and normalize_company(name)==nt and st:return st.group(1).upper(),name
- return None,None
-
 def accession_parts(filename):
  m=re.search(r'edgar/data/(\d+)/(\d{10}-\d{2}-\d{6})\.txt$',filename,re.I)
  if not m:return None
  cik=str(int(m.group(1)));acc=m.group(2);return cik,acc,acc.replace('-','')
 
+def header_index_url(filename):
+ parts=accession_parts(filename)
+ if not parts:return None
+ cik,acc,ad=parts
+ return f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index-headers.html'
+
 def filing_index_urls_from_filename(filename):
  parts=accession_parts(filename)
  if not parts:return []
  cik,acc,ad=parts;base=f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index'
- return [base+'.htm',base+'.html']
+ return [base+'.html']
+
+def native_text(url,limit=400000,timeout=12):
+ req=urllib.request.Request(url,headers=UA)
+ with urllib.request.urlopen(req,timeout=timeout) as r:
+  return r.read(limit).decode('latin-1','replace'),url
+
+def header_page(filename):
+ url=header_index_url(filename)
+ if not url:raise RuntimeError('no header index url')
+ try:return native_text(url)
+ except Exception:
+  return old.get(url,timeout=10)
+
+def flat_header_entity_state(target,cik,text):
+ # SEC index-headers pages are a canonical text rendering of the submission header.
+ # Strip only HTML tags; preserve the filing-header line structure.
+ cleaned=html.unescape(re.sub(r'<[^>]*>','',text)).replace('\r','')
+ nt=normalize_company(target);zcik=str(cik).zfill(10)
+ blocks=re.split(r'(?im)^\s*COMPANY\s+DATA\s*:\s*$',cleaned)
+ for block in blocks[1:]:
+  part=re.split(r'(?im)^\s*FILING\s+VALUES\s*:\s*$',block,maxsplit=1)[0]
+  nm=re.search(r'(?im)^\s*COMPANY\s+CONFORMED\s+NAME\s*:\s*(.+?)\s*$',part)
+  ck=re.search(r'(?im)^\s*CENTRAL\s+INDEX\s+KEY\s*:\s*(\d{1,10})\s*$',part)
+  st=re.search(r'(?im)^\s*STATE\s+OF\s+INCORPORATION\s*:\s*([A-Z0-9]{2,3})\s*$',part)
+  if not nm or not ck:continue
+  name=nm.group(1).strip();mcik=ck.group(1).zfill(10)
+  if mcik==zcik and normalize_company(name)==nt and st:return st.group(1).upper(),name
+ return None,None
+
+def submission_prefix(filename,limit=131072):
+ url='https://www.sec.gov/Archives/'+filename.lstrip('/')
+ headers={**UA,'Range':f'bytes=0-{limit-1}'}
+ req=urllib.request.Request(url,headers=headers)
+ with urllib.request.urlopen(req,timeout=12) as r:
+  return r.read(limit).decode('latin-1','replace'),url,getattr(r,'status',None)
+
+def sgml_entity_state(target,cik,text):
+ nt=normalize_company(target);zcik=str(cik).zfill(10)
+ for block in SGML_BLOCK_RE.findall(text):
+  nm=re.search(r'<CONFORMED-NAME>\s*([^\r\n<]+)',block,re.I);ck=re.search(r'<CIK>\s*(\d{1,10})',block,re.I);st=re.search(r'<STATE-OF-INCORPORATION>\s*([A-Z0-9]{2,3})',block,re.I)
+  if not nm or not ck:continue
+  name=nm.group(1).strip();mcik=ck.group(1).zfill(10)
+  if mcik==zcik and normalize_company(name)==nt and st:return st.group(1).upper(),name
+ return None,None
 
 def entity_state(target,cik,text):
  matches=list(ENTITY_RE.finditer(text));nt=normalize_company(target);zcik=str(cik).zfill(10)
@@ -100,17 +132,25 @@ def resolve_from_rows(row,master_rows):
  rec['historicalExactCikCount']=len(by_cik);rec['historicalExactCiks']=sorted(by_cik)[:6]
  if not seed:return rec
  rec['seedCik']=seed;rec['seedSource']=source;rec['filingCandidateCount']=len(candidates)
- # Primary route: only the beginning of the official complete submission. The SGML header binds name, CIK and state in one COMPANY-DATA block.
- for fr in candidates[:6]:
+ # Primary: canonical SEC index-headers page, native SEC first. It binds name, CIK and state in one COMPANY DATA block.
+ for fr in candidates[:4]:
+  try:
+   text,tr=header_page(fr['filename']);st,name=flat_header_entity_state(row['issuer'],seed,text)
+   rec.setdefault('attempts',[]).append({'route':'INDEX_HEADERS','form':fr['form'],'dateFiled':fr['dateFiled'],'headerUrl':header_index_url(fr['filename']),'transport':tr,'historicalEntityName':name,'stateCode':st})
+   if st:
+    rec.update({'classification':'US' if st in old.US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_INDEX_HEADERS_COMPANY_DATA_STATE','headerUrl':header_index_url(fr['filename']),'historicalEntityName':name,'evidenceForm':fr['form'],'evidenceDateFiled':fr['dateFiled']});return rec
+  except Exception as e:rec.setdefault('attempts',[]).append({'route':'INDEX_HEADERS','form':fr['form'],'dateFiled':fr['dateFiled'],'headerUrl':header_index_url(fr['filename']),'error':type(e).__name__})
+  time.sleep(.03)
+ # Secondary diagnostic: raw submission prefix. Kept to diagnose SEC transport/header-format differences; it does not relax identity requirements.
+ for fr in candidates[:2]:
   try:
    text,url,status=submission_prefix(fr['filename']);st,name=sgml_entity_state(row['issuer'],seed,text)
    rec.setdefault('attempts',[]).append({'route':'SUBMISSION_RANGE','form':fr['form'],'dateFiled':fr['dateFiled'],'submissionUrl':url,'httpStatus':status,'historicalEntityName':name,'stateCode':st})
    if st:
     rec.update({'classification':'US' if st in old.US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_SUBMISSION_SGML_ENTITY_STATE_RANGE','submissionUrl':url,'historicalEntityName':name,'evidenceForm':fr['form'],'evidenceDateFiled':fr['dateFiled']});return rec
   except Exception as e:rec.setdefault('attempts',[]).append({'route':'SUBMISSION_RANGE','form':fr['form'],'dateFiled':fr['dateFiled'],'error':type(e).__name__})
-  time.sleep(.03)
- # Secondary diagnostic fallback: filing-index rendering. This does not relax identity or PIT requirements.
- for fr in candidates[:3]:
+ # Tertiary diagnostic fallback: ordinary filing-index rendering.
+ for fr in candidates[:1]:
   for iu in filing_index_urls_from_filename(fr['filename']):
    try:
     text,tr=old.get(iu,timeout=7);st,name,role=entity_state(row['issuer'],seed,text)
@@ -128,6 +168,6 @@ def main():
  for row in unknown:
   rec=resolve_from_rows(row,master_rows);results.append(rec);print('COUNTRY',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
- out={'purpose':'Fast top-10 UNKNOWN PIT country pilot. Historical CIK seeding uses only issuer-bearing forms in official 2005 SEC master indexes. Primary country evidence is the first 128 KiB of the official complete-submission SGML fetched with HTTP Range; classification requires one COMPANY-DATA block with the same seeded historical CIK, matching normalized historical issuer name, and STATE-OF-INCORPORATION. Filing-index parsing is diagnostic fallback only. This reopens the formerly rejected complete-submission route because historical master indexes now supply the correct PIT issuer CIK and exact filing path and Range avoids full-file transport. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
+ out={'purpose':'Fast top-10 UNKNOWN PIT country pilot. Historical CIK seeding uses only issuer-bearing forms in official 2005 SEC master indexes. Primary country evidence is the canonical SEC accession index-headers page fetched native-SEC first; classification requires one COMPANY DATA block with the same seeded historical CIK, matching normalized historical issuer name, and STATE OF INCORPORATION. Raw submission Range and ordinary filing-index parsing are diagnostic fallbacks only. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'masterIssuerFormRowCount':sum(r['form'] in ISSUER_FORMS for r in master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('results','masterIndexTransports')}),flush=True)
 if __name__=='__main__':main()
