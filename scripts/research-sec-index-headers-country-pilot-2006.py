@@ -21,12 +21,12 @@ def get_master(year,q):
  zurl=base+'/master.zip'
  try:
   req=urllib.request.Request(zurl,headers=UA)
-  with urllib.request.urlopen(req,timeout=90) as r:data=r.read(20_000_000)
+  with urllib.request.urlopen(req,timeout=45) as r:data=r.read(20_000_000)
   with zipfile.ZipFile(io.BytesIO(data)) as z:
    name=next(n for n in z.namelist() if n.lower().endswith('master.idx'))
    return z.read(name).decode('latin-1','replace'),zurl
  except Exception as ze:
-  text,tr=old.get(base+'/master.idx',timeout=120)
+  text,tr=old.get(base+'/master.idx',timeout=60)
   return text,tr+' | zip_error='+type(ze).__name__
 
 def load_master(years):
@@ -84,29 +84,29 @@ def resolve_from_rows(row,master_rows):
  if not seed:return rec
  rec['seedCik']=seed;rec['seedSource']=source;rec['filingCandidateCount']=len(candidates)
  seen=set()
- for fr in candidates[:24]:
+ for fr in candidates[:12]:
   for iu in filing_index_urls_from_filename(fr['filename']):
    if iu in seen:continue
    seen.add(iu)
    try:
-    text,tr=old.get(iu,timeout=14);st,name,role=entity_state(row['issuer'],seed,text)
+    text,tr=old.get(iu,timeout=10);st,name,role=entity_state(row['issuer'],seed,text)
     rec.setdefault('attempts',[]).append({'form':fr['form'],'dateFiled':fr['dateFiled'],'indexUrl':iu,'transport':tr,'entityName':name,'entityRole':role,'stateCode':st})
     if st:
      rec.update({'classification':'US' if st in old.US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_FILING_INDEX_ENTITY_STATE','indexUrl':iu,'historicalEntityName':name,'historicalEntityRole':role,'evidenceForm':fr['form'],'evidenceDateFiled':fr['dateFiled']});return rec
    except Exception as e:rec.setdefault('attempts',[]).append({'form':fr['form'],'dateFiled':fr['dateFiled'],'indexUrl':iu,'error':type(e).__name__})
-   time.sleep(.04)
+   time.sleep(.03)
  return rec
 
 def main():
  data=json.loads(SRC.read_text())
  unknown=sorted([r for r in data['identityRows'] if r.get('classification')=='UNKNOWN'],key=lambda r:float(r.get('aggregateWeight') or 0),reverse=True)[:10]
- years=sorted({int(r['asOfReportDate'][:4]) for r in unknown}|{int(r['asOfReportDate'][:4])-1 for r in unknown})
+ years=sorted({int(r['asOfReportDate'][:4]) for r in unknown})
  master_rows,master_transports=load_master(years)
  print('MASTER',json.dumps({'years':years,'rows':len(master_rows),'transports':master_transports}),flush=True)
  results=[]
  for row in unknown:
   rec=resolve_from_rows(row,master_rows);results.append(rec);print('INDEX',json.dumps({k:rec.get(k) for k in ['ticker','issuer','aggregateWeight','historicalExactCikCount','seedCik','seedSource','filingCandidateCount','classification','stateCode','resolutionSource','evidenceForm','evidenceDateFiled']}),flush=True)
  resolved=[r for r in results if r['classification']!='UNKNOWN']
- out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes to resolve filing-time company name -> CIK -> filing path directly, avoiding browse-edgar transport. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Classification still requires a historical filing index entity block with the same CIK, matching normalized issuer name, and State of Incorp. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
+ out={'purpose':'Fast top-10 UNKNOWN PIT country pilot using official historical SEC quarterly master indexes from the report year to resolve filing-time company name -> CIK -> filing path directly, avoiding browse-edgar transport. Historical exact normalized company name is preferred; current ticker metadata is only a fallback exact-name CIK seed. Classification still requires a historical filing index entity block with the same CIK, matching normalized issuer name, and State of Incorp. No current state, returns, ranks, or strategy outcomes are used.','masterYears':years,'masterIndexTransports':master_transports,'masterRowCount':len(master_rows),'sampleCount':len(results),'resolvedCount':len(resolved),'resolvedWeight':sum(float(r.get('aggregateWeight') or 0) for r in resolved),'sampleWeight':sum(float(r.get('aggregateWeight') or 0) for r in results),'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('results','masterIndexTransports')}),flush=True)
 if __name__=='__main__':main()
