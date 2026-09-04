@@ -447,6 +447,35 @@
   top: 17px;
 }
 
+.target-execution-comparison { padding: 20px; }
+.target-execution-note {
+  color: var(--text-soft);
+  font-family: "Roboto Mono", monospace;
+  font-size: 12px;
+  margin: 0 0 14px;
+}
+.target-execution-charts {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.target-execution-charts > div {
+  border: 1px solid var(--line-strong);
+  min-width: 0;
+}
+.target-execution-charts > div > span {
+  border-bottom: 1px solid var(--line);
+  color: var(--text-muted);
+  display: block;
+  font-family: "Roboto Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  padding: 10px 12px;
+  text-transform: uppercase;
+}
+.target-execution-charts .allocation-band { min-height: 116px; }
+
 @media (max-width: 900px) {
   .dynamic-shell main { margin-left: 0; }
   .dynamic-shell .sidebar {
@@ -477,6 +506,12 @@
   .rules-grid > div:nth-child(2n) { border-right: 0; }
   .rules-grid > div:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
   .equity-chart { height: 300px; }
+}
+
+@media (max-width: 520px) {
+  .target-execution-comparison { padding: 14px; }
+  .target-execution-charts { grid-template-columns: 1fr; }
+  .target-execution-charts .allocation-band { min-height: 92px; }
 }
 
 @media (max-width: 520px) {
