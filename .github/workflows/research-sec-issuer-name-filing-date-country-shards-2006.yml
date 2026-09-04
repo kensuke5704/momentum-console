@@ -1,0 +1,39 @@
+name: Research SEC Issuer Name Filing Date Country Shards 2006
+on:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-issuer-name-filing-date-country-shard-2006.py"
+      - ".github/workflows/research-sec-issuer-name-filing-date-country-shards-2006.yml"
+permissions:
+  contents: read
+jobs:
+  country:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SHARD_INDEX: ${{ matrix.shard }}
+      SHARD_COUNT: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download country and PIT artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/research /tmp/country /tmp/pit
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9902743513/zip > /tmp/country.zip
+          unzip -q /tmp/country.zip -d /tmp/country
+          cp /tmp/country/country-full-coverage-unknown-retry-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9878189715/zip > /tmp/pit.zip
+          unzip -q /tmp/pit.zip -d /tmp/pit
+          cp /tmp/pit/nq-pit-holdings-2006-ec-filtered.json data/research/
+      - run: python3 scripts/research-sec-issuer-name-filing-date-country-shard-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-issuer-name-filing-date-country-shard-${{ matrix.shard }}-2006
+          path: data/research/sec-issuer-name-filing-date-country-shard-*-2006.json
