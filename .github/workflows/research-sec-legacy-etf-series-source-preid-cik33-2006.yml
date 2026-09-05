@@ -2,6 +2,10 @@ name: Research SEC Legacy ETF Series Source Pre-ID CIK33 2006
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - ".github/workflows/research-sec-legacy-etf-series-source-preid-cik33-2006.yml"
 
 permissions:
   contents: read
