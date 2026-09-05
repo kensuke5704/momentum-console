@@ -1,0 +1,49 @@
+name: Research SEC Hybrid ETF Source Catalog H1 2006
+
+on:
+  workflow_dispatch:
+    inputs:
+      preid_artifact_id:
+        description: "Clean merged pre-Series-ID source artifact id"
+        required: true
+        type: string
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py"
+      - ".github/workflows/research-sec-hybrid-etf-source-catalog-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREID_ARTIFACT_ID: ${{ inputs.preid_artifact_id }}
+      ID_ARTIFACT_ID: "9963958301"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download clean pre-ID and fixed ID-era v3 catalogs
+        run: |
+          mkdir -p data/research /tmp/pre /tmp/post
+          test -n "$PREID_ARTIFACT_ID"
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/$PREID_ARTIFACT_ID/zip > /tmp/pre.zip
+          unzip -q /tmp/pre.zip -d /tmp/pre
+          cp /tmp/pre/sec-legacy-etf-series-source-preid-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/$ID_ARTIFACT_ID/zip > /tmp/post.zip
+          unzip -q /tmp/post.zip -d /tmp/post
+          find /tmp/post -type f -maxdepth 2 -print
+          POST=$(find /tmp/post -type f -name '*.json' | head -1)
+          test -n "$POST"
+          cp "$POST" data/research/sec-id-era-strict-series-source-h1-2006.json
+      - name: Build hybrid PIT source catalog
+        run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-hybrid-etf-source-catalog-h1-2006
+          path: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          if-no-files-found: error
