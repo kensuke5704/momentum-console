@@ -1,0 +1,62 @@
+name: Research SEC ID Era Strict Series Source H1 2006 V2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-id-era-strict-series-source-shard-h1-2006-v2.py"
+      - ".github/workflows/research-sec-id-era-strict-series-source-h1-2006-v2.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed complete-portfolio inventory and operational-prefilter inputs
+        run: |
+          mkdir -p data/research /tmp/inv /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963841667/zip > /tmp/inv.zip
+          unzip -q /tmp/inv.zip -d /tmp/inv
+          cp /tmp/inv/sec-complete-portfolio-inventory-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9962972058/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-h1-2006.json data/research/
+      - name: Build metadata-strict Series source shard
+        run: python3 scripts/research-sec-id-era-strict-series-source-shard-h1-2006-v2.py --shard ${{ matrix.shard }} --shards 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: id-era-strict-v2-series-source-shard-${{ matrix.shard }}
+          path: data/research/sec-id-era-strict-series-source-h1-2006-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  merge:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: id-era-strict-v2-series-source-shard-*
+          path: data/research/id-era-strict-shards
+          merge-multiple: true
+      - run: python3 scripts/research-sec-id-era-strict-series-source-merge-h1-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-id-era-strict-series-source-h1-2006-v2
+          path: data/research/sec-id-era-strict-series-source-h1-2006.json
+          if-no-files-found: error
