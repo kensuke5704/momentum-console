@@ -36,6 +36,49 @@ def registrant_equivalent(candidate_norm, company_norm):
         return x[4:] if x.startswith('THE ') else x
     return candidate_norm==company_norm or core(candidate_norm)==core(company_norm)
 
+def prepare_binding_index(lines):
+    norm_lines=[base.norm(line) for line in lines]
+    token_lines=defaultdict(set)
+    for i,n in enumerate(norm_lines):
+        for token in set(n.split()):
+            token_lines[token].add(i)
+    marker_lines=[i for i,line in enumerate(lines) if strict.EXPLICIT_ETF_CLASS_LINE.search(line)]
+    phrase_cache={}
+    return {'normLines':norm_lines,'tokenLines':{k:tuple(sorted(v)) for k,v in token_lines.items()},'markerLines':marker_lines,'phraseCache':phrase_cache}
+
+def phrase_norm(op_index,i,width):
+    key=(i,width)
+    cache=op_index['phraseCache']
+    if key not in cache:
+        cache[key]=base.norm(' '.join(op_index['normLines'][i:i+width]))
+    return cache[key]
+
+def classify_binding_indexed(title, normalized_title, registrant, op_index):
+    parts=normalized_title.split()
+    if not parts:
+        return None,None
+    candidate_lines=op_index['tokenLines'].get(parts[0],())
+    hits=set()
+    n=len(op_index['normLines'])
+    for token_line in candidate_lines:
+        for i in range(max(0,token_line-2),token_line+1):
+            for width in (1,2,3):
+                if i+width>n or not (i<=token_line<i+width):
+                    continue
+                if normalized_title in phrase_norm(op_index,i,width):
+                    hits.add(i)
+    if not hits:
+        return None,None
+    markers=op_index['markerLines']
+    nearest=min((abs(i-j) for i in hits for j in markers),default=None)
+    if strict.TITLE_ETF_SEMANTIC.search(title):
+        return 'TITLE_EXPLICIT_ETF_SEMANTIC',nearest
+    if strict.REGISTRANT_ETF_SEMANTIC.search(registrant):
+        return 'REGISTRANT_EXPLICIT_ETF_SEMANTIC',nearest
+    if nearest is not None and nearest<=strict.MAX_CLASS_LINE_DISTANCE:
+        return 'LOCAL_EXPLICIT_ETF_CLASS_WITHIN_6_LINES',nearest
+    return None,nearest
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--shard',type=int,required=True);ap.add_argument('--shards',type=int,required=True);args=ap.parse_args()
     h2=json.loads(H2.read_text());h1=json.loads(H1.read_text());pref=json.loads(PREF.read_text())
@@ -53,7 +96,8 @@ def main():
             try:
                 text,tr,_,prior=base.ft(rec['submissionUrl'],5_000_000,24);c=base.rule.find(base.rule.CREATION,text);e=base.rule.find(base.rule.EXCHANGE,text);lines=h2diag.line_text(text).splitlines()
                 rec.update({'transport':tr,'priorErrors':prior,'creationIssuerOwnEvidence':bool(c),'exchangeIssuerOwnEvidence':bool(e),'lineCount':len(lines)})
-                if c and e: ops[cik].append({'dateFiled':f['dateFiled'],'form':f['form'],'filename':f['filename'],'lines':lines})
+                if c and e:
+                    ops[cik].append({'dateFiled':f['dateFiled'],'form':f['form'],'filename':f['filename'],'bindingIndex':prepare_binding_index(lines)})
             except Exception as ex: rec.update({'error':type(ex).__name__,'errorDetail':str(ex)[:700]})
             pros_audit.append(rec)
     occurrences={};audit=[]
@@ -74,7 +118,7 @@ def main():
                     for op in ops.get(r['cik'],[]):
                         cache_key=(r['cik'],candidate['title'],candidate['normalizedTitle'],r['company'],op['filename'])
                         if cache_key not in binding_cache:
-                            binding_cache[cache_key]=strict.classify_binding(candidate['title'],candidate['normalizedTitle'],r['company'],op['lines'])
+                            binding_cache[cache_key]=classify_binding_indexed(candidate['title'],candidate['normalizedTitle'],r['company'],op['bindingIndex'])
                         binding,distance=binding_cache[cache_key]
                         if not binding: continue
                         proposals.append({**candidate,'binding':binding,'explicitEtfClassLineDistance':distance,'evidenceDateFiled':op['dateFiled'],'evidenceForm':op['form'],'evidenceFilename':op['filename']})
@@ -99,7 +143,7 @@ def main():
         src=sorted(latest.values(),key=lambda x:(x['cik'],x['normalizedSeriesName']))
         snaps.append({'signalMonth':month,'asOf':asof,'sourceSeriesCount':len(src),'sourceFilings':src})
     binding=Counter(r['binding'] for r in identities.values());forms=Counter(r['sourceForm'] for r in occ)
-    out={'purpose':'Shard of strict pre-Series-ID complete-portfolio ETF source catalog. Selection semantics are identical to the monolithic resolver except that a normalized title equivalent to the SEC registrant/company name, including a leading THE decoration on either side, is explicitly rejected as a non-Series identity. CIK modulo partitioning only changes execution topology. Binding classification is memoized by exact candidate/evidence-filing inputs; this changes execution cost only, not selection semantics.','seriesIdMandatoryDate':SERIES_ID_START,'sourceCutoff':SOURCE_CUTOFF,'evidenceCutoff':EVIDENCE_CUTOFF,'shard':args.shard,'shards':args.shards,'assignedCiks':sorted(assigned),'candidateSourceFilingCount':len(rows),'candidateRegistrantWithSourceFilingCount':len(source_ciks),'operationalEvidenceFilingCount':sum(len(v) for v in ops.values()),'positiveIdentityCount':len(identities),'bindingCounts':dict(sorted(binding.items())),'sourceOccurrenceCount':len(occ),'sourceFormCounts':dict(sorted(forms.items())),'sourceNoScheduleCount':sum('error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'amendmentNoScheduleCount':sum(str(x.get('form','')).endswith('/A') and 'error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'prospectusErrorCount':sum('error' in x for x in pros_audit),'sourceErrorCount':sum('error' in x for x in audit),'positiveIdentities':sorted(identities.values(),key=lambda x:x['legacyIdentity']),'sourceOccurrences':sorted(occ,key=lambda x:(x['legacyIdentity'],x['sourceFilingDate'],x['sourceAccession'] or '')),'monthSnapshots':snaps,'prospectusAudit':pros_audit,'sourceAudit':audit,'masterTransports':trs}
+    out={'purpose':'Shard of strict pre-Series-ID complete-portfolio ETF source catalog. Selection semantics are identical to the monolithic resolver except that a normalized title equivalent to the SEC registrant/company name, including a leading THE decoration on either side, is explicitly rejected as a non-Series identity. CIK modulo partitioning only changes execution topology. Binding classification is memoized by exact candidate/evidence-filing inputs. Prospectus normalized lines, token-to-line lookup, phrase normalization, and ETF-class marker lines are indexed once per evidence filing; the accepted substring, semantic, and six-line tests remain unchanged. These changes affect execution cost only, not selection semantics.','seriesIdMandatoryDate':SERIES_ID_START,'sourceCutoff':SOURCE_CUTOFF,'evidenceCutoff':EVIDENCE_CUTOFF,'shard':args.shard,'shards':args.shards,'assignedCiks':sorted(assigned),'candidateSourceFilingCount':len(rows),'candidateRegistrantWithSourceFilingCount':len(source_ciks),'operationalEvidenceFilingCount':sum(len(v) for v in ops.values()),'positiveIdentityCount':len(identities),'bindingCounts':dict(sorted(binding.items())),'sourceOccurrenceCount':len(occ),'sourceFormCounts':dict(sorted(forms.items())),'sourceNoScheduleCount':sum('error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'amendmentNoScheduleCount':sum(str(x.get('form','')).endswith('/A') and 'error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'prospectusErrorCount':sum('error' in x for x in pros_audit),'sourceErrorCount':sum('error' in x for x in audit),'positiveIdentities':sorted(identities.values(),key=lambda x:x['legacyIdentity']),'sourceOccurrences':sorted(occ,key=lambda x:(x['legacyIdentity'],x['sourceFilingDate'],x['sourceAccession'] or '')),'monthSnapshots':snaps,'prospectusAudit':pros_audit,'sourceAudit':audit,'masterTransports':trs}
     outp=ROOT/f'data/research/sec-legacy-etf-series-source-preid-2006-shard-{args.shard}.json';outp.parent.mkdir(parents=True,exist_ok=True);outp.write_text(json.dumps(out,indent=2)+'\n')
     print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('positiveIdentities','sourceOccurrences','monthSnapshots','prospectusAudit','sourceAudit','masterTransports')}),flush=True)
 if __name__=='__main__':main()
