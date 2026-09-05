@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 55
     env:
       GH_TOKEN: ${{ github.token }}
-      PREID_RUN_ID: "33950024447"
+      PREID_RUN_ID: "33950337808"
       ID_ARTIFACT_ID: "9963958301"
     steps:
       - uses: actions/checkout@v4
@@ -60,16 +60,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
+          import json,re
           from pathlib import Path
           p=Path('data/research/sec-legacy-etf-series-source-preid-2006.json')
           d=json.loads(p.read_text())
+          def norm(v):
+              return ' '.join(re.sub(r'[^A-Z0-9]+',' ',v.upper()).split())
+          def trust_equiv(v):
+              n=norm(v)
+              return n[4:] if n.startswith('THE ') else n
           bad=[]
           for r in d['positiveIdentities']:
-              n=r['normalizedSeriesName']
-              company=' '.join(__import__('re').sub(r'[^A-Z0-9]+',' ',r['registrant'].upper()).split())
+              n=trust_equiv(r['normalizedSeriesName'])
+              company=trust_equiv(r['registrant'])
               if n==company:
-                  bad.append((r['legacyIdentity'],n))
+                  bad.append((r['legacyIdentity'],r['normalizedSeriesName'],r['registrant']))
           print('PREID_SUMMARY',json.dumps({
               'shardCount':d.get('shardCount'),
               'candidateRegistrantCount':d.get('candidateRegistrantCount'),
