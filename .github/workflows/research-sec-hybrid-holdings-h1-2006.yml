@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 55
     env:
       GH_TOKEN: ${{ github.token }}
-      PREID_RUN_ID: "33948690373"
+      PREID_RUN_ID: "33950024447"
       ID_ARTIFACT_ID: "9963958301"
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +71,8 @@ jobs:
               if n==company:
                   bad.append((r['legacyIdentity'],n))
           print('PREID_SUMMARY',json.dumps({
+              'shardCount':d.get('shardCount'),
+              'candidateRegistrantCount':d.get('candidateRegistrantCount'),
               'positiveIdentityCount':d['positiveIdentityCount'],
               'sourceOccurrenceCount':d['sourceOccurrenceCount'],
               'bindingCounts':d.get('bindingCounts'),
@@ -78,6 +80,8 @@ jobs:
               'prospectusErrorCount':d.get('prospectusErrorCount'),
               'registrantIdentityLeakCount':len(bad),
           }))
+          if d.get('candidateRegistrantCount') != 47:
+              raise SystemExit('candidate registrant invariant failed')
           if bad:
               print('BAD_REGISTRANT_IDENTITIES',json.dumps(bad))
               raise SystemExit(2)
