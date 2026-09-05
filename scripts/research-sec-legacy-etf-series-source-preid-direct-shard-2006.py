@@ -9,19 +9,27 @@ CLASS_TOKEN=re.compile(r'\b(?:VIPER(?:S)?|ETF|EXCHANGE[- ]TRADED)\b',re.I)
 CLASS_ONLY=re.compile(r'^(?:VIPER(?:S)?(?: SHARES?)?|ETF SHARES?|EXCHANGE[- ]TRADED SHARES?)\s*[\*\(\)/®R.-]*$',re.I)
 
 def direct_classify(title,normalized_title,registrant,op_index):
-    norm_lines=op_index['normLines'];n=len(norm_lines);direct=[]
-    for i in range(n):
-        for width in (1,2,3):
-            if i+width>n:continue
-            phrase=' '.join(norm_lines[i:i+width]);pos=phrase.find(normalized_title)
-            if pos<0:continue
-            suffix=phrase[pos+len(normalized_title):].strip()
-            if suffix and CLASS_TOKEN.search(suffix):
-                direct.append((i,'TITLE_PHRASE_CARRIES_CLASS'))
-            if phrase==normalized_title:
-                j=i+width
-                if j<n and CLASS_ONLY.fullmatch(norm_lines[j].strip()):
-                    direct.append((i,'IMMEDIATE_CLASS_ONLY_LINE'))
+    norm_lines=op_index['normLines'];n=len(norm_lines);parts=normalized_title.split()
+    if not parts:return None,None
+    direct=[];seen=set()
+    # Preserve the same direct-association semantics while using the existing token index
+    # to avoid a full prospectus scan for every Series title.
+    for token_line in op_index['tokenLines'].get(parts[0],()):
+        for i in range(max(0,token_line-2),token_line+1):
+            for width in (1,2,3):
+                if i+width>n or not (i<=token_line<i+width):continue
+                key=(i,width)
+                if key in seen:continue
+                seen.add(key)
+                phrase=' '.join(norm_lines[i:i+width]);pos=phrase.find(normalized_title)
+                if pos<0:continue
+                suffix=phrase[pos+len(normalized_title):].strip()
+                if suffix and CLASS_TOKEN.search(suffix):
+                    direct.append((i,'TITLE_PHRASE_CARRIES_CLASS'))
+                if phrase==normalized_title:
+                    j=i+width
+                    if j<n and CLASS_ONLY.fullmatch(norm_lines[j].strip()):
+                        direct.append((i,'IMMEDIATE_CLASS_ONLY_LINE'))
     if not direct:return None,None
     markers=op_index['markerLines'];nearest=min((abs(i-j) for i,_ in direct for j in markers),default=0)
     if base.strict.TITLE_ETF_SEMANTIC.search(title):return 'TITLE_EXPLICIT_ETF_SEMANTIC',nearest
