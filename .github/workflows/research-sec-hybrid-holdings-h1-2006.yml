@@ -1,0 +1,142 @@
+name: Research SEC Hybrid Source to Holdings H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - ".github/workflows/research-sec-hybrid-holdings-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  hybrid-holdings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREID_RUN_ID: "33948690373"
+      ID_ARTIFACT_ID: "9963958301"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for authoritative pre-ID run and download clean merged catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/pre /tmp/post
+          for i in $(seq 1 80); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.conclusion // ""')
+            echo "preid status=${status} conclusion=${conclusion} poll=${i}"
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success"
+              break
+            fi
+            sleep 30
+          done
+          status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.status')
+          conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.conclusion // ""')
+          test "$status" = "completed"
+          test "$conclusion" = "success"
+
+          preid_artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "sec-legacy-etf-series-source-preid-2006-sharded") | .id' | head -n1)
+          test -n "$preid_artifact_id"
+          echo "PREID_ARTIFACT_ID=${preid_artifact_id}" >> "$GITHUB_ENV"
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${preid_artifact_id}/zip" > /tmp/pre.zip
+          unzip -q /tmp/pre.zip -d /tmp/pre
+          cp /tmp/pre/sec-legacy-etf-series-source-preid-2006.json data/research/
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${ID_ARTIFACT_ID}/zip" > /tmp/post.zip
+          unzip -q /tmp/post.zip -d /tmp/post
+          post=$(find /tmp/post -type f -name '*.json' | head -n1)
+          test -n "$post"
+          cp "$post" data/research/sec-id-era-strict-series-source-h1-2006.json
+
+      - name: Audit clean pre-ID identities before hybrid merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/research/sec-legacy-etf-series-source-preid-2006.json')
+          d=json.loads(p.read_text())
+          bad=[]
+          for r in d['positiveIdentities']:
+              n=r['normalizedSeriesName']
+              company=' '.join(__import__('re').sub(r'[^A-Z0-9]+',' ',r['registrant'].upper()).split())
+              if n==company:
+                  bad.append((r['legacyIdentity'],n))
+          print('PREID_SUMMARY',json.dumps({
+              'positiveIdentityCount':d['positiveIdentityCount'],
+              'sourceOccurrenceCount':d['sourceOccurrenceCount'],
+              'bindingCounts':d.get('bindingCounts'),
+              'sourceErrorCount':d.get('sourceErrorCount'),
+              'prospectusErrorCount':d.get('prospectusErrorCount'),
+              'registrantIdentityLeakCount':len(bad),
+          }))
+          if bad:
+              print('BAD_REGISTRANT_IDENTITIES',json.dumps(bad))
+              raise SystemExit(2)
+          PY
+
+      - name: Build hybrid PIT source catalog
+        run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+
+      - name: Syntax-check hybrid holdings extractor
+        run: python3 -m py_compile scripts/research-nq-pit-holdings-hybrid-h1-2006.py
+
+      - name: Extract raw holdings only for hybrid-catalog sources
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006.py
+
+      - name: Structural audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('data/research/sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          h=json.loads(Path('data/research/nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          print('HYBRID_SUMMARY',json.dumps({
+              'legacyPositiveIdentityCount':c['legacyPositiveIdentityCount'],
+              'postIdPositiveSeriesCount':c['postIdPositiveSeriesCount'],
+              'exactUniqueBridgeCount':c['exactUniqueBridgeCount'],
+              'ambiguousBridgeCount':c['ambiguousBridgeCount'],
+          }))
+          for cs,hs in zip(c['monthSnapshots'],h['monthSnapshots']):
+              assert cs['signalMonth']==hs['signalMonth']
+              print('MONTH_AUDIT',json.dumps({
+                  'signalMonth':cs['signalMonth'],
+                  'catalog':cs['sourceSeriesCount'],
+                  'legacy':cs['legacySourceCount'],
+                  'seriesId':cs['seriesIdSourceCount'],
+                  'parsed':hs['parsedSourceSeriesCount'],
+                  'legacyParsed':hs['parsedLegacySourceCount'],
+                  'seriesIdParsed':hs['parsedSeriesIdSourceCount'],
+                  'missing':len(hs['missingParsedSeries']),
+              }))
+          print('HOLDINGS_SUMMARY',json.dumps({
+              'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],
+              'filingFetchSuccessCount':h['filingFetchSuccessCount'],
+              'filingFetchErrorCount':h['filingFetchErrorCount'],
+              'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],
+              'legacyAssetSectionCounts':h['legacyAssetSectionCounts'],
+          }))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-hybrid-source-and-holdings-h1-2006
+          path: |
+            data/research/sec-legacy-etf-series-source-preid-2006.json
+            data/research/sec-id-era-strict-series-source-h1-2006.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+          if-no-files-found: warn
