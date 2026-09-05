@@ -18,7 +18,7 @@ UA = {
 }
 SCHEDULE = re.compile(
     r"SCHEDULE OF PORTFOLIO INVESTMENTS|SCHEDULE OF INVESTMENTS|PORTFOLIO OF INVESTMENTS|"
-    r"PORTFOLIO HOLDINGS|STATEMENT OF INVESTMENTS|SCHEDULE OF SECURITIES",
+    r"PORTFOLIO HOLDINGS|STATEMENT OF INVESTMENTS|STATEMENT OF NET ASSETS|SCHEDULE OF SECURITIES",
     re.I,
 )
 DOCUMENT_BLOCK = re.compile(r"(?is)<DOCUMENT>(.*?)</DOCUMENT>")
@@ -116,6 +116,7 @@ def main() -> None:
                 "primaryDocumentType": doc_type,
                 "documentDescription": description,
                 "scheduleMarkerCount": len(windows),
+                "hasCompletePortfolioSchedule": bool(windows),
                 "scheduleWindows": windows,
             })
         except Exception as exc:
@@ -131,9 +132,11 @@ def main() -> None:
         "purpose": (
             "Production-independent structural diagnostic of H2 2005 complete-portfolio filings for candidate "
             "registrants from the existing operational prefilter. N-Q/N-Q-A and certified annual/semiannual "
-            "shareholder reports N-CSR/N-CSRS plus amendments are inspected. Only explicit schedule headings and "
-            "nearby filing text are retained. No holdings outcomes, later Series IDs, ranks, returns, or strategy "
-            "results are used."
+            "shareholder reports N-CSR/N-CSRS plus amendments are inspected. Accepted complete-portfolio headings "
+            "include the observed historical 'Statement of Net Assets' grammar. An amendment is a holdings source "
+            "only when its own primary filing document contains an accepted complete-portfolio schedule. Only "
+            "explicit schedule headings and nearby filing text are retained. No holdings outcomes, later Series "
+            "IDs, ranks, returns, or strategy results are used."
         ),
         "shard": args.shard,
         "shards": args.shards,
@@ -143,6 +146,9 @@ def main() -> None:
         "fetchSuccessCount": sum("error" not in x for x in results),
         "fetchErrorCount": sum("error" in x for x in results),
         "scheduleMarkerCount": sum(x.get("scheduleMarkerCount", 0) for x in results),
+        "completePortfolioSourceCount": sum(bool(x.get("hasCompletePortfolioSchedule")) for x in results),
+        "amendmentCount": sum(str(x.get("form", "")).endswith("/A") for x in results),
+        "amendmentCompletePortfolioSourceCount": sum(str(x.get("form", "")).endswith("/A") and bool(x.get("hasCompletePortfolioSchedule")) for x in results),
         "results": results,
     }
     out_path = ROOT / "data" / "research" / f"sec-complete-portfolio-title-diagnostic-h2-2005-shard-{args.shard}.json"
