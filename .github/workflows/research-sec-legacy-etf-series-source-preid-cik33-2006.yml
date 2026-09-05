@@ -1,0 +1,37 @@
+name: Research SEC Legacy ETF Series Source Pre-ID CIK33 2006
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  cik33:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed H2/H1 inventories and operational-prefilter inputs
+        run: |
+          mkdir -p data/research /tmp/h2 /tmp/h1 /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963689740/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+          cp /tmp/h2/sec-complete-portfolio-inventory-h2-2005.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963841667/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/sec-complete-portfolio-inventory-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9962972058/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-h1-2006.json data/research/
+      - name: Resolve deterministic candidate CIK index 33 with unchanged source rules
+        run: python3 scripts/research-sec-legacy-etf-series-source-preid-shard-2006.py --shard 33 --shards 47
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preid-source-shard-33-longrun
+          path: data/research/sec-legacy-etf-series-source-preid-2006-shard-33.json
+          if-no-files-found: error
