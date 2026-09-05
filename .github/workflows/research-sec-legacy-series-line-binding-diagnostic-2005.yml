@@ -1,0 +1,32 @@
+name: Research SEC Legacy Series Line Binding Diagnostic 2005
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - "scripts/research-sec-legacy-series-line-binding-diagnostic-2005.py"
+      - ".github/workflows/research-sec-legacy-series-line-binding-diagnostic-2005.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download legacy strict-source artifact
+        run: |
+          mkdir -p data/research /tmp/legacy
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963062000/zip > /tmp/legacy.zip
+          unzip -q /tmp/legacy.zip -d /tmp/legacy
+          cp /tmp/legacy/sec-legacy-etf-series-source-q4-2005.json data/research/
+      - name: Diagnose line-level ETF Series binding
+        run: python3 scripts/research-sec-legacy-series-line-binding-diagnostic-2005.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-legacy-series-line-binding-diagnostic-2005
+          path: data/research/sec-legacy-series-line-binding-diagnostic-2005.json
