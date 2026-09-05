@@ -12,10 +12,17 @@ MONTHS=[('2006-01','2006-01-31'),('2006-02','2006-02-28')]
 
 def main():
     paths=sorted(IN_DIR.glob('sec-legacy-etf-series-source-preid-2006-shard-*.json'))
-    if len(paths)!=4: raise RuntimeError(f'expected 4 shards, got {len(paths)}')
+    if not paths: raise RuntimeError('no pre-ID shards found')
     shards=[json.loads(p.read_text()) for p in paths]
+    shard_counts={int(s['shards']) for s in shards}
+    if len(shard_counts)!=1: raise RuntimeError(f'inconsistent shard counts {sorted(shard_counts)}')
+    expected=next(iter(shard_counts))
+    shard_ids=sorted(int(s['shard']) for s in shards)
+    if len(paths)!=expected or shard_ids!=list(range(expected)):
+        raise RuntimeError(f'expected shards 0..{expected-1}, got {shard_ids}')
     assigned=[c for s in shards for c in s['assignedCiks']]
-    if len(assigned)!=47 or len(set(assigned))!=47: raise RuntimeError(f'assigned CIK invariant failed total={len(assigned)} unique={len(set(assigned))}')
+    if len(assigned)!=47 or len(set(assigned))!=47:
+        raise RuntimeError(f'assigned CIK invariant failed total={len(assigned)} unique={len(set(assigned))}')
     occ={}
     for s in shards:
         for r in s['sourceOccurrences']:
@@ -39,11 +46,11 @@ def main():
         snapshots.append({'signalMonth':month,'asOf':asof,'sourceSeriesCount':len(src),'sourceFilings':src})
     binding=Counter(r['binding'] for r in identities.values());forms=Counter(r['sourceForm'] for r in occurrences)
     out={
-        'purpose':'Merged strict pre-Series-ID complete-portfolio ETF source catalog through 2006-02-05. Four-way CIK sharding changes execution topology only; selection semantics are unchanged. Contemporary schedule titles require same-CIK issuer-own Creation Unit plus exchange evidence and Series-level ETF binding. No later Series IDs, holdings outcomes, ranks, returns, or strategy results are used.',
-        'seriesIdMandatoryDate':'2006-02-06','sourceCutoff':'2006-02-05','evidenceCutoff':'2006-02-28','shardCount':4,
+        'purpose':f'Merged strict pre-Series-ID complete-portfolio ETF source catalog through 2006-02-05. {expected}-way CIK sharding changes execution topology only; selection semantics are unchanged. Contemporary schedule titles require same-CIK issuer-own Creation Unit plus exchange evidence and Series-level ETF binding. A normalized title exactly equal to the SEC registrant/company name is rejected as a non-Series identity. No later Series IDs, holdings outcomes, ranks, returns, or strategy results are used.',
+        'seriesIdMandatoryDate':'2006-02-06','sourceCutoff':'2006-02-05','evidenceCutoff':'2006-02-28','shardCount':expected,
         'candidateRegistrantCount':len(set(assigned)),
         'candidateSourceFilingCount':sum(s['candidateSourceFilingCount'] for s in shards),
-        'candidateRegistrantWithSourceFilingCount':len({c for s in shards for c in s['assignedCiks'] if any(r['cik']==c for r in s['sourceAudit'])}),
+        'candidateRegistrantWithSourceFilingCount':len({r['cik'] for s in shards for r in s['sourceAudit']}),
         'operationalEvidenceFilingCount':sum(s['operationalEvidenceFilingCount'] for s in shards),
         'positiveIdentityCount':len(identities),'bindingCounts':dict(sorted(binding.items())),
         'sourceOccurrenceCount':len(occurrences),'sourceFormCounts':dict(sorted(forms.items())),
