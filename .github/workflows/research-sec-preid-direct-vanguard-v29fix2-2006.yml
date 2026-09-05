@@ -1,0 +1,73 @@
+name: Research SEC Pre-ID Direct Vanguard v2.9 Fix2 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - "scripts/research-sec-legacy-etf-series-source-preid-direct-shard-2006-v29fix2.py"
+      - ".github/workflows/research-sec-preid-direct-vanguard-v29fix2-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  replacement:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,4,12]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed H2/H1 inventories and operational-prefilter inputs
+        run: |
+          mkdir -p data/research /tmp/h2 /tmp/h1 /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963689740/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+          cp /tmp/h2/sec-complete-portfolio-inventory-h2-2005.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963841667/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/sec-complete-portfolio-inventory-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9962972058/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-h1-2006.json data/research/
+      - name: Re-resolve mixed trust with same-line direct Series class association
+        run: python3 scripts/research-sec-legacy-etf-series-source-preid-direct-shard-2006-v29fix2.py --shard ${{ matrix.shard }} --shards 47
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preid-direct-vanguard-v29fix2-${{ matrix.shard }}
+          path: data/research/sec-legacy-etf-series-source-preid-2006-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  merge:
+    needs: replacement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download prior clean merged base and same-line direct replacements
+        run: |
+          mkdir -p data/research/preid-direct-replacements /tmp/base
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9971996574/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-legacy-etf-series-source-preid-2006.json data/research/sec-legacy-etf-series-source-preid-base-2006.json
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: preid-direct-vanguard-v29fix2-*
+          path: data/research/preid-direct-replacements
+          merge-multiple: true
+      - name: Replace four mixed-trust CIKs and rebuild snapshots
+        run: python3 scripts/research-sec-preid-direct-replacement-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-legacy-etf-series-source-preid-direct-v29fix2-2006
+          path: data/research/sec-legacy-etf-series-source-preid-direct-2006.json
+          if-no-files-found: error
