@@ -57,6 +57,7 @@ def main():
             except Exception as ex: rec.update({'error':type(ex).__name__,'errorDetail':str(ex)[:700]})
             pros_audit.append(rec)
     occurrences={};audit=[]
+    binding_cache={}
     for r in rows:
         rec={k:r.get(k) for k in ('cik','company','form','dateFiled','accession','filename')}
         try:
@@ -71,7 +72,10 @@ def main():
                         continue
                     proposals=[]
                     for op in ops.get(r['cik'],[]):
-                        binding,distance=strict.classify_binding(candidate['title'],candidate['normalizedTitle'],r['company'],op['lines'])
+                        cache_key=(r['cik'],candidate['title'],candidate['normalizedTitle'],r['company'],op['filename'])
+                        if cache_key not in binding_cache:
+                            binding_cache[cache_key]=strict.classify_binding(candidate['title'],candidate['normalizedTitle'],r['company'],op['lines'])
+                        binding,distance=binding_cache[cache_key]
                         if not binding: continue
                         proposals.append({**candidate,'binding':binding,'explicitEtfClassLineDistance':distance,'evidenceDateFiled':op['dateFiled'],'evidenceForm':op['form'],'evidenceFilename':op['filename']})
                     if not proposals: continue
@@ -95,7 +99,7 @@ def main():
         src=sorted(latest.values(),key=lambda x:(x['cik'],x['normalizedSeriesName']))
         snaps.append({'signalMonth':month,'asOf':asof,'sourceSeriesCount':len(src),'sourceFilings':src})
     binding=Counter(r['binding'] for r in identities.values());forms=Counter(r['sourceForm'] for r in occ)
-    out={'purpose':'Shard of strict pre-Series-ID complete-portfolio ETF source catalog. Selection semantics are identical to the monolithic resolver except that a normalized title equivalent to the SEC registrant/company name, including a leading THE decoration on either side, is explicitly rejected as a non-Series identity. CIK modulo partitioning only changes execution topology.','seriesIdMandatoryDate':SERIES_ID_START,'sourceCutoff':SOURCE_CUTOFF,'evidenceCutoff':EVIDENCE_CUTOFF,'shard':args.shard,'shards':args.shards,'assignedCiks':sorted(assigned),'candidateSourceFilingCount':len(rows),'candidateRegistrantWithSourceFilingCount':len(source_ciks),'operationalEvidenceFilingCount':sum(len(v) for v in ops.values()),'positiveIdentityCount':len(identities),'bindingCounts':dict(sorted(binding.items())),'sourceOccurrenceCount':len(occ),'sourceFormCounts':dict(sorted(forms.items())),'sourceNoScheduleCount':sum('error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'amendmentNoScheduleCount':sum(str(x.get('form','')).endswith('/A') and 'error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'prospectusErrorCount':sum('error' in x for x in pros_audit),'sourceErrorCount':sum('error' in x for x in audit),'positiveIdentities':sorted(identities.values(),key=lambda x:x['legacyIdentity']),'sourceOccurrences':sorted(occ,key=lambda x:(x['legacyIdentity'],x['sourceFilingDate'],x['sourceAccession'] or '')),'monthSnapshots':snaps,'prospectusAudit':pros_audit,'sourceAudit':audit,'masterTransports':trs}
+    out={'purpose':'Shard of strict pre-Series-ID complete-portfolio ETF source catalog. Selection semantics are identical to the monolithic resolver except that a normalized title equivalent to the SEC registrant/company name, including a leading THE decoration on either side, is explicitly rejected as a non-Series identity. CIK modulo partitioning only changes execution topology. Binding classification is memoized by exact candidate/evidence-filing inputs; this changes execution cost only, not selection semantics.','seriesIdMandatoryDate':SERIES_ID_START,'sourceCutoff':SOURCE_CUTOFF,'evidenceCutoff':EVIDENCE_CUTOFF,'shard':args.shard,'shards':args.shards,'assignedCiks':sorted(assigned),'candidateSourceFilingCount':len(rows),'candidateRegistrantWithSourceFilingCount':len(source_ciks),'operationalEvidenceFilingCount':sum(len(v) for v in ops.values()),'positiveIdentityCount':len(identities),'bindingCounts':dict(sorted(binding.items())),'sourceOccurrenceCount':len(occ),'sourceFormCounts':dict(sorted(forms.items())),'sourceNoScheduleCount':sum('error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'amendmentNoScheduleCount':sum(str(x.get('form','')).endswith('/A') and 'error' not in x and not x.get('hasCompletePortfolioSchedule',False) for x in audit),'prospectusErrorCount':sum('error' in x for x in pros_audit),'sourceErrorCount':sum('error' in x for x in audit),'positiveIdentities':sorted(identities.values(),key=lambda x:x['legacyIdentity']),'sourceOccurrences':sorted(occ,key=lambda x:(x['legacyIdentity'],x['sourceFilingDate'],x['sourceAccession'] or '')),'monthSnapshots':snaps,'prospectusAudit':pros_audit,'sourceAudit':audit,'masterTransports':trs}
     outp=ROOT/f'data/research/sec-legacy-etf-series-source-preid-2006-shard-{args.shard}.json';outp.parent.mkdir(parents=True,exist_ok=True);outp.write_text(json.dumps(out,indent=2)+'\n')
     print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in ('positiveIdentities','sourceOccurrences','monthSnapshots','prospectusAudit','sourceAudit','masterTransports')}),flush=True)
 if __name__=='__main__':main()
