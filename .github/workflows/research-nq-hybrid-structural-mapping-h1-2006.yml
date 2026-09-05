@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
-      HOLDINGS_RUN_ID: "33949346746"
+      HOLDINGS_RUN_ID: "33950160834"
       NPX_ARTIFACT_ID: "9876020712"
     steps:
       - uses: actions/checkout@v4
