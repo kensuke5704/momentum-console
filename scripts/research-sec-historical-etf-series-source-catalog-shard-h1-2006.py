@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INV = ROOT / "data/research/sec-marketwide-nq-inventory-h1-2006.json"
+LOOKBACK = ROOT / "data/research/sec-marketwide-nq-lookback-q4-2005.json"
 PREF = ROOT / "data/research/sec-etf-registrant-operational-prefilter-h1-2006.json"
 SHARD_INDEX = int(os.environ.get("SHARD_INDEX", "0"))
 SHARD_COUNT = int(os.environ.get("SHARD_COUNT", "1"))
@@ -61,10 +62,27 @@ def main() -> None:
     if SHARD_COUNT < 1 or not 0 <= SHARD_INDEX < SHARD_COUNT:
         raise ValueError("invalid shard configuration")
     inv = json.loads(INV.read_text())
+    lookback = json.loads(LOOKBACK.read_text())
     pref = json.loads(PREF.read_text())
     all_ciks = sorted(pref["positiveCiks"])
     selected = [cik for i, cik in enumerate(all_ciks) if i % SHARD_COUNT == SHARD_INDEX]
-    pros, master_transports = base.load_prospectus(set(selected))
+    selected_set = set(selected)
+    pros, master_transports = base.load_prospectus(selected_set)
+
+    h1_nq_rows = [
+        {**row, "inventoryPeriod": "2006H1"}
+        for row in inv["rows"]
+        if row["cik"] in selected_set
+    ]
+    pre2006_nq_rows = [
+        {**row, "inventoryPeriod": "2005Q4"}
+        for row in lookback["rows"]
+        if row["cik"] in selected_set
+    ]
+    identity_nq_rows = sorted(
+        pre2006_nq_rows + h1_nq_rows,
+        key=lambda row: (row["dateFiled"], row["cik"], row["accession"], row["form"]),
+    )
 
     directly_bound_evidence = []
     operational_by_cik: dict[str, list[dict]] = defaultdict(list)
@@ -153,19 +171,23 @@ def main() -> None:
     for row in sorted(directly_bound_evidence, key=evidence_sort_key):
         maybe_keep_earlier(first, row)
 
-    # Some pre-2006 SEC prospectus index pages expose no Series/Class table even though the
-    # filing itself contains issuer-own Creation Unit + exchange evidence. In that case,
-    # bind only when contemporaneously public N-Q index metadata supplies either:
-    #   (a) an explicit ETF/VIPER class for the Series, or
-    #   (b) the exact normalized Series name inside the local operational-evidence context.
-    # The binding becomes public only when BOTH ingredients are public, so the effective
-    # evidenceDateFiled is max(prospectus date, N-Q metadata filing date). This prevents
-    # later Series metadata from being backfilled into an earlier PIT month.
+    # Older prospectus index pages can omit Series/Class metadata even when the filing has
+    # issuer-own Creation Unit + exchange evidence. Use N-Q metadata only as a PIT identity
+    # bridge. Q4 2005 rows are intentionally loaded alongside H1 2006 rows here so January
+    # 2006 is not forced to wait for a new H1 filing. Loading a Q4 row does not itself make
+    # the Series ETF-positive; strict operational evidence is still required. The effective
+    # binding date is max(operational prospectus date, N-Q metadata filing date), preventing
+    # later metadata from being backfilled into an earlier month.
     nq_diagnostics = []
     parsed_nq = []
-    selected_set = set(selected)
-    for row in [x for x in inv["rows"] if x["cik"] in selected_set]:
-        rec = {k: row[k] for k in ("cik", "company", "form", "dateFiled", "filename", "accession", "indexUrl")}
+    for row in identity_nq_rows:
+        rec = {
+            k: row[k]
+            for k in (
+                "cik", "company", "form", "dateFiled", "filename", "accession",
+                "indexUrl", "inventoryPeriod"
+            )
+        }
         try:
             series, transport, prior = base.parse_index_series(row["indexUrl"])
             rec["transport"] = transport
@@ -199,6 +221,7 @@ def main() -> None:
                         "evidenceDateFiled": binding_public,
                         "operationalEvidenceDateFiled": op["dateFiled"],
                         "seriesMetadataDateFiled": row["dateFiled"],
+                        "seriesMetadataInventoryPeriod": row["inventoryPeriod"],
                         "evidenceForm": op["form"],
                         "evidenceFilename": op["filename"],
                         "binding": (
@@ -216,6 +239,7 @@ def main() -> None:
             rec["fallbackBoundSeriesIds"] = sorted(set(fallback_ids))
         except Exception as exc:
             rec["error"] = type(exc).__name__
+            rec["errorDetail"] = str(exc)[:900]
             rec["seriesCount"] = 0
             rec["fallbackBoundSeriesIds"] = []
         nq_diagnostics.append(rec)
@@ -223,6 +247,10 @@ def main() -> None:
     positive_series = sorted(first.values(), key=lambda x: x["seriesId"])
     positive_ids = set(first)
 
+    # Both Q4 2005 and H1 2006 N-Q rows may appear in this candidate source table, but only
+    # for independently strict-positive Series IDs. The merge stage separately selects the
+    # latest filing public by each month end and also requires the Series evidence date to
+    # be public by that month end.
     nq_rows = []
     positive_by_accession: dict[str, list[str]] = defaultdict(list)
     for row, series in parsed_nq:
@@ -244,9 +272,11 @@ def main() -> None:
         dedup[(row["seriesId"], row["accession"])] = row
     nq_rows = list(dedup.values())
 
-    fallback_count = sum(
-        row["binding"].startswith("NQ_") for row in positive_series
-    )
+    fallback_count = sum(row["binding"].startswith("NQ_") for row in positive_series)
+    parsed_pre2006 = [(row, series) for row, series in parsed_nq if row["inventoryPeriod"] == "2005Q4"]
+    pre2006_positive_accessions = {
+        row["accession"] for row in nq_rows if row["inventoryPeriod"] == "2005Q4"
+    }
     out = {
         "purpose": (
             "Shard of the source-complete H1 2006 strict ETF Series-ID evidence scan. Candidate CIKs are "
@@ -255,14 +285,23 @@ def main() -> None:
             "binding requires validated issuer-own Creation Unit plus exchange evidence. When an older "
             "prospectus index exposes no Series/Class table, contemporaneously public N-Q metadata may bridge "
             "the Series only via an explicit ETF/VIPER class or exact Series name inside the local operational "
-            "evidence context; the effective binding date is the later of the two filings. No holdings outcomes, "
-            "ranks, returns, or strategy results are used."
+            "evidence context; the effective binding date is the later of the two filings. Q4 2005 N-Q rows are "
+            "included only to restore PIT identity/source history before the H1 window; monthly source selection "
+            "remains a separate latest-public-N-Q rule. No holdings outcomes, ranks, returns, or strategy results "
+            "are used."
         ),
+        "source": "SEC_COMPLETE_SUBMISSION_STRICT_SERIES_PIT_CATALOG_V2_Q4_LOOKBACK_SHARD",
         "shardIndex": SHARD_INDEX,
         "shardCount": SHARD_COUNT,
         "candidateRegistrantCount": len(all_ciks),
         "selectedRegistrantCount": len(selected),
         "selectedCiks": selected,
+        "sourceNqFilingCount": len(h1_nq_rows),
+        "identityNqFilingCount": len(identity_nq_rows),
+        "pre2006IdentityNqFilingCount": len(pre2006_nq_rows),
+        "parsedIdentityNqFilingCount": len(parsed_nq),
+        "parsedPre2006IdentityNqFilingCount": len(parsed_pre2006),
+        "pre2006IdentitySeriesRowCount": sum(len(series) for _, series in parsed_pre2006),
         "prospectusInspectedCount": len(prospectus_diagnostics),
         "prospectusErrorCount": sum("error" in x for x in prospectus_diagnostics),
         "prospectusDirectEvidenceRecordCount": len(directly_bound_evidence),
@@ -271,9 +310,17 @@ def main() -> None:
         "nqFallbackPositiveSeriesCount": fallback_count,
         "positiveSeries": positive_series,
         "nqPositiveSeriesFilingCount": len(nq_rows),
-        "nqPositiveSeriesFilings": sorted(nq_rows, key=lambda x: (x["seriesId"], x["dateFiled"], x["accession"])),
+        "pre2006PositiveSourceNqFilingCount": len(pre2006_positive_accessions),
+        "pre2006PositiveSourceNqSeriesRowCount": sum(
+            row["inventoryPeriod"] == "2005Q4" for row in nq_rows
+        ),
+        "nqPositiveSeriesFilings": sorted(
+            nq_rows,
+            key=lambda x: (x["seriesId"], x["dateFiled"], x["accession"]),
+        ),
         "nqIndexErrorCount": sum("error" in x for x in nq_diagnostics),
         "masterTransports": master_transports,
+        "lookbackInventorySource": lookback.get("source"),
         "prospectusDiagnostics": prospectus_diagnostics,
         "nqDiagnostics": nq_diagnostics,
     }
@@ -284,12 +331,18 @@ def main() -> None:
         json.dumps({
             "shardIndex": SHARD_INDEX,
             "selectedRegistrantCount": len(selected),
+            "sourceNqFilingCount": out["sourceNqFilingCount"],
+            "identityNqFilingCount": out["identityNqFilingCount"],
+            "pre2006IdentityNqFilingCount": out["pre2006IdentityNqFilingCount"],
+            "parsedPre2006IdentityNqFilingCount": out["parsedPre2006IdentityNqFilingCount"],
+            "pre2006IdentitySeriesRowCount": out["pre2006IdentitySeriesRowCount"],
             "prospectusInspectedCount": len(prospectus_diagnostics),
             "prospectusErrorCount": out["prospectusErrorCount"],
             "issuerOwnOperationalFilingCount": out["issuerOwnOperationalFilingCount"],
             "positiveSeriesCount": len(positive_series),
             "nqFallbackPositiveSeriesCount": fallback_count,
             "nqPositiveSeriesFilingCount": len(nq_rows),
+            "pre2006PositiveSourceNqFilingCount": out["pre2006PositiveSourceNqFilingCount"],
             "nqIndexErrorCount": out["nqIndexErrorCount"],
         }),
         flush=True,
