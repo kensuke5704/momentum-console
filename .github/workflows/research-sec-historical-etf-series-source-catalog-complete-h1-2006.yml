@@ -1,8 +1,10 @@
 name: Research SEC Historical ETF Series Source Catalog Complete H1 2006
 on:
+  workflow_dispatch:
   push:
     branches: ["research/nq-npx-mapping-2006-20260903"]
     paths:
+      - "scripts/research-sec-marketwide-nq-lookback-q4-2005.py"
       - "scripts/research-sec-historical-etf-series-source-catalog-shard-h1-2006.py"
       - "scripts/research-sec-historical-etf-series-source-catalog-merge-h1-2006.py"
       - ".github/workflows/research-sec-historical-etf-series-source-catalog-complete-h1-2006.yml"
@@ -26,6 +28,8 @@ jobs:
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/9946255797/zip > /tmp/h1-inventory.zip
           unzip -q /tmp/h1-inventory.zip -d /tmp/h1-inventory
           cp /tmp/h1-inventory/sec-marketwide-nq-inventory-h1-2006.json data/research/
+      - name: Build official Q4 2005 N-Q PIT lookback
+        run: python3 scripts/research-sec-marketwide-nq-lookback-q4-2005.py
       - name: Download and merge completed H1 prefilter shards
         run: |
           for id in 9946655199 9946564013 9946627605 9946556132 9946652669 9946629047 9946599883 9946573198 9946600158 9946621704 9946657775 9946650848; do
@@ -38,6 +42,7 @@ jobs:
           name: strict-series-catalog-h1-inputs
           path: |
             data/research/sec-marketwide-nq-inventory-h1-2006.json
+            data/research/sec-marketwide-nq-lookback-q4-2005.json
             data/research/sec-etf-registrant-operational-prefilter-h1-2006.json
 
   shard:
