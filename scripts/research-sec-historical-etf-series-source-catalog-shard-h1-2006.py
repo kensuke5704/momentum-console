@@ -25,16 +25,10 @@ def load_module(name: str, path: Path):
 
 
 base = load_module("catalog_base", ROOT / "scripts/research-sec-historical-etf-series-source-catalog-h1-2006.py")
+meta = load_module("series_meta", ROOT / "scripts/research-nq-series-metadata-2006.py")
 
 
 def complete_prospectus_set(rows: list[dict]) -> list[dict]:
-    """Source-complete deterministic prospectus set without outcome-based selection.
-
-    Every core registration/prospectus filing is retained because mixed trusts may file
-    separate core amendments for different Series in the same month. For high-volume 497
-    supplements, retain the latest filing available at each H1 month end; deduplication
-    naturally carries a late-2005 supplement into January when it is still the latest.
-    """
     chosen: dict[str, dict] = {}
     for row in rows:
         if row["form"] in base.CORE:
@@ -56,6 +50,32 @@ def maybe_keep_earlier(target: dict[str, dict], candidate: dict) -> None:
     current = target.get(sid)
     if current is None or evidence_sort_key(candidate) < evidence_sort_key(current):
         target[sid] = candidate
+
+
+def submission_series(row: dict) -> tuple[list[dict], str, list[dict]]:
+    """Read filing-header Series/Class contracts without using meta's ETF classification."""
+    text, transport, _, prior = base.ft(base.su(row["filename"]), 1_500_000, 22)
+    parsed = meta.parse_series_contracts(text, row["company"])
+    out = []
+    seen = set()
+    for item in parsed:
+        sid = (item.get("seriesId") or "").upper()
+        if not base.SID_RE.fullmatch(sid) or sid in seen:
+            continue
+        seen.add(sid)
+        out.append({
+            "seriesId": sid,
+            "seriesName": (item.get("seriesName") or "").strip(),
+            "classes": [
+                {
+                    "classId": cls.get("id"),
+                    "className": cls.get("name") or "",
+                    "ticker": cls.get("ticker") or "",
+                }
+                for cls in item.get("classes", [])
+            ],
+        })
+    return out, transport, prior
 
 
 def main() -> None:
@@ -151,33 +171,27 @@ def main() -> None:
                 rec["error"] = type(exc).__name__
                 rec["errorDetail"] = str(exc)[:900]
             prospectus_diagnostics.append(rec)
-            print(
-                "PROSPECTUS",
-                json.dumps({
-                    "shard": SHARD_INDEX,
-                    "cik": cik,
-                    "form": filing["form"],
-                    "dateFiled": filing["dateFiled"],
-                    "series": rec.get("indexSeriesCount"),
-                    "creation": rec.get("creationIssuerOwnEvidence"),
-                    "exchange": rec.get("exchangeIssuerOwnEvidence"),
-                    "positive": rec.get("positiveSeriesCount"),
-                    "error": rec.get("error"),
-                }),
-                flush=True,
-            )
+            print("PROSPECTUS", json.dumps({
+                "shard": SHARD_INDEX,
+                "cik": cik,
+                "form": filing["form"],
+                "dateFiled": filing["dateFiled"],
+                "series": rec.get("indexSeriesCount"),
+                "creation": rec.get("creationIssuerOwnEvidence"),
+                "exchange": rec.get("exchangeIssuerOwnEvidence"),
+                "positive": rec.get("positiveSeriesCount"),
+                "error": rec.get("error"),
+            }), flush=True)
 
     first: dict[str, dict] = {}
     for row in sorted(directly_bound_evidence, key=evidence_sort_key):
         maybe_keep_earlier(first, row)
 
-    # Older prospectus index pages can omit Series/Class metadata even when the filing has
-    # issuer-own Creation Unit + exchange evidence. Use N-Q metadata only as a PIT identity
-    # bridge. Q4 2005 rows are intentionally loaded alongside H1 2006 rows here so January
-    # 2006 is not forced to wait for a new H1 filing. Loading a Q4 row does not itself make
-    # the Series ETF-positive; strict operational evidence is still required. The effective
-    # binding date is max(operational prospectus date, N-Q metadata filing date), preventing
-    # later metadata from being backfilled into an earlier month.
+    # Old SEC N-Q index pages can expose no Series/Class table. Resolve identity from the
+    # same filing's complete-submission <SERIES> header only when index metadata is empty or
+    # unavailable. The metadata parser's ETF classifications are deliberately ignored: it
+    # supplies only Series ID/name/class contracts. Strict issuer-own prospectus evidence
+    # still controls ETF positivity, and evidenceDateFiled remains the later public filing.
     nq_diagnostics = []
     parsed_nq = []
     for row in identity_nq_rows:
@@ -188,10 +202,27 @@ def main() -> None:
                 "indexUrl", "inventoryPeriod"
             )
         }
+        series = []
         try:
-            series, transport, prior = base.parse_index_series(row["indexUrl"])
-            rec["transport"] = transport
-            rec["priorErrors"] = prior
+            try:
+                series, transport, prior = base.parse_index_series(row["indexUrl"])
+                rec["indexTransport"] = transport
+                rec["indexPriorErrors"] = prior
+                rec["indexSeriesCount"] = len(series)
+            except Exception as exc:
+                rec["indexError"] = type(exc).__name__
+                rec["indexErrorDetail"] = str(exc)[:500]
+                rec["indexSeriesCount"] = 0
+
+            if series:
+                rec["seriesMetadataSource"] = "FILING_INDEX_SERIES_TABLE"
+            else:
+                series, transport, prior = submission_series(row)
+                rec["submissionSeriesTransport"] = transport
+                rec["submissionSeriesPriorErrors"] = prior
+                rec["submissionSeriesCount"] = len(series)
+                rec["seriesMetadataSource"] = "COMPLETE_SUBMISSION_SERIES_HEADER"
+
             rec["seriesCount"] = len(series)
             parsed_nq.append((row, series))
 
@@ -222,6 +253,7 @@ def main() -> None:
                         "operationalEvidenceDateFiled": op["dateFiled"],
                         "seriesMetadataDateFiled": row["dateFiled"],
                         "seriesMetadataInventoryPeriod": row["inventoryPeriod"],
+                        "seriesMetadataSource": rec["seriesMetadataSource"],
                         "evidenceForm": op["form"],
                         "evidenceFilename": op["filename"],
                         "binding": (
@@ -246,11 +278,6 @@ def main() -> None:
 
     positive_series = sorted(first.values(), key=lambda x: x["seriesId"])
     positive_ids = set(first)
-
-    # Both Q4 2005 and H1 2006 N-Q rows may appear in this candidate source table, but only
-    # for independently strict-positive Series IDs. The merge stage separately selects the
-    # latest filing public by each month end and also requires the Series evidence date to
-    # be public by that month end.
     nq_rows = []
     positive_by_accession: dict[str, list[str]] = defaultdict(list)
     for row, series in parsed_nq:
@@ -279,16 +306,13 @@ def main() -> None:
     }
     out = {
         "purpose": (
-            "Shard of the source-complete H1 2006 strict ETF Series-ID evidence scan. Candidate CIKs are "
-            "partitioned deterministically. Every core 485/N-1A prospectus/registration filing through "
-            "2006-06-30 plus the latest 497 available at each H1 month end is inspected. Final Series-ID "
-            "binding requires validated issuer-own Creation Unit plus exchange evidence. When an older "
-            "prospectus index exposes no Series/Class table, contemporaneously public N-Q metadata may bridge "
-            "the Series only via an explicit ETF/VIPER class or exact Series name inside the local operational "
-            "evidence context; the effective binding date is the later of the two filings. Q4 2005 N-Q rows are "
-            "included only to restore PIT identity/source history before the H1 window; monthly source selection "
-            "remains a separate latest-public-N-Q rule. No holdings outcomes, ranks, returns, or strategy results "
-            "are used."
+            "Shard of the source-complete H1 2006 strict ETF Series-ID evidence scan with a Q4 2005 N-Q "
+            "lookback. Strict ETF positivity requires issuer-own Creation Unit plus exchange evidence. N-Q "
+            "Series identity is read from the filing index when available, otherwise from the same filing's "
+            "complete-submission <SERIES> header; metadata-level ETF classification is never used. The binding "
+            "date is the later public filing. Q4 rows restore pre-H1 PIT identity/source history, while monthly "
+            "source selection remains a separate latest-public-N-Q rule. No holdings outcomes, ranks, returns, "
+            "or strategy results are used."
         ),
         "source": "SEC_COMPLETE_SUBMISSION_STRICT_SERIES_PIT_CATALOG_V2_Q4_LOOKBACK_SHARD",
         "shardIndex": SHARD_INDEX,
@@ -302,6 +326,9 @@ def main() -> None:
         "parsedIdentityNqFilingCount": len(parsed_nq),
         "parsedPre2006IdentityNqFilingCount": len(parsed_pre2006),
         "pre2006IdentitySeriesRowCount": sum(len(series) for _, series in parsed_pre2006),
+        "submissionHeaderMetadataFilingCount": sum(
+            x.get("seriesMetadataSource") == "COMPLETE_SUBMISSION_SERIES_HEADER" for x in nq_diagnostics
+        ),
         "prospectusInspectedCount": len(prospectus_diagnostics),
         "prospectusErrorCount": sum("error" in x for x in prospectus_diagnostics),
         "prospectusDirectEvidenceRecordCount": len(directly_bound_evidence),
@@ -318,7 +345,8 @@ def main() -> None:
             nq_rows,
             key=lambda x: (x["seriesId"], x["dateFiled"], x["accession"]),
         ),
-        "nqIndexErrorCount": sum("error" in x for x in nq_diagnostics),
+        "nqIndexErrorCount": sum("indexError" in x for x in nq_diagnostics),
+        "nqMetadataErrorCount": sum("error" in x for x in nq_diagnostics),
         "masterTransports": master_transports,
         "lookbackInventorySource": lookback.get("source"),
         "prospectusDiagnostics": prospectus_diagnostics,
@@ -326,27 +354,25 @@ def main() -> None:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, indent=2) + "\n")
-    print(
-        "SUMMARY",
-        json.dumps({
-            "shardIndex": SHARD_INDEX,
-            "selectedRegistrantCount": len(selected),
-            "sourceNqFilingCount": out["sourceNqFilingCount"],
-            "identityNqFilingCount": out["identityNqFilingCount"],
-            "pre2006IdentityNqFilingCount": out["pre2006IdentityNqFilingCount"],
-            "parsedPre2006IdentityNqFilingCount": out["parsedPre2006IdentityNqFilingCount"],
-            "pre2006IdentitySeriesRowCount": out["pre2006IdentitySeriesRowCount"],
-            "prospectusInspectedCount": len(prospectus_diagnostics),
-            "prospectusErrorCount": out["prospectusErrorCount"],
-            "issuerOwnOperationalFilingCount": out["issuerOwnOperationalFilingCount"],
-            "positiveSeriesCount": len(positive_series),
-            "nqFallbackPositiveSeriesCount": fallback_count,
-            "nqPositiveSeriesFilingCount": len(nq_rows),
-            "pre2006PositiveSourceNqFilingCount": out["pre2006PositiveSourceNqFilingCount"],
-            "nqIndexErrorCount": out["nqIndexErrorCount"],
-        }),
-        flush=True,
-    )
+    print("SUMMARY", json.dumps({
+        "shardIndex": SHARD_INDEX,
+        "selectedRegistrantCount": len(selected),
+        "sourceNqFilingCount": out["sourceNqFilingCount"],
+        "identityNqFilingCount": out["identityNqFilingCount"],
+        "pre2006IdentityNqFilingCount": out["pre2006IdentityNqFilingCount"],
+        "parsedPre2006IdentityNqFilingCount": out["parsedPre2006IdentityNqFilingCount"],
+        "pre2006IdentitySeriesRowCount": out["pre2006IdentitySeriesRowCount"],
+        "submissionHeaderMetadataFilingCount": out["submissionHeaderMetadataFilingCount"],
+        "prospectusInspectedCount": len(prospectus_diagnostics),
+        "prospectusErrorCount": out["prospectusErrorCount"],
+        "issuerOwnOperationalFilingCount": out["issuerOwnOperationalFilingCount"],
+        "positiveSeriesCount": len(positive_series),
+        "nqFallbackPositiveSeriesCount": fallback_count,
+        "nqPositiveSeriesFilingCount": len(nq_rows),
+        "pre2006PositiveSourceNqFilingCount": out["pre2006PositiveSourceNqFilingCount"],
+        "nqIndexErrorCount": out["nqIndexErrorCount"],
+        "nqMetadataErrorCount": out["nqMetadataErrorCount"],
+    }), flush=True)
 
 
 if __name__ == "__main__":
