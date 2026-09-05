@@ -17,11 +17,11 @@ jobs:
   shard:
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 8
       matrix:
-        shard: [0,1,2,3]
+        shard: [0,1,2,3,4,5,6,7]
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -39,7 +39,7 @@ jobs:
           unzip -q /tmp/pref.zip -d /tmp/pref
           cp /tmp/pref/sec-etf-registrant-operational-prefilter-h1-2006.json data/research/
       - name: Resolve strict pre-Series-ID source shard
-        run: python3 scripts/research-sec-legacy-etf-series-source-preid-shard-2006.py --shard ${{ matrix.shard }} --shards 4
+        run: python3 scripts/research-sec-legacy-etf-series-source-preid-shard-2006.py --shard ${{ matrix.shard }} --shards 8
       - uses: actions/upload-artifact@v4
         if: always()
         with:
