@@ -1,0 +1,98 @@
+name: Research N-Q Hybrid Structural Mapping H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - ".github/workflows/research-nq-hybrid-structural-mapping-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  mapping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_RUN_ID: "33949346746"
+      NPX_ARTIFACT_ID: "9876020712"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for hybrid holdings run and download artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/hybrid /tmp/npx
+          for i in $(seq 1 100); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.conclusion // ""')
+            echo "holdings status=${status} conclusion=${conclusion} poll=${i}"
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success"
+              break
+            fi
+            sleep 30
+          done
+          status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.status')
+          conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.conclusion // ""')
+          test "$status" = "completed"
+          test "$conclusion" = "success"
+
+          hybrid_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "sec-hybrid-source-and-holdings-h1-2006") | .id' | head -n1)
+          test -n "$hybrid_id"
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${hybrid_id}/zip" > /tmp/hybrid.zip
+          unzip -q /tmp/hybrid.zip -d /tmp/hybrid
+          cp /tmp/hybrid/nq-pit-holdings-hybrid-h1-2006.json data/research/
+          cp /tmp/hybrid/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+
+      - name: Download frozen N-PX security master
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          npx=$(find /tmp/npx -type f -name 'npx-security-master-2006.json' | head -n1)
+          test -n "$npx"
+          cp "$npx" data/research/npx-security-master-2006.json
+
+      - name: Syntax-check mapping wrapper
+        run: python3 -m py_compile scripts/research-nq-hybrid-structural-mapping-h1-2006.py
+
+      - name: Apply frozen COMMON_EQUITY and structural mapping rules
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006.py
+
+      - name: Audit monthly deterministic mapping coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('data/research/nq-hybrid-structural-mapping-h1-2006.json').read_text())
+          for s in d['monthSnapshots']:
+              print('MONTH_MAPPING',json.dumps({
+                  'signalMonth':s['signalMonth'],
+                  'sourceSeriesCount':s['sourceSeriesCount'],
+                  'commonEquityHoldingCount':s['commonEquityHoldingCount'],
+                  'uniqueMappedCount':s['uniqueMappedCount'],
+                  'uniqueMappedCountRate':s['uniqueMappedCountRate'],
+                  'uniqueMappedWeightRate':s['uniqueMappedWeightRate'],
+                  'ambiguousCount':s['ambiguousCount'],
+                  'unmappedCount':s['unmappedCount'],
+              }))
+          print('MAPPING_METHODS',json.dumps(d['matchMethodCounts']))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-hybrid-structural-mapping-h1-2006
+          path: |
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          if-no-files-found: warn
