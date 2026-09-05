@@ -1,0 +1,89 @@
+name: Research SEC Legacy ETF Series Source Pre-ID Recover Heavy 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/nq-npx-mapping-2006-20260903"]
+    paths:
+      - ".github/workflows/research-sec-legacy-etf-series-source-preid-recover-heavy-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  heavy:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [33, 40]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed H2/H1 inventories and operational-prefilter inputs
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/h2 /tmp/h1 /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963689740/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+          cp /tmp/h2/sec-complete-portfolio-inventory-h2-2005.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963841667/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/sec-complete-portfolio-inventory-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9962972058/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-h1-2006.json data/research/
+      - name: Resolve heavy deterministic candidate CIK
+        run: python3 scripts/research-sec-legacy-etf-series-source-preid-shard-2006.py --shard ${{ matrix.shard }} --shards 47
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preid-source-recovery-${{ matrix.shard }}
+          path: data/research/sec-legacy-etf-series-source-preid-2006-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  merge:
+    needs: heavy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRIOR_RUN_ID: "33950337808"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the 45 successful prior shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research/preid-shards /tmp/prior
+          for n in $(seq 0 46); do
+            if [ "$n" = "33" ] || [ "$n" = "40" ]; then
+              continue
+            fi
+            name="preid-source-shard-${n}"
+            id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PRIOR_RUN_ID}/artifacts?per_page=100" --jq ".artifacts[] | select(.name == \"${name}\") | .id" | head -n1)
+            test -n "$id"
+            gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${id}/zip" > "/tmp/prior/${n}.zip"
+            unzip -oq "/tmp/prior/${n}.zip" -d data/research/preid-shards
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: preid-source-recovery-*
+          path: data/research/preid-shards
+          merge-multiple: true
+      - name: Verify all 47 shards and merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=$(find data/research/preid-shards -maxdepth 1 -type f -name 'sec-legacy-etf-series-source-preid-2006-shard-*.json' | wc -l)
+          echo "PREID_SHARD_COUNT=${count}"
+          test "$count" -eq 47
+          python3 scripts/research-sec-legacy-etf-series-source-preid-merge-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-legacy-etf-series-source-preid-2006-sharded
+          path: data/research/sec-legacy-etf-series-source-preid-2006.json
+          if-no-files-found: error
