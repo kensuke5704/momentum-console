@@ -16,6 +16,7 @@ CATALOG = Path(os.environ.get(
     str(ROOT / "data/research/sec-historical-etf-series-source-catalog-complete-h1-2006.json"),
 ))
 INVENTORY = ROOT / "data/research/sec-marketwide-nq-inventory-h1-2006.json"
+LOOKBACK_INVENTORY = ROOT / "data/research/sec-marketwide-nq-lookback-q4-2005.json"
 OUT = ROOT / "data/research/nq-pit-holdings-catalog-h1-2006.json"
 SOURCE_CATALOG_RUN_ID = os.environ.get("SOURCE_CATALOG_RUN_ID")
 UA = {
@@ -86,7 +87,13 @@ def annotate_sections(holdings: list[dict], combined: str) -> tuple[list[dict], 
 def main() -> None:
     catalog = json.loads(CATALOG.read_text())
     inventory = json.loads(INVENTORY.read_text())
-    inv_by_key = {source_key(row): row for row in inventory["rows"]}
+    lookback = json.loads(LOOKBACK_INVENTORY.read_text())
+    inventory_rows = [
+        {**row, "inventoryPeriod": "2005Q4"} for row in lookback["rows"]
+    ] + [
+        {**row, "inventoryPeriod": "2006H1"} for row in inventory["rows"]
+    ]
+    inv_by_key = {source_key(row): row for row in inventory_rows}
 
     requested: dict[tuple[str, str], dict] = {}
     for snap in catalog["monthSnapshots"]:
@@ -127,6 +134,7 @@ def main() -> None:
             "accession": request["accession"],
             "registrant": request["registrant"],
             "filename": inv["filename"],
+            "inventoryPeriod": inv["inventoryPeriod"],
             "targetSeriesIds": sorted(target_ids),
             "months": sorted(request["months"]),
         }
@@ -159,17 +167,21 @@ def main() -> None:
                 s = all_by_id.get(sid)
                 name = (s or {}).get("seriesName") or request["series"].get(sid) or ""
                 blocks = grouped.get(sid, [])
+                base_record = {
+                    "seriesId": sid,
+                    "seriesName": name,
+                    "accession": request["accession"],
+                    "cik": request["cik"],
+                    "registrant": request["registrant"],
+                    "filingDate": inv["dateFiled"],
+                    "reportDate": audit_row["reportDate"],
+                    "sourceFilename": inv["filename"],
+                    "sourceInventoryPeriod": inv["inventoryPeriod"],
+                    "primaryDocument": primary,
+                }
                 if not blocks:
                     by_series[sid] = {
-                        "seriesId": sid,
-                        "seriesName": name,
-                        "accession": request["accession"],
-                        "cik": request["cik"],
-                        "registrant": request["registrant"],
-                        "filingDate": inv["dateFiled"],
-                        "reportDate": audit_row["reportDate"],
-                        "sourceFilename": inv["filename"],
-                        "primaryDocument": primary,
+                        **base_record,
                         "schedulePages": 0,
                         "parseStatus": "NO_GROUPED_SCHEDULE",
                         "holdings": [],
@@ -182,15 +194,7 @@ def main() -> None:
                 count = len(holdings)
                 top10 = sum(h.get("weight", 0.0) for h in holdings[:10]) if holdings else 0.0
                 by_series[sid] = {
-                    "seriesId": sid,
-                    "seriesName": name,
-                    "accession": request["accession"],
-                    "cik": request["cik"],
-                    "registrant": request["registrant"],
-                    "filingDate": inv["dateFiled"],
-                    "reportDate": audit_row["reportDate"],
-                    "sourceFilename": inv["filename"],
-                    "primaryDocument": primary,
+                    **base_record,
                     "assignmentRule": "EXPLICIT_SERIES_BOUNDARY_GROUP_ALL_REGISTERED_SERIES",
                     "schedulePages": len(blocks),
                     "parseMethod": method,
@@ -210,6 +214,7 @@ def main() -> None:
                     "index": i,
                     "total": len(requested),
                     "accession": request["accession"],
+                    "inventoryPeriod": inv["inventoryPeriod"],
                     "targets": len(target_ids),
                     "groupedTargets": len(target_ids & set(grouped)),
                     "parsedTargets": audit_row["parsedTargetSeriesCount"],
@@ -239,6 +244,7 @@ def main() -> None:
             "asOf": snap["asOf"],
             "catalogSourceSeriesCount": snap["sourceSeriesCount"],
             "parsedSourceSeriesCount": sum(x.get("parseStatus") == "PARSED" for x in records),
+            "pre2006SourceSeriesCount": sum(x.get("sourceInventoryPeriod") == "2005Q4" for x in records),
             "missingParsedSeries": missing,
             "sourceFilings": records,
         })
@@ -249,6 +255,7 @@ def main() -> None:
                 "catalog": snap["sourceSeriesCount"],
                 "records": len(records),
                 "parsed": sum(x.get("parseStatus") == "PARSED" for x in records),
+                "pre2006": sum(x.get("sourceInventoryPeriod") == "2005Q4" for x in records),
                 "missing": len(missing),
             }),
             flush=True,
@@ -264,18 +271,25 @@ def main() -> None:
     out = {
         "purpose": (
             "Catalog-driven H1 2006 raw N-Q holdings extraction. Source selection comes exclusively from "
-            "the strict historical ETF Series-ID PIT catalog. Every filing-time registered series is used "
-            "only for explicit schedule-boundary assignment; only catalog-positive Series IDs are retained. "
-            "Each parsed holding is additionally annotated with the already accepted explicit legacy asset "
-            "section rule, but no holding is filtered at this raw stage. The catalog has already selected the "
-            "latest N-Q/N-Q-A public by each month end. Source ETF eligibility is deferred because Production "
-            "applies name/count/concentration eligibility after EC+US+CORP holding filters. No known registrant "
-            "regex, holdings-based source discovery, ranks, returns, or strategy outcomes are used."
+            "the strict historical ETF Series-ID PIT catalog. The inventory lookup contains both Q4 2005 and "
+            "H1 2006 only so a catalog-selected pre-2006 accession can be fetched; this extractor never adds a "
+            "source outside the catalog month snapshot. Every filing-time registered series is used only for "
+            "explicit schedule-boundary assignment; only catalog-positive Series IDs are retained. Each parsed "
+            "holding is annotated with the accepted explicit legacy asset section rule, but no holding is filtered "
+            "at this raw stage. Source ETF eligibility remains deferred until after COMMON_EQUITY and conservative "
+            "issuer-country mapping. No known registrant regex, holdings-based source discovery, ranks, returns, "
+            "or strategy outcomes are used."
         ),
         "sourceCatalogPath": str(CATALOG.relative_to(ROOT)) if CATALOG.is_relative_to(ROOT) else str(CATALOG),
         "sourceCatalogRunId": int(SOURCE_CATALOG_RUN_ID) if SOURCE_CATALOG_RUN_ID else None,
         "sourceInventoryArtifactId": 9946255797,
+        "sourceLookbackInventoryPath": str(LOOKBACK_INVENTORY.relative_to(ROOT)),
+        "h1InventoryFilingCount": len(inventory["rows"]),
+        "q4LookbackInventoryFilingCount": len(lookback["rows"]),
         "uniqueSourceFilingCount": len(requested),
+        "pre2006RequestedSourceFilingCount": sum(
+            inv_by_key.get(key, {}).get("inventoryPeriod") == "2005Q4" for key in requested
+        ),
         "filingFetchSuccessCount": sum("error" not in x for x in filing_audit),
         "filingFetchErrorCount": sum("error" in x for x in filing_audit),
         "assignmentRule": (
@@ -303,6 +317,7 @@ def main() -> None:
         "SUMMARY",
         json.dumps({
             "uniqueSourceFilingCount": out["uniqueSourceFilingCount"],
+            "pre2006RequestedSourceFilingCount": out["pre2006RequestedSourceFilingCount"],
             "filingFetchSuccessCount": out["filingFetchSuccessCount"],
             "filingFetchErrorCount": out["filingFetchErrorCount"],
             "uniqueParsedHoldingCount": out["uniqueParsedHoldingCount"],
