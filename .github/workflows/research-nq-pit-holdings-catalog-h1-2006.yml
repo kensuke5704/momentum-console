@@ -1,0 +1,43 @@
+name: Research N-Q PIT Holdings Catalog H1 2006
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Strict Series catalog workflow run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  holdings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CATALOG_RUN_ID: ${{ inputs.source_run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download strict Series catalog and its PIT inventories
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/catalog /tmp/inputs
+          catalog_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${SOURCE_CATALOG_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "sec-historical-etf-series-source-catalog-complete-h1-2006") | .id' | head -n1)
+          inputs_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${SOURCE_CATALOG_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "strict-series-catalog-h1-inputs") | .id' | head -n1)
+          test -n "$catalog_id"
+          test -n "$inputs_id"
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${catalog_id}/zip" > /tmp/catalog.zip
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${inputs_id}/zip" > /tmp/inputs.zip
+          unzip -q /tmp/catalog.zip -d /tmp/catalog
+          unzip -q /tmp/inputs.zip -d /tmp/inputs
+          cp /tmp/catalog/sec-historical-etf-series-source-catalog-complete-h1-2006.json data/research/
+          cp /tmp/inputs/sec-marketwide-nq-inventory-h1-2006.json data/research/
+          cp /tmp/inputs/sec-marketwide-nq-lookback-q4-2005.json data/research/
+      - name: Extract raw holdings for catalog-selected PIT Series
+        run: python3 scripts/research-nq-pit-holdings-catalog-h1-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-pit-holdings-catalog-h1-2006
+          path: data/research/nq-pit-holdings-catalog-h1-2006.json
