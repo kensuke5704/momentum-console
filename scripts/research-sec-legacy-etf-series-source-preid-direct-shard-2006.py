@@ -11,9 +11,7 @@ CLASS_ONLY=re.compile(r'^(?:VIPER(?:S)?(?: SHARES?)?|ETF SHARES?|EXCHANGE[- ]TRA
 def direct_classify(title,normalized_title,registrant,op_index):
     norm_lines=op_index['normLines'];n=len(norm_lines);parts=normalized_title.split()
     if not parts:return None,None
-    direct=[];seen=set()
-    # Preserve the same direct-association semantics while using the existing token index
-    # to avoid a full prospectus scan for every Series title.
+    exact_hits=set();direct=[];seen=set()
     for token_line in op_index['tokenLines'].get(parts[0],()):
         for i in range(max(0,token_line-2),token_line+1):
             for width in (1,2,3):
@@ -21,20 +19,23 @@ def direct_classify(title,normalized_title,registrant,op_index):
                 key=(i,width)
                 if key in seen:continue
                 seen.add(key)
-                phrase=' '.join(norm_lines[i:i+width]);pos=phrase.find(normalized_title)
+                phrase=base.phrase_norm(op_index,i,width)
+                if base.accepted_title_phrase(phrase,normalized_title):exact_hits.add(i)
+                pos=phrase.find(normalized_title)
                 if pos<0:continue
                 suffix=phrase[pos+len(normalized_title):].strip()
-                if suffix and CLASS_TOKEN.search(suffix):
-                    direct.append((i,'TITLE_PHRASE_CARRIES_CLASS'))
+                if suffix and CLASS_TOKEN.search(suffix):direct.append((i,'TITLE_PHRASE_CARRIES_CLASS'))
                 if phrase==normalized_title:
                     j=i+width
-                    if j<n and CLASS_ONLY.fullmatch(norm_lines[j].strip()):
-                        direct.append((i,'IMMEDIATE_CLASS_ONLY_LINE'))
-    if not direct:return None,None
-    markers=op_index['markerLines'];nearest=min((abs(i-j) for i,_ in direct for j in markers),default=0)
-    if base.strict.TITLE_ETF_SEMANTIC.search(title):return 'TITLE_EXPLICIT_ETF_SEMANTIC',nearest
-    if base.strict.REGISTRANT_ETF_SEMANTIC.search(registrant):return 'REGISTRANT_EXPLICIT_ETF_SEMANTIC',nearest
-    return 'DIRECT_EXPLICIT_ETF_CLASS_ASSOCIATION',nearest
+                    if j<n and CLASS_ONLY.fullmatch(norm_lines[j].strip()):direct.append((i,'IMMEDIATE_CLASS_ONLY_LINE'))
+    if not exact_hits:return None,None
+    markers=op_index['markerLines']
+    nearest_exact=min((abs(i-j) for i in exact_hits for j in markers),default=None)
+    if base.strict.TITLE_ETF_SEMANTIC.search(title):return 'TITLE_EXPLICIT_ETF_SEMANTIC',nearest_exact
+    if base.strict.REGISTRANT_ETF_SEMANTIC.search(registrant):return 'REGISTRANT_EXPLICIT_ETF_SEMANTIC',nearest_exact
+    if not direct:return None,nearest_exact
+    nearest_direct=min((abs(i-j) for i,_ in direct for j in markers),default=nearest_exact)
+    return 'DIRECT_EXPLICIT_ETF_CLASS_ASSOCIATION',nearest_direct
 
 base.classify_binding_indexed=direct_classify
 if __name__=='__main__':base.main()
