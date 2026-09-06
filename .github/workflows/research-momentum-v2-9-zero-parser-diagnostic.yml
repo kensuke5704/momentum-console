@@ -1,0 +1,95 @@
+name: Research Momentum v2.9 Zero Parser Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-zero-parser-diagnostic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect representative zero-holdings schedule formats
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util, json
+          from pathlib import Path
+
+          root=Path('.')
+          def load(name,path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              module=importlib.util.module_from_spec(spec)
+              assert spec.loader is not None
+              spec.loader.exec_module(module)
+              return module
+
+          seg=load('seg',root/'scripts/research-nq-series-segmentation-2006.py')
+          diag=load('diag',root/'scripts/research-sec-complete-portfolio-title-diagnostic-h2-2005.py')
+          corrected=load('corrected',root/'scripts/research-nq-pit-holdings-2006-corrected.py')
+          pilot=seg.nqpilot
+
+          targets=[
+              {
+                  'label':'POWERSHARES_DYNAMIC_MARKET',
+                  'filename':'edgar/data/1209466/0001104659-06-020486.txt',
+                  'form':'N-Q',
+                  'company':'POWERSHARES EXCHANGE TRADED FUND TRUST',
+                  'seriesId':'S000003023',
+              },
+              {
+                  'label':'ISHARES_SP100',
+                  'filename':'edgar/data/1100663/0001193125-06-126674.txt',
+                  'form':'N-CSR',
+                  'company':'ISHARES TRUST',
+                  'seriesId':'S000004306',
+              },
+              {
+                  'label':'VANGUARD_VALUE',
+                  'filename':'edgar/data/36405/0000932471-06-000909.txt',
+                  'form':'N-Q',
+                  'company':'VANGUARD INDEX FUNDS',
+                  'seriesId':'S000002840',
+              },
+          ]
+
+          for target in targets:
+              submission,transport=diag.fetch(target['filename'])
+              primary,description,text,doctype=diag.primary_document(submission,target['form'])
+              series=seg.meta.parse_series_contracts(submission,target['company'])
+              grouped,audit=seg.grouped_schedule_blocks(text,series)
+              blocks=grouped.get(target['seriesId'],[])
+              combined='\n'.join(blocks)
+              method,holdings,total=corrected.parsed_holdings(combined)
+              html_rows=pilot.html_rows(combined)
+              plain=pilot.plain_lines(combined)
+              print('TARGET',json.dumps({
+                  **target,
+                  'transport':transport,
+                  'primary':primary,
+                  'primaryType':doctype,
+                  'registeredSeries':len(series),
+                  'scheduleMarkers':len(audit),
+                  'assignedTargetBlocks':len(blocks),
+                  'combinedLength':len(combined),
+                  'parseMethod':method,
+                  'parsedHoldings':len(holdings),
+                  'parsedValue':total,
+                  'htmlRows':len(html_rows),
+                  'plainLines':len(plain),
+              }))
+              print('ASSIGNMENT',json.dumps([x for x in audit if x.get('seriesId')==target['seriesId']][:12]))
+              for i,row in enumerate(html_rows[:35]):
+                  print(target['label'],'HTMLROW',i,json.dumps(row))
+              nonempty=[line for line in plain if line]
+              for i,line in enumerate(nonempty[:70]):
+                  print(target['label'],'PLAIN',i,repr(line[:500]))
+          PY
