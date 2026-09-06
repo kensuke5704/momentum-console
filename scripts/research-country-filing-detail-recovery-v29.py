@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import html, importlib.util, json, os, re
+import html, importlib.util, json, os, re, urllib.request
 from collections import defaultdict
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -21,28 +21,29 @@ def detail_page(filename):
  if filename in DETAIL_CACHE:return DETAIL_CACHE[filename]
  url=detail_url(filename)
  if not url:raise RuntimeError('no detail url')
- r=base.fetch_candidates(('https://r.jina.ai/'+url,url),800_000,14)
- DETAIL_CACHE[filename]=r
- return r
+ # Evidence remains the historical SEC accession page. Jina is transport/rendering only.
+ # Use one bounded route so SEC native 403 retries cannot dominate the structural run.
+ proxy='https://r.jina.ai/'+url
+ req=urllib.request.Request(proxy,headers=base.UA)
+ with urllib.request.urlopen(req,timeout=8) as r:
+  result=(r.read(800_000).decode('latin-1','replace'),proxy)
+ DETAIL_CACHE[filename]=result
+ return result
 
 def detail_entity_state(target,cik,text):
- # EDGAR filing detail page exposes historical filer identity and State of Incorp.
  cleaned=html.unescape(re.sub(r'<[^>]*>',' ',text)).replace('\r',' ')
  cleaned=re.sub(r'\s+',' ',cleaned)
  zcik=str(cik).zfill(10);nt=base.normalize_company(target)
- # Bound state to a nearby historical filer/issuer identity carrying the same CIK.
  pat=re.compile(r'([^|]{2,180}?)\s*\((?:Filer|Issuer|Filed by|Subject)\)\s*CIK:\s*(\d{1,10}).{0,500}?State\s+of\s+Incorp\.?:\s*([A-Z0-9]{2,3})',re.I)
  for nm,ck,st in pat.findall(cleaned):
   name=re.sub(r'^.*?(?:Business Address|Mailing Address)\s+','',nm,flags=re.I).strip(' :-')
   if ck.zfill(10)==zcik and base.normalize_company(name)==nt:return st.upper(),name
- # Jina text often inserts headings/newlines differently; require same CIK and exact normalized name in a narrow window.
  cikpos=[m.start() for m in re.finditer(r'CIK:\s*0*'+re.escape(str(int(zcik))),cleaned,re.I)]
  for pos in cikpos:
   w=cleaned[max(0,pos-220):pos+700]
   sm=re.search(r'State\s+of\s+Incorp\.?:\s*([A-Z0-9]{2,3})',w,re.I)
   if not sm:continue
-  if any(base.normalize_company(f) and base.normalize_company(f) in base.normalize_company(w) for f in [target]):
-   return sm.group(1).upper(),target
+  if nt and nt in base.normalize_company(w):return sm.group(1).upper(),target
  return None,None
 
 def main():
@@ -60,9 +61,11 @@ def main():
  results=[];resolved=us=nonus=errors=0
  for gi,cik in enumerate(my_seeds):
   queries=grouped[cik];candidate_union={}
+  # Start with the two highest-priority PIT issuer filings per report date.
+  # A missing/unreadable filing stays UNKNOWN; no inference or default is introduced.
   for q in queries:
    report=q.get('asOfReportDate')
-   for fr in sorted([r for r in by_cik.get(cik,[]) if report and r['dateFiled']<=report],key=base.filing_sort_key)[:6]:candidate_union[fr['filename']]=fr
+   for fr in sorted([r for r in by_cik.get(cik,[]) if report and r['dateFiled']<=report],key=base.filing_sort_key)[:2]:candidate_union[fr['filename']]=fr
   pages=[]
   for fr in sorted(candidate_union.values(),key=base.filing_sort_key):
    try:text,tr=detail_page(fr['filename']);pages.append((fr,text,tr))
@@ -78,7 +81,7 @@ def main():
     if rec['classification']!='UNKNOWN':break
    if rec['classification']!='UNKNOWN':resolved+=1;us+=rec['classification']=='US';nonus+=rec['classification']=='NON_US'
    results.append(rec)
-  if (gi+1)%20==0:print('PROGRESS',json.dumps({'shard':shard_i,'ciksDone':gi+1,'queryRowsDone':len(results),'resolved':resolved,'errors':errors,'detailCache':len(DETAIL_CACHE)}),flush=True)
- out={'purpose':'Return-independent PIT recovery using SEC historical filing-detail pages. Reuse only the already accepted historical exact issuer-form -> unique CIK seed; promote UNKNOWN only when a pre-report-date accession detail page shows the same historical entity/CIK and State of Incorp. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes.','shardIndex':shard_i,'shardCount':shard_n,'allInputUnknownCount':len(all_unknown),'allHistoricalExactUniqueCikQueryCount':sum(len(v) for v in grouped.values()),'allHistoricalExactUniqueCikCount':len(seeds),'shardCikCount':len(my_seeds),'shardInputUnknownCount':len(my_rows),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(my_rows)-resolved,'transportErrorCount':errors,'detailCacheCount':len(DETAIL_CACHE),'masterYears':years,'masterIndexTransports':transports,'results':results}
+  if (gi+1)%10==0:print('PROGRESS',json.dumps({'shard':shard_i,'ciksDone':gi+1,'queryRowsDone':len(results),'resolved':resolved,'errors':errors,'detailCache':len(DETAIL_CACHE)}),flush=True)
+ out={'purpose':'Return-independent PIT recovery using historical SEC filing-detail pages. Reuse only the accepted historical exact issuer-form -> unique CIK seed; promote UNKNOWN only when a pre-report-date accession detail page shows the same historical entity/CIK and State of Incorp. Transport is a bounded rendered copy of the SEC accession page. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes.','shardIndex':shard_i,'shardCount':shard_n,'allInputUnknownCount':len(all_unknown),'allHistoricalExactUniqueCikQueryCount':sum(len(v) for v in grouped.values()),'allHistoricalExactUniqueCikCount':len(seeds),'shardCikCount':len(my_seeds),'shardInputUnknownCount':len(my_rows),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(my_rows)-resolved,'transportErrorCount':errors,'detailCacheCount':len(DETAIL_CACHE),'masterYears':years,'masterIndexTransports':transports,'results':results}
  path=ROOT/f'data/research/country-filing-detail-recovery-v29-shard-{shard_i}.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'results','masterIndexTransports'}}),flush=True)
 if __name__=='__main__':main()
