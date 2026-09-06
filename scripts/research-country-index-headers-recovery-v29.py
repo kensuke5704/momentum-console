@@ -17,10 +17,8 @@ def clean_issuer(s):
  return ' '.join(s.replace('’',"'").split()).strip(' .,-')
 
 def normalize_company(s):
- s=JURIS_RE.sub('',s or '')
- s=clean_issuer(s).upper().replace('&',' AND ')
- s=re.sub(r'\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|AG|THE)\b',' ',s)
- s=re.sub(r'[^A-Z0-9]+',' ',s)
+ s=JURIS_RE.sub('',s or '');s=clean_issuer(s).upper().replace('&',' AND ')
+ s=re.sub(r'\b(?:INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LIMITED|LTD|PLC|AG|THE)\b',' ',s);s=re.sub(r'[^A-Z0-9]+',' ',s)
  return ' '.join(s.split())
 
 def cleaned_forms(raw):
@@ -31,7 +29,7 @@ def cleaned_forms(raw):
   changed=False
   for p in pats:
    ns=re.sub(p,'',s,flags=re.I).strip()
-   if ns!=s: vals.append(ns);s=ns;changed=True
+   if ns!=s:vals.append(ns);s=ns;changed=True
  return list(dict.fromkeys(v for v in vals if v))
 
 def fetch_candidates(candidates,limit,timeout):
@@ -39,13 +37,9 @@ def fetch_candidates(candidates,limit,timeout):
  for candidate in candidates:
   try:
    req=urllib.request.Request(candidate,headers=UA)
-   with urllib.request.urlopen(req,timeout=timeout) as r:
-    return r.read(limit).decode('latin-1','replace'),candidate
+   with urllib.request.urlopen(req,timeout=timeout) as r:return r.read(limit).decode('latin-1','replace'),candidate
   except Exception as e:last=e
  raise RuntimeError(repr(last))
-
-def get_text(url,limit=2_000_000,timeout=20):
- return fetch_candidates((url,'https://r.jina.ai/'+url),limit,timeout)
 
 def load_master(years):
  rows=[];transports={}
@@ -56,17 +50,15 @@ def load_master(years):
     req=urllib.request.Request(base+'/master.zip',headers=UA)
     with urllib.request.urlopen(req,timeout=35) as r:data=r.read(20_000_000)
     with zipfile.ZipFile(io.BytesIO(data)) as z:
-     name=next(n for n in z.namelist() if n.lower().endswith('master.idx'))
-     text=z.read(name).decode('latin-1','replace');tr=base+'/master.zip'
+     name=next(n for n in z.namelist() if n.lower().endswith('master.idx'));text=z.read(name).decode('latin-1','replace');tr=base+'/master.zip'
    except Exception:
     text,tr=fetch_candidates(('https://r.jina.ai/'+base+'/master.idx',base+'/master.idx'),20_000_000,45)
    transports[f'{year}Q{q}']=tr
    for line in text.splitlines():
     p=line.split('|')
-    if len(p)<5 or not p[0].strip().isdigit(): continue
+    if len(p)<5 or not p[0].strip().isdigit():continue
     cik,company,form,date,filename=[x.strip() for x in p[:5]];form=form.upper()
-    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',date): continue
-    rows.append({'cik':cik.zfill(10),'company':company,'normalizedCompany':normalize_company(company),'form':form,'dateFiled':date,'filename':filename})
+    if re.fullmatch(r'\d{4}-\d{2}-\d{2}',date):rows.append({'cik':cik.zfill(10),'company':company,'normalizedCompany':normalize_company(company),'form':form,'dateFiled':date,'filename':filename})
  return rows,transports
 
 def accession_parts(filename):
@@ -77,77 +69,75 @@ def accession_parts(filename):
 def header_index_url(filename):
  parts=accession_parts(filename)
  if not parts:return None
- cik,acc,ad=parts
- return f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index-headers.html'
+ cik,acc,ad=parts;return f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index-headers.html'
 
 def header_page(filename):
  if filename in HEADER_CACHE:return HEADER_CACHE[filename]
  url=header_index_url(filename)
  if not url:raise RuntimeError('no header index url')
- result=fetch_candidates(('https://r.jina.ai/'+url,url),500_000,14)
- HEADER_CACHE[filename]=result
- return result
+ result=fetch_candidates(('https://r.jina.ai/'+url,url),500_000,12);HEADER_CACHE[filename]=result;return result
 
 def flat_header_entity_state(target,cik,text):
- cleaned=html.unescape(re.sub(r'<[^>]*>','',text)).replace('\r','')
- nt=normalize_company(target);zcik=str(cik).zfill(10)
- blocks=re.split(r'(?im)^\s*COMPANY\s+DATA\s*:\s*$',cleaned)
- for block in blocks[1:]:
+ cleaned=html.unescape(re.sub(r'<[^>]*>','',text)).replace('\r','');nt=normalize_company(target);zcik=str(cik).zfill(10)
+ for block in re.split(r'(?im)^\s*COMPANY\s+DATA\s*:\s*$',cleaned)[1:]:
   part=re.split(r'(?im)^\s*(?:FILING\s+VALUES|BUSINESS\s+ADDRESS|MAIL\s+ADDRESS|FORMER\s+COMPANY)\s*:\s*$',block,maxsplit=1)[0]
-  nm=re.search(r'(?im)^\s*COMPANY\s+CONFORMED\s+NAME\s*:\s*(.+?)\s*$',part)
-  ck=re.search(r'(?im)^\s*CENTRAL\s+INDEX\s+KEY\s*:\s*(\d{1,10})\s*$',part)
-  st=re.search(r'(?im)^\s*STATE\s+OF\s+INCORPORATION\s*:\s*([A-Z0-9]{2,3})\s*$',part)
-  if not nm or not ck:continue
-  name=nm.group(1).strip();mcik=ck.group(1).zfill(10)
-  if mcik==zcik and normalize_company(name)==nt and st:return st.group(1).upper(),name
+  nm=re.search(r'(?im)^\s*COMPANY\s+CONFORMED\s+NAME\s*:\s*(.+?)\s*$',part);ck=re.search(r'(?im)^\s*CENTRAL\s+INDEX\s+KEY\s*:\s*(\d{1,10})\s*$',part);st=re.search(r'(?im)^\s*STATE\s+OF\s+INCORPORATION\s*:\s*([A-Z0-9]{2,3})\s*$',part)
+  if nm and ck and ck.group(1).zfill(10)==zcik and normalize_company(nm.group(1).strip())==nt and st:return st.group(1).upper(),nm.group(1).strip()
  return None,None
 
 def filing_sort_key(r):return (FORM_PRIORITY.get(r['form'],50),-int(r['dateFiled'].replace('-','')),r['filename'])
 
-def exact_candidates(row,master_rows):
- report=row.get('asOfReportDate');forms=[]
+def seed_cik(row):
+ ciks=set()
+ for a in row.get('attempts',[]):
+  if a.get('historicalExactCikCount')==1 and a.get('seedCik'):ciks.add(str(a['seedCik']).zfill(10))
+ return next(iter(ciks)) if len(ciks)==1 else None
+
+def query_forms(row):
+ out=[]
  for issuer in row.get('issuerVariants',[]):
   for f in cleaned_forms(str(issuer)):
-   if f and f not in forms:forms.append(f)
- by=defaultdict(list);matched_forms=[]
- for form in forms:
-  target=normalize_company(form)
-  exact=[r for r in master_rows if r.get('form') in ISSUER_FORMS and report and r.get('dateFiled')<=report and r.get('normalizedCompany')==target]
-  if exact:matched_forms.append(form)
-  for r in exact:by[str(r.get('cik') or '').zfill(10)].append(r)
- if len(by)!=1:return None,[],matched_forms
- cik=next(iter(by));rows=sorted(by[cik],key=filing_sort_key);seen=set();out=[]
- for r in rows:
-  fn=r.get('filename')
-  if fn and fn not in seen:seen.add(fn);out.append(r)
- return cik,out,matched_forms
+   if f not in out:out.append(f)
+ return out
 
 def main():
  shard_i=int(os.environ.get('SHARD_INDEX','0'));shard_n=int(os.environ.get('SHARD_COUNT','1'))
- data=json.loads(SRC.read_text())
- all_unknown=sorted([r for r in data.get('resolutionAudit',[]) if r.get('classification')=='UNKNOWN'],key=lambda r:(r.get('ticker') or '',r.get('securityId') or '',r.get('asOfReportDate') or ''))
- unknown=[r for i,r in enumerate(all_unknown) if i%shard_n==shard_i]
- years=sorted({int(r['asOfReportDate'][:4]) for r in unknown if r.get('asOfReportDate')});master,transports=load_master(years)
- results=[];resolved=us=nonus=errors=0
- for i,row in enumerate(unknown):
-  cik,candidates,forms=exact_candidates(row,master)
-  rec={'ticker':row.get('ticker'),'securityId':row.get('securityId'),'asOfReportDate':row.get('asOfReportDate'),'issuerVariants':row.get('issuerVariants',[]),'historicalExactCik':cik,'matchedIssuerForms':forms,'classification':'UNKNOWN','attempts':[]}
-  if cik:
-   for fr in candidates[:6]:
+ data=json.loads(SRC.read_text());all_unknown=sorted([r for r in data.get('resolutionAudit',[]) if r.get('classification')=='UNKNOWN'],key=lambda r:(r.get('ticker') or '',r.get('securityId') or '',r.get('asOfReportDate') or ''))
+ grouped=defaultdict(list);no_seed=[]
+ for r in all_unknown:
+  c=seed_cik(r)
+  if c:grouped[c].append(r)
+  else:no_seed.append(r)
+ seeds=sorted(grouped);my_seeds=[c for i,c in enumerate(seeds) if i%shard_n==shard_i];my_rows=[r for c in my_seeds for r in grouped[c]]
+ years=sorted({int(r['asOfReportDate'][:4]) for r in my_rows if r.get('asOfReportDate')});master,transports=load_master(years);by_cik=defaultdict(list)
+ for r in master:
+  if r.get('form') in ISSUER_FORMS:by_cik[r['cik']].append(r)
+ results=[];resolved=us=nonus=errors=0;filings_fetched=0
+ for gi,cik in enumerate(my_seeds):
+  queries=grouped[cik];candidate_union={}
+  for q in queries:
+   report=q.get('asOfReportDate');cand=sorted([r for r in by_cik.get(cik,[]) if report and r['dateFiled']<=report],key=filing_sort_key)[:6]
+   for fr in cand:candidate_union[fr['filename']]=fr
+  header_records=[]
+  for fr in sorted(candidate_union.values(),key=filing_sort_key):
+   try:
+    text,tr=header_page(fr['filename']);filings_fetched+=1;header_records.append((fr,text,tr))
+   except Exception as e:
+    errors+=1;header_records.append((fr,None,type(e).__name__))
+  for q in queries:
+   forms=query_forms(q);report=q.get('asOfReportDate');rec={'ticker':q.get('ticker'),'securityId':q.get('securityId'),'asOfReportDate':report,'issuerVariants':q.get('issuerVariants',[]),'historicalExactCik':cik,'matchedIssuerForms':forms,'classification':'UNKNOWN','attempts':[]}
+   eligible=sorted([x for x in header_records if x[0]['dateFiled']<=report],key=lambda x:filing_sort_key(x[0]))
+   for fr,text,tr in eligible:
+    if text is None:
+     rec['attempts'].append({'form':fr['form'],'dateFiled':fr['dateFiled'],'filename':fr['filename'],'error':tr});continue
     for issuer in forms:
-     try:
-      text,tr=header_page(fr['filename']);st,name=flat_header_entity_state(issuer,cik,text)
-      rec['attempts'].append({'form':fr.get('form'),'dateFiled':fr.get('dateFiled'),'filename':fr.get('filename'),'transport':tr,'stateCode':st,'historicalEntityName':name})
-      if st:
-       rec.update({'classification':'US' if st in US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_INDEX_HEADERS_COMPANY_DATA_STATE','historicalEntityName':name,'evidenceForm':fr.get('form'),'evidenceDateFiled':fr.get('dateFiled'),'evidenceFilename':fr.get('filename'),'evidenceTransport':tr});break
-     except Exception as e:
-      errors+=1;rec['attempts'].append({'form':fr.get('form'),'dateFiled':fr.get('dateFiled'),'filename':fr.get('filename'),'error':type(e).__name__})
+     st,name=flat_header_entity_state(issuer,cik,text);rec['attempts'].append({'form':fr['form'],'dateFiled':fr['dateFiled'],'filename':fr['filename'],'transport':tr,'stateCode':st,'historicalEntityName':name})
+     if st:
+      rec.update({'classification':'US' if st in US_CODES else 'NON_US','stateCode':st,'resolutionSource':'PIT_INDEX_HEADERS_COMPANY_DATA_STATE','historicalEntityName':name,'evidenceForm':fr['form'],'evidenceDateFiled':fr['dateFiled'],'evidenceFilename':fr['filename'],'evidenceTransport':tr});break
     if rec['classification']!='UNKNOWN':break
-    time.sleep(.005)
-  if rec['classification']!='UNKNOWN':resolved+=1;us+=rec['classification']=='US';nonus+=rec['classification']=='NON_US'
-  results.append(rec)
-  if (i+1)%50==0:print('PROGRESS',json.dumps({'shard':shard_i,'done':i+1,'resolved':resolved,'errors':errors,'headerCache':len(HEADER_CACHE)}),flush=True)
- out={'purpose':'Return-independent PIT recovery of strict-country UNKNOWN identities using only official SEC accession index-headers pages. Classification requires historical cleaned exact issuer-form name -> exactly one CIK in pre-report-date SEC master index, then matching COMPANY DATA name+CIK+STATE OF INCORPORATION in the same historical accession header. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes are used.','shardIndex':shard_i,'shardCount':shard_n,'allInputUnknownCount':len(all_unknown),'shardInputUnknownCount':len(unknown),'historicalExactUniqueCikCount':sum(r['historicalExactCik'] is not None for r in results),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(unknown)-resolved,'transportErrorCount':errors,'headerCacheCount':len(HEADER_CACHE),'masterYears':years,'masterIndexTransports':transports,'results':results}
- out_path=ROOT/f'data/research/country-index-headers-recovery-v29-shard-{shard_i}.json';out_path.parent.mkdir(parents=True,exist_ok=True);out_path.write_text(json.dumps(out,indent=2)+'\n')
- print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'results','masterIndexTransports'}}),flush=True)
+   if rec['classification']!='UNKNOWN':resolved+=1;us+=rec['classification']=='US';nonus+=rec['classification']=='NON_US'
+   results.append(rec)
+  if (gi+1)%20==0:print('PROGRESS',json.dumps({'shard':shard_i,'ciksDone':gi+1,'queryRowsDone':len(results),'resolved':resolved,'errors':errors,'headerCache':len(HEADER_CACHE)}),flush=True)
+ out={'purpose':'Return-independent PIT recovery of strict-country UNKNOWN identities using official SEC accession index-headers pages. The already accepted historical exact issuer-form -> unique CIK seed is reused; each recovered country still requires a matching historical company name, same CIK and STATE OF INCORPORATION in a pre-report-date accession header. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes are used.','shardIndex':shard_i,'shardCount':shard_n,'allInputUnknownCount':len(all_unknown),'allHistoricalExactUniqueCikQueryCount':sum(len(v) for v in grouped.values()),'allHistoricalExactUniqueCikCount':len(seeds),'shardCikCount':len(my_seeds),'shardInputUnknownCount':len(my_rows),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(my_rows)-resolved,'transportErrorCount':errors,'headerCacheCount':len(HEADER_CACHE),'filingFetchCount':filings_fetched,'masterYears':years,'masterIndexTransports':transports,'results':results}
+ out_path=ROOT/f'data/research/country-index-headers-recovery-v29-shard-{shard_i}.json';out_path.parent.mkdir(parents=True,exist_ok=True);out_path.write_text(json.dumps(out,indent=2)+'\n');print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'results','masterIndexTransports'}}),flush=True)
 if __name__=='__main__':main()
