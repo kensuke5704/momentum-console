@@ -1,0 +1,41 @@
+name: Research Momentum v2.9 Country Filing-Index Recovery
+on:
+  push:
+    paths:
+      - '.github/workflows/research-momentum-v2-9-country-filing-index-recovery-v29.yml'
+      - 'scripts/research-country-filing-index-recovery-v29.py'
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: research-momentum-v2-9-country-filing-index-recovery-v29
+  cancel-in-progress: true
+jobs:
+  recover:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COUNTRY_ARTIFACT_ID: '9987700449'
+      SHARD_INDEX: ${{ matrix.shard }}
+      SHARD_COUNT: '8'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download final Gate country artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/c
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
+          unzip -q /tmp/c.zip -d /tmp/c
+          cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+      - name: Recover strict UNKNOWN from historical filing detail pages
+        run: python3 scripts/research-country-filing-index-recovery-v29.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-filing-index-recovery-v29-${{ matrix.shard }}
+          path: data/research/country-filing-index-recovery-v29-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
