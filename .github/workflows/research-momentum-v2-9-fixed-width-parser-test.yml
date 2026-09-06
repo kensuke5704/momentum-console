@@ -1,0 +1,72 @@
+name: Research Momentum v2.9 Fixed Width Parser Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-fixed-width-parser-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test remaining structural formats
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util, json
+          from pathlib import Path
+          root=Path('.')
+          def load(name,path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              module=importlib.util.module_from_spec(spec)
+              assert spec.loader is not None
+              spec.loader.exec_module(module)
+              return module
+          hybrid=load('hybrid',root/'scripts/research-nq-pit-holdings-hybrid-h1-2006.py')
+          parser=load('parser',root/'scripts/research-nq-schedule-bound-parser-v29-v2.py')
+          grouping=load('grouping',root/'scripts/research-nq-hybrid-grouping-v29.py')
+          targets=[
+            {'label':'POWERSHARES','filename':'edgar/data/1209466/0001047469-06-000199.txt','form':'N-CSRS','company':'POWERSHARES EXCHANGE TRADED FUND TRUST','regime':'LEGACY','identity':'S000003023','normalized':'POWERSHARES DYNAMIC MARKET PORTFOLIO','min':20},
+            {'label':'STREETTRACKS','filename':'edgar/data/1168164/0000950135-06-003771.txt','form':'N-CSRS','company':'STREETTRACKS INDEX SHARES FUNDS (Formerly Fresco Index Shares Funds)','regime':'SERIES','seriesId':'S000006392','min':20},
+            {'label':'VANGUARD_INTL','filename':'edgar/data/857489/0000932471-05-001803.txt','form':'N-CSR','company':'VANGUARD INTERNATIONAL EQUITY INDEX FUNDS','regime':'LEGACY','identity':'S000005786','normalized':'EMERGING MARKETS STOCK INDEX FUND','min':20},
+            {'label':'VANGUARD_WORLD','filename':'edgar/data/52848/0000932471-05-001615.txt','form':'N-CSR','company':'VANGUARD WORLD FUNDS','regime':'LEGACY','identity':'S000004441','normalized':'MATERIALS INDEX FUND','min':20},
+            {'label':'FIRST_TRUST','filename':'edgar/data/1329377/0000875626-05-002016.txt','form':'N-Q','company':'FIRST TRUST EXCHANGE-TRADED FUND','regime':'LEGACY','identity':'FT','normalized':'FIRST TRUST DOW JONES SELECT MICROCAP INDEXSM FUND','min':20},
+            {'label':'ISHARES_TRUST','filename':'edgar/data/1100663/0001193125-06-003352.txt','form':'N-CSRS','company':'ISHARES TRUST','regime':'LEGACY','identity':'ISHLV','normalized':'ISHARES MORNINGSTAR LARGE VALUE INDEX FUND','min':20},
+            {'label':'ISHARES_R1000_VALUE','filename':'edgar/data/1100663/0001193125-05-176111.txt','form':'N-Q','company':'ISHARES TRUST','regime':'LEGACY','identity':'S000004345','normalized':'ISHARES RUSSELL 1000 VALUE INDEX FUND','min':20},
+            {'label':'ISHARES_UMBRELLA_FALSE','filename':'edgar/data/930667/0001193125-06-014026.txt','form':'N-Q','company':'ISHARES INC','regime':'LEGACY','identity':'UMBRELLA','normalized':'ISHARES MSCI INDEX FUND','expect_no_grouped':True},
+          ]
+          results=[]
+          for target in targets:
+              submission,transport,_=hybrid.fetch_submission(target['filename'])
+              primary,description,text,doctype=hybrid.h2diag.primary_document(submission,target['form'])
+              if target['regime']=='SERIES':
+                  series=hybrid.seg.meta.parse_series_contracts(submission,target['company'])
+                  grouped,audit=grouping.series_grouped_schedule_blocks(text,series)
+                  blocks=grouped.get(target['seriesId'],[])
+              else:
+                  grouped,audit=grouping.legacy_grouped_schedule_blocks(text,{target['identity']:{'normalizedSeriesName':target['normalized']}})
+                  blocks=grouped.get(target['identity'],[])
+              method,holdings,total=parser.parsed_holdings('\n'.join(blocks))
+              row={'label':target['label'],'blocks':len(blocks),'method':method,'holdings':len(holdings),'total':total,'sample':[h['description'] for h in holdings[:5]],'weightSum':sum(float(h.get('weight') or 0) for h in holdings)}
+              print('RESULT',json.dumps(row),flush=True)
+              results.append(row)
+              if target.get('expect_no_grouped'):
+                  if blocks:
+                      raise SystemExit(f"{target['label']}: notes marker still produced a grouped schedule")
+                  continue
+              if not blocks:
+                  raise SystemExit(f"{target['label']}: no genuine schedule block")
+              if len(holdings)<target['min']:
+                  raise SystemExit(f"{target['label']}: parser below structural minimum {len(holdings)}")
+              if not (99.999 <= row['weightSum'] <= 100.001):
+                  raise SystemExit(f"{target['label']}: weights do not normalize to 100")
+          print('SUMMARY',json.dumps(results),flush=True)
+          PY
