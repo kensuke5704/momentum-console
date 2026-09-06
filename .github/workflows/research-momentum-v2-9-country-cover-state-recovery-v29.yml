@@ -1,4 +1,4 @@
-name: Research Momentum v2.9 Country CIK-Header State Recovery
+name: Research Momentum v2.9 Country 24M Lookback Recovery
 on:
   push:
     branches: ["research/momentum-v2-9-preid-fix-20260906"]
@@ -29,10 +29,10 @@ jobs:
           gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
           unzip -q /tmp/c.zip -d /tmp/c
           cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
-      - name: Recover strict UNKNOWN from exact historical CIK header state
-        run: python3 scripts/research-country-cik-header-state-recovery-v29.py
+      - name: Recover strict UNKNOWN from fixed 24-month historical SEC lookback
+        run: python3 scripts/research-country-24m-lookback-recovery-v29.py
       - uses: actions/upload-artifact@v4
         with:
-          name: country-cik-header-state-recovery-v29-${{ matrix.shard }}
-          path: data/research/country-cik-header-state-recovery-v29-shard-${{ matrix.shard }}.json
+          name: country-24m-lookback-recovery-v29-${{ matrix.shard }}
+          path: data/research/country-24m-lookback-recovery-v29-shard-${{ matrix.shard }}.json
           if-no-files-found: error
