@@ -44,6 +44,7 @@ NUM_ONLY_RE = re.compile(r"^\(?\$?\s*\d[\d,]*(?:\.\d+)?\s*\)?$")
 SEPARATOR_RE = re.compile(r"^[-_= .]+$")
 DATE_RE = re.compile(r"^(?:AS OF\s+)?(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\b.*\b20\d{2}\b", re.I)
 PERCENT_HEADER_RE = re.compile(r"(?:--|[-–—]\s*)\(?\d+(?:\.\d+)?%\)?\s*$")
+CATEGORY_PREFIX_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 &'/.\-]{1,90}\s+\(\d+(?:\.\d+)?%\)\s+(?=[A-Za-z*^])")
 HEADER_RE = re.compile(
     r"^(?:COMMON STOCKS?|COMMON SHARES?|PREFERRED STOCKS?|PREFERRED SHARES?|SHORT[- ]TERM INVESTMENTS?|"
     r"MONEY MARKET(?: FUND)?|CORPORATE BONDS?|U\.S\. GOVERNMENT|TOTAL(?: INVESTMENTS?)?|NET ASSETS?|"
@@ -65,6 +66,10 @@ def clean_desc(value: str) -> str:
     value = re.sub(r"\bTABLE OF CONTENTS\b", " ", value, flags=re.I)
     value = pilot.clean_desc(value)
     value = re.sub(r"\.{2,}", " ", value)
+    value = " ".join(value.split())
+    # Historical fixed-width conversion can join a sector label and the first issuer.
+    # Strip only a leading textual category followed by an explicit parenthetical percent.
+    value = CATEGORY_PREFIX_RE.sub("", value)
     return " ".join(value.split())
 
 
@@ -79,7 +84,7 @@ def is_nonsecurity_text(line: str) -> bool:
         return True
     if SEPARATOR_RE.fullmatch(value):
         return True
-    if DATE_RE.search(value):
+    if DATE_RE.search(value) or value.upper().startswith("AS OF "):
         return True
     if BAD_TEXT_RE.search(value):
         return True
@@ -163,7 +168,6 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
         if SEPARATOR_RE.fullmatch(line) or line in {"$", "—", "-"}:
             continue
 
-        # Quantity-first fixed-width rows, common in PowerShares and First Trust.
         m = LEADING_QTY_RE.match(line)
         if m:
             qty_raw, desc_raw, _currency, value_raw = m.groups()
@@ -175,7 +179,6 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
                 pending_qty = None
                 continue
 
-        # Issuer-first fixed-width rows, including dot-leader tables.
         m = pilot.TAIL_RE.match(line)
         if m:
             prefix, qty_raw, _currency, value_raw = m.groups()
@@ -192,7 +195,6 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
                     pending_qty = None
                     continue
                 if pending_desc:
-                    # A wrapped issuer can put only a footnote marker on the numeric tail line.
                     joined = clean_desc(" ".join(x for x in (pending_desc, desc) if x))
                     if security_text(joined):
                         emit(holdings, joined, qty, value)
@@ -200,7 +202,6 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
                         pending_qty = None
                         continue
 
-        # Split-column fixed-width rows, common in iShares/Vanguard shareholder reports.
         if NUM_ONLY_RE.fullmatch(line):
             number = pilot.parse_number(line)
             if number is None or number <= 0 or not pending_desc:
@@ -232,6 +233,36 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
     return pilot.dedupe(holdings)
 
 
+def drop_page_split_suffix_duplicates(rows: list[dict]) -> list[dict]:
+    """Drop only exact quantity/value duplicates whose shorter issuer is a strict suffix.
+
+    This targets page-header splits such as 'Exxon Mobil Corp.' plus a second
+    'n Mobil Corp.' row. Requiring identical quantity or market value prevents
+    issuer-similarity guessing.
+    """
+    keep = []
+    for i, row in enumerate(rows):
+        desc = clean_desc(str(row.get("description") or ""))
+        q = row.get("quantityOrPrincipal")
+        v = float(row.get("marketValue") or 0.0)
+        duplicate = False
+        if len(desc) >= 8:
+            for j, other in enumerate(rows):
+                if i == j:
+                    continue
+                odesc = clean_desc(str(other.get("description") or ""))
+                if len(odesc) <= len(desc) or not odesc.upper().endswith(desc.upper()):
+                    continue
+                same_q = q is not None and other.get("quantityOrPrincipal") == q
+                same_v = v > 0 and float(other.get("marketValue") or 0.0) == v
+                if same_q or same_v:
+                    duplicate = True
+                    break
+        if not duplicate:
+            keep.append(row)
+    return keep
+
+
 def parsed_holdings(combined: str) -> tuple[str, list[dict], float]:
     combined = corrected.trim_series_schedule(combined)
     bound_html = base.parse_bound_html_holdings(combined)
@@ -247,7 +278,7 @@ def parsed_holdings(combined: str) -> tuple[str, list[dict], float]:
     out = []
     seen = set()
     for holding in parsed:
-        desc = " ".join(str(holding.get("description") or "").split())
+        desc = clean_desc(str(holding.get("description") or ""))
         value = max(0.0, float(holding.get("marketValue") or 0.0))
         quantity = holding.get("quantityOrPrincipal")
         if not desc or value <= 0:
@@ -262,6 +293,7 @@ def parsed_holdings(combined: str) -> tuple[str, list[dict], float]:
             "quantityOrPrincipal": quantity,
         })
 
+    out = drop_page_split_suffix_duplicates(out)
     total = sum(row["marketValue"] for row in out)
     if total > 0:
         for row in out:
