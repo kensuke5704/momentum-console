@@ -10,6 +10,7 @@ US_CODES={'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN',
 FORM_PRIORITY={'10-K':0,'10-K/A':1,'10-Q':2,'10-Q/A':3,'8-K':4,'8-K/A':5,'DEF 14A':6,'DEFA14A':7,'PRE 14A':8,'11-K':9,'S-8':10,'S-8 POS':11}
 ISSUER_FORMS=set(FORM_PRIORITY)
 JURIS_RE=re.compile(r'\s*/[A-Z0-9]{2,3}/?\s*$',re.I)
+HEADER_CACHE={}
 
 def clean_issuer(s):
  s=re.sub(r'\s*\((?:[a-z]{1,3}|\d{1,3})\)\s*$','',s or '',flags=re.I)
@@ -33,22 +34,24 @@ def cleaned_forms(raw):
    if ns!=s: vals.append(ns);s=ns;changed=True
  return list(dict.fromkeys(v for v in vals if v))
 
-def get_text(url,limit=2_000_000,timeout=20):
+def fetch_candidates(candidates,limit,timeout):
  last=None
- for candidate in (url,'https://r.jina.ai/'+url):
+ for candidate in candidates:
   try:
    req=urllib.request.Request(candidate,headers=UA)
    with urllib.request.urlopen(req,timeout=timeout) as r:
     return r.read(limit).decode('latin-1','replace'),candidate
-  except Exception as e: last=e
+  except Exception as e:last=e
  raise RuntimeError(repr(last))
+
+def get_text(url,limit=2_000_000,timeout=20):
+ return fetch_candidates((url,'https://r.jina.ai/'+url),limit,timeout)
 
 def load_master(years):
  rows=[];transports={}
  for year in years:
   for q in range(1,5):
    base=f'https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{q}'
-   text=None;tr=None
    try:
     req=urllib.request.Request(base+'/master.zip',headers=UA)
     with urllib.request.urlopen(req,timeout=35) as r:data=r.read(20_000_000)
@@ -56,7 +59,7 @@ def load_master(years):
      name=next(n for n in z.namelist() if n.lower().endswith('master.idx'))
      text=z.read(name).decode('latin-1','replace');tr=base+'/master.zip'
    except Exception:
-    text,tr=get_text(base+'/master.idx',limit=20_000_000,timeout=45)
+    text,tr=fetch_candidates(('https://r.jina.ai/'+base+'/master.idx',base+'/master.idx'),20_000_000,45)
    transports[f'{year}Q{q}']=tr
    for line in text.splitlines():
     p=line.split('|')
@@ -78,9 +81,12 @@ def header_index_url(filename):
  return f'https://www.sec.gov/Archives/edgar/data/{cik}/{ad}/{acc}-index-headers.html'
 
 def header_page(filename):
+ if filename in HEADER_CACHE:return HEADER_CACHE[filename]
  url=header_index_url(filename)
- if not url: raise RuntimeError('no header index url')
- return get_text(url,limit=500_000,timeout=20)
+ if not url:raise RuntimeError('no header index url')
+ result=fetch_candidates(('https://r.jina.ai/'+url,url),500_000,14)
+ HEADER_CACHE[filename]=result
+ return result
 
 def flat_header_entity_state(target,cik,text):
  cleaned=html.unescape(re.sub(r'<[^>]*>','',text)).replace('\r','')
@@ -91,7 +97,7 @@ def flat_header_entity_state(target,cik,text):
   nm=re.search(r'(?im)^\s*COMPANY\s+CONFORMED\s+NAME\s*:\s*(.+?)\s*$',part)
   ck=re.search(r'(?im)^\s*CENTRAL\s+INDEX\s+KEY\s*:\s*(\d{1,10})\s*$',part)
   st=re.search(r'(?im)^\s*STATE\s+OF\s+INCORPORATION\s*:\s*([A-Z0-9]{2,3})\s*$',part)
-  if not nm or not ck: continue
+  if not nm or not ck:continue
   name=nm.group(1).strip();mcik=ck.group(1).zfill(10)
   if mcik==zcik and normalize_company(name)==nt and st:return st.group(1).upper(),name
  return None,None
@@ -102,13 +108,13 @@ def exact_candidates(row,master_rows):
  report=row.get('asOfReportDate');forms=[]
  for issuer in row.get('issuerVariants',[]):
   for f in cleaned_forms(str(issuer)):
-   if f and f not in forms: forms.append(f)
+   if f and f not in forms:forms.append(f)
  by=defaultdict(list);matched_forms=[]
  for form in forms:
   target=normalize_company(form)
   exact=[r for r in master_rows if r.get('form') in ISSUER_FORMS and report and r.get('dateFiled')<=report and r.get('normalizedCompany')==target]
-  if exact: matched_forms.append(form)
-  for r in exact: by[str(r.get('cik') or '').zfill(10)].append(r)
+  if exact:matched_forms.append(form)
+  for r in exact:by[str(r.get('cik') or '').zfill(10)].append(r)
  if len(by)!=1:return None,[],matched_forms
  cik=next(iter(by));rows=sorted(by[cik],key=filing_sort_key);seen=set();out=[]
  for r in rows:
@@ -137,11 +143,11 @@ def main():
      except Exception as e:
       errors+=1;rec['attempts'].append({'form':fr.get('form'),'dateFiled':fr.get('dateFiled'),'filename':fr.get('filename'),'error':type(e).__name__})
     if rec['classification']!='UNKNOWN':break
-    time.sleep(.01)
+    time.sleep(.005)
   if rec['classification']!='UNKNOWN':resolved+=1;us+=rec['classification']=='US';nonus+=rec['classification']=='NON_US'
   results.append(rec)
-  if (i+1)%50==0:print('PROGRESS',json.dumps({'shard':shard_i,'done':i+1,'resolved':resolved,'errors':errors}),flush=True)
- out={'purpose':'Return-independent PIT recovery of strict-country UNKNOWN identities using only official SEC accession index-headers pages. Classification requires historical cleaned exact issuer-form name -> exactly one CIK in pre-report-date SEC master index, then matching COMPANY DATA name+CIK+STATE OF INCORPORATION in the same historical accession header. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes are used.','shardIndex':shard_i,'shardCount':shard_n,'allInputUnknownCount':len(all_unknown),'shardInputUnknownCount':len(unknown),'historicalExactUniqueCikCount':sum(r['historicalExactCik'] is not None for r in results),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(unknown)-resolved,'transportErrorCount':errors,'masterYears':years,'masterIndexTransports':transports,'results':results}
+  if (i+1)%50==0:print('PROGRESS',json.dumps({'shard':shard_i,'done':i+1,'resolved':resolved,'errors':errors,'headerCache':len(HEADER_CACHE)}),flush=True)
+ out={'purpose':'Return-independent PIT recovery of strict-country UNKNOWN identities using only official SEC accession index-headers pages. Classification requires historical cleaned exact issuer-form name -> exactly one CIK in pre-report-date SEC master index, then matching COMPANY DATA name+CIK+STATE OF INCORPORATION in the same historical accession header. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes are used.','shardIndex':shard_i,'shardCount':shard_n,'allInputUnknownCount':len(all_unknown),'shardInputUnknownCount':len(unknown),'historicalExactUniqueCikCount':sum(r['historicalExactCik'] is not None for r in results),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(unknown)-resolved,'transportErrorCount':errors,'headerCacheCount':len(HEADER_CACHE),'masterYears':years,'masterIndexTransports':transports,'results':results}
  out_path=ROOT/f'data/research/country-index-headers-recovery-v29-shard-{shard_i}.json';out_path.parent.mkdir(parents=True,exist_ok=True);out_path.write_text(json.dumps(out,indent=2)+'\n')
  print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'results','masterIndexTransports'}}),flush=True)
 if __name__=='__main__':main()
