@@ -1,0 +1,186 @@
+name: Research Momentum v2.9 Authoritative Structural Gate B H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-authoritative-structural-gate-b-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate-b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AUTHORITATIVE_RUN_ID: "34016656323"
+      NPX_ARTIFACT_ID: "9876020712"
+      BASE_COUNTRY_ARTIFACT_ID: "9944538015"
+      STRUCT_COUNTRY_ARTIFACT_ID: "9944797581"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for authoritative holdings and download
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${AUTHORITATIVE_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${AUTHORITATIVE_RUN_ID}" --jq '.conclusion // ""')
+            echo "authoritative status=${status} conclusion=${conclusion}"
+            if [ "$status" = "completed" ]; then
+              [ "$conclusion" = "success" ] || { echo "authoritative holdings failed"; exit 1; }
+              break
+            fi
+            sleep 10
+          done
+          artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${AUTHORITATIVE_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name=="momentum-v2-9-authoritative-h1-2006-v2") | .id' | head -n1)
+          [ -n "$artifact_id" ] || { echo "authoritative artifact missing"; exit 1; }
+          mkdir -p data/research /tmp/auth
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${artifact_id}/zip" > /tmp/auth.zip
+          unzip -q /tmp/auth.zip -d /tmp/auth
+          for f in nq-pit-holdings-hybrid-h1-2006.json sec-hybrid-etf-source-catalog-h1-2006.json momentum-v2-9-authoritative-source-audit-h1-2006.json momentum-v2-9-authoritative-holdings-audit-h1-2006.json; do
+            cp "$(find /tmp/auth -type f -name "$f" | head -n1)" "data/research/$f"
+          done
+          echo "$artifact_id" > data/research/authoritative-artifact-id.txt
+      - name: Download frozen N-PX and historical country evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/npx /tmp/base /tmp/struct
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp "$(find /tmp/npx -type f -name 'npx-security-master-2006.json' | head -n1)" data/research/npx-security-master-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${BASE_COUNTRY_ARTIFACT_ID}/zip" > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp "$(find /tmp/base -type f -name 'sec-submission-header-country-full-merged-2006.json' | head -n1)" data/research/sec-submission-header-country-full-merged-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${STRUCT_COUNTRY_ARTIFACT_ID}/zip" > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp "$(find /tmp/struct -type f -name 'structural-new-matches-submission-header-country-2006.json' | head -n1)" data/research/structural-new-matches-submission-header-country-2006.json
+      - name: COMMON_EQUITY and frozen deterministic N-PX mapping
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006.py
+      - name: Conservative historical country cache
+        run: python3 scripts/research-nq-hybrid-country-cache-h1-2006.py
+      - name: Resolve mapped UNKNOWN with PIT SEC headers only
+        run: python3 scripts/research-nq-hybrid-country-resolve-h1-2006.py
+      - name: Primary Production-order Universe
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+      - name: Country upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+      - name: Final Gate B structural audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, math
+          from pathlib import Path
+          r=Path('data/research')
+          raw=json.loads((r/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          source_audit=json.loads((r/'momentum-v2-9-authoritative-source-audit-h1-2006.json').read_text())
+          parse_audit=json.loads((r/'momentum-v2-9-authoritative-holdings-audit-h1-2006.json').read_text())
+          mapping=json.loads((r/'nq-hybrid-structural-mapping-h1-2006.json').read_text())
+          country=json.loads((r/'nq-hybrid-country-resolved-h1-2006.json').read_text())
+          primary=json.loads((r/'nq-hybrid-universe-h1-2006.json').read_text())
+          upper=json.loads((r/'nq-hybrid-universe-country-upper-bound-h1-2006.json').read_text())
+          catalog=json.loads((r/'sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          artifact_id=int((r/'authoritative-artifact-id.txt').read_text().strip())
+
+          def compare(a,b):
+              ar={x['symbol']:x['universeRank'] for x in a}; br={x['symbol']:x['universeRank'] for x in b}
+              common=sorted(set(ar)&set(br)); k=min(len(a),len(b),80)
+              overlap=len(common)/k if k else 1.0
+              rho=None
+              if len(common)>=2:
+                  n=len(common); d2=sum((ar[s]-br[s])**2 for s in common); rho=1-(6*d2)/(n*(n*n-1))
+              elif len(common)==len(ar)==len(br): rho=1.0
+              top2=[x['symbol'] for x in a[:2]]
+              top2ret=sum(s in br for s in top2)/len(top2) if top2 else 1.0
+              return {'k':k,'commonCount':len(common),'overlap':overlap,'spearman':rho,'primaryTop2':top2,'top2Retention':top2ret}
+
+          rm={x['signalMonth']:x for x in raw['monthSnapshots']}; mm={x['signalMonth']:x for x in mapping['monthSnapshots']}; cm={x['signalMonth']:x for x in country['monthSnapshots']}; pm={x['signalMonth']:x for x in primary['monthSnapshots']}; um={x['signalMonth']:x for x in upper['monthSnapshots']}
+          months=[]
+          for month in sorted(pm):
+              rr=rm[month]; m=mm[month]; c=cm[month]; p=pm[month]; u=um[month]
+              mapped_total=mapped_known=0; mapped_weight=known_weight=0.0
+              for f in c['sourceFilings']:
+                  for h in f.get('holdings',[]):
+                      if h.get('mappingStatus')!='MATCHED_UNIQUE': continue
+                      mapped_total+=1; w=float(h.get('weight') or 0); mapped_weight+=w
+                      if h.get('countryClassification') in {'US','NON_US'}:
+                          mapped_known+=1; known_weight+=w
+              months.append({
+                  'signalMonth':month,
+                  'sourceSeriesCount':rr.get('catalogSourceSeriesCount',len(rr.get('sourceFilings',[]))),
+                  'commonEquityHoldingCount':m.get('commonEquityHoldingCount'),
+                  'uniqueMappedCount':m.get('uniqueMappedCount'),
+                  'uniqueMappedCountRate':(m.get('uniqueMappedCount')/m.get('commonEquityHoldingCount')) if m.get('commonEquityHoldingCount') else None,
+                  'uniqueMappedWeightRate':m.get('uniqueMappedWeightRate'),
+                  'ambiguousMappingCount':m.get('ambiguousCount'),
+                  'ambiguousMappingWeight':m.get('ambiguousWeight'),
+                  'unmappedCount':m.get('unmappedCount'),
+                  'unmappedWeight':m.get('unmappedWeight'),
+                  'mappedCountryKnownCountRate':mapped_known/mapped_total if mapped_total else None,
+                  'mappedCountryKnownWeightRate':known_weight/mapped_weight if mapped_weight else None,
+                  'eligibleSourceSeriesCount':p['eligibleSourceSeriesCount'],
+                  'primaryUniverseSize':len(p['symbols']),
+                  'countryUpperBoundUniverseSize':len(u['symbols']),
+                  'countryUpperBoundComparison':compare(p['symbols'],u['symbols']),
+              })
+
+          conflicts=[]
+          if source_audit.get('umbrellaCount') or source_audit.get('internationalGrowthCount') or source_audit.get('vanguardAliasGroupCount'): conflicts.append('SOURCE_IDENTITY_HYGIENE')
+          if catalog.get('ambiguousBridgeCount'): conflicts.append('AMBIGUOUS_HYBRID_BRIDGE')
+          if parse_audit.get('filingFetchErrorCount'): conflicts.append('HOLDINGS_FETCH_ERRORS')
+          if parse_audit.get('uniqueZeroHoldingTargetCount'): conflicts.append('ZERO_HOLDINGS_SOURCE')
+          if parse_audit.get('uniqueNoGroupedTargetCount'): conflicts.append('NO_GROUPED_SCHEDULE')
+          if parse_audit.get('ambiguousAssignedMarkerCount'): conflicts.append('AMBIGUOUS_MARKER_ASSIGNED')
+          if parse_audit.get('badFinancialTextHoldingCount'): conflicts.append('FINANCIAL_TEXT_PARSED_AS_HOLDING')
+          if any((x.get('ambiguousMappingCount') or 0)>0 for x in months): conflicts.append('AMBIGUOUS_NPX_MAPPING')
+          if any(x['eligibleSourceSeriesCount']==0 for x in months): conflicts.append('NO_ELIGIBLE_SOURCE_MONTH')
+          if any(x['primaryUniverseSize']==0 for x in months): conflicts.append('EMPTY_PRIMARY_UNIVERSE')
+
+          # Primary vs preregistered country upper-bound sensitivity is diagnostic only.
+          # These thresholds are not strategy-performance thresholds; they mirror the already-preregistered
+          # practical structural fidelity yardstick and are evaluated without returns.
+          comps=[x['countryUpperBoundComparison'] for x in months]
+          sensitivity_stable=all(c['overlap']>=0.70 and (c['spearman'] is None or c['spearman']>=0.75) and c['top2Retention']>=0.80 for c in comps)
+          if not sensitivity_stable: conflicts.append('COUNTRY_UPPER_BOUND_MATERIALLY_CHANGES_UNIVERSE')
+
+          out={
+              'purpose':'Final return-independent Gate B structural audit for the authoritative H1 2006 historical Universe reconstruction.',
+              'inputArtifacts':{'authoritativeH1ArtifactId':artifact_id,'frozenNpxMasterArtifactId':9876020712,'baselineHistoricalCountryArtifactId':9944538015,'structuralHistoricalCountryArtifactId':9944797581},
+              'sourceIdentity':source_audit,
+              'parsing':{k:parse_audit.get(k) for k in ['uniqueSourceFilingCount','filingFetchSuccessCount','filingFetchErrorCount','uniqueParsedHoldingCount','assetSectionCounts','uniqueZeroHoldingTargetCount','uniqueNoGroupedTargetCount','ambiguousAssignedMarkerCount','badFinancialTextHoldingCount']},
+              'mappingMethodCounts':mapping.get('matchMethodCounts'),
+              'country':{k:country.get(k) for k in ['unresolvedInputCount','resolvedUSCount','resolvedNonUSCount','remainingUnknownCount']},
+              'months':months,
+              'countryUpperBoundSensitivityStable':sensitivity_stable,
+              'structuralConflicts':conflicts,
+              'gateBStructuralPass':not conflicts,
+              'stage21PerformanceConsulted':False,
+              'productionModified':False,
+          }
+          (r/'momentum-v2-9-authoritative-gate-b-audit-h1-2006.json').write_text(json.dumps(out,indent=2)+'\n')
+          print('GATE_B',json.dumps({k:v for k,v in out.items() if k!='months'}))
+          for x in months: print('MONTH',json.dumps(x))
+          if conflicts: raise SystemExit('Gate B structural blockers: '+','.join(conflicts))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-authoritative-structural-gate-b-h1-2006
+          path: |
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-h1-2006.json
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/nq-hybrid-country-cache-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+            data/research/momentum-v2-9-authoritative-gate-b-audit-h1-2006.json
+          if-no-files-found: warn
