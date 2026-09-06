@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -21,15 +22,52 @@ hybrid = final_v3.hybrid
 parser = final_v3.parser
 grouping = load("grouping_v29_v3_for_holdings", ROOT / "scripts/research-nq-hybrid-grouping-v29-v3.py")
 
+BARE_MONTH_RE = re.compile(r"^(?:JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)$", re.I)
+REPORT_LABEL_RE = re.compile(
+    r"(?:DATE OF REPORTING PERIOD|SIX MONTHS ENDED|SPECIAL MEETING OF SHAREHOLDERS|"
+    r"SHAREHOLDER EXPENSES|ACCOUNT VALUE|EXPENSE RATIO|EXPENSES PAID|TABLE OF CONTENTS)",
+    re.I,
+)
+
+
+def html_first_clean_v4(combined: str) -> tuple[str, list[dict], float]:
+    """Preserve valid HTML rows, but reject deterministic report/temporal labels.
+
+    The filter is based only on filing structure and text type. If no valid HTML
+    security rows remain, the already-validated fixed-width parser is used.
+    """
+    trimmed = parser.corrected.trim_series_schedule(combined)
+    html_rows = parser.base.parse_bound_html_holdings(trimmed)
+    if html_rows:
+        out = []
+        seen = set()
+        for holding in html_rows:
+            desc = " ".join(str(holding.get("description") or "").split())
+            value = max(0.0, float(holding.get("marketValue") or 0.0))
+            quantity = holding.get("quantityOrPrincipal")
+            if not desc or value <= 0:
+                continue
+            if parser.BAD_TEXT_RE.search(desc) or BARE_MONTH_RE.fullmatch(desc) or REPORT_LABEL_RE.search(desc):
+                continue
+            if parser.is_nonsecurity_text(desc):
+                continue
+            key = (desc, quantity, value)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"description": desc, "marketValue": value, "quantityOrPrincipal": quantity})
+        out = parser.drop_page_split_suffix_duplicates(out)
+        if out:
+            total = sum(row["marketValue"] for row in out)
+            for row in out:
+                row["weight"] = 100.0 * row["marketValue"] / total
+            out.sort(key=lambda row: row["weight"], reverse=True)
+            return "schedule_bound_html_preserved_v4", out, total
+    return parser.parsed_holdings(combined)
+
 
 def annotate_sections_fast_exact(holdings: list[dict], combined: str) -> tuple[list[dict], dict, dict]:
-    """Logic-equivalent asset-section attribution with first-position caching.
-
-    The prior implementation enumerated every occurrence of every issuer alias even
-    though only the earliest occurrence was retained. str.find(alias) returns that
-    same earliest position. Caching by exact alias changes computation only, not
-    matching semantics, section rules, source text, or eligibility.
-    """
+    """Logic-equivalent asset-section attribution with first-position caching."""
     vis = hybrid.seg.visible(combined)
     nv = hybrid.ec.ntext(vis)
     positions = []
@@ -56,7 +94,6 @@ def annotate_sections_fast_exact(holdings: list[dict], combined: str) -> tuple[l
 
         section = "UNKNOWN"
         if best_pos is not None:
-            # positions are sorted; retain the same nearest-prior-section rule.
             prior_section = None
             for p, s in positions:
                 if p >= best_pos:
@@ -75,6 +112,7 @@ def annotate_sections_fast_exact(holdings: list[dict], combined: str) -> tuple[l
     return out, dict(counts), dict(weights)
 
 
+hybrid.corrected.parsed_holdings = html_first_clean_v4
 hybrid.annotate_sections = annotate_sections_fast_exact
 hybrid.legacy_grouped_schedule_blocks = grouping.legacy_grouped_schedule_blocks
 hybrid.seg.grouped_schedule_blocks = grouping.series_grouped_schedule_blocks
