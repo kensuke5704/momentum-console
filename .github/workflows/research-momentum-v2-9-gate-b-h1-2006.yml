@@ -1,0 +1,230 @@
+name: Research Momentum v2.9 Gate B H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-gate-b-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate-b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_ARTIFACT_ID: "9982024795"
+      NPX_ARTIFACT_ID: "9876020712"
+      BASE_COUNTRY_ARTIFACT_ID: "9944538015"
+      STRUCT_COUNTRY_ARTIFACT_ID: "9944797581"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frozen structural inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/holdings /tmp/npx /tmp/base-country /tmp/struct-country
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" > /tmp/holdings.zip
+          unzip -q /tmp/holdings.zip -d /tmp/holdings
+          cp /tmp/holdings/nq-pit-holdings-hybrid-h1-2006.json data/research/
+          cp /tmp/holdings/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp "$(find /tmp/npx -type f -name 'npx-security-master-2006.json' | head -n1)" data/research/npx-security-master-2006.json
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${BASE_COUNTRY_ARTIFACT_ID}/zip" > /tmp/base-country.zip
+          unzip -q /tmp/base-country.zip -d /tmp/base-country
+          cp "$(find /tmp/base-country -type f -name 'sec-submission-header-country-full-merged-2006.json' | head -n1)" data/research/sec-submission-header-country-full-merged-2006.json
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${STRUCT_COUNTRY_ARTIFACT_ID}/zip" > /tmp/struct-country.zip
+          unzip -q /tmp/struct-country.zip -d /tmp/struct-country
+          cp "$(find /tmp/struct-country -type f -name 'structural-new-matches-submission-header-country-2006.json' | head -n1)" data/research/structural-new-matches-submission-header-country-2006.json
+
+      - name: Syntax-check accepted structural chain
+        run: |
+          python3 -m py_compile \
+            scripts/research-nq-hybrid-structural-mapping-h1-2006.py \
+            scripts/research-nq-catalog-structural-mapping-h1-2006.py \
+            scripts/research-nq-hybrid-country-cache-h1-2006.py \
+            scripts/research-nq-hybrid-country-resolve-h1-2006.py \
+            scripts/research-nq-hybrid-universe-h1-2006.py
+
+      - name: Apply COMMON_EQUITY and frozen deterministic N-PX mapping
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006.py
+
+      - name: Apply conservative historical country cache
+        run: python3 scripts/research-nq-hybrid-country-cache-h1-2006.py
+
+      - name: Resolve only remaining UNKNOWN country identities using PIT SEC headers
+        run: python3 scripts/research-nq-hybrid-country-resolve-h1-2006.py
+
+      - name: Apply source eligibility, aggregate securities and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+
+      - name: Structural Gate B audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, re
+          from collections import defaultdict
+          from pathlib import Path
+
+          root=Path('data/research')
+          catalog=json.loads((root/'sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          raw=json.loads((root/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          mapping=json.loads((root/'nq-hybrid-structural-mapping-h1-2006.json').read_text())
+          country=json.loads((root/'nq-hybrid-country-resolved-h1-2006.json').read_text())
+          universe=json.loads((root/'nq-hybrid-universe-h1-2006.json').read_text())
+
+          def strip_vanguard(value):
+              return re.sub(r'^VANGUARD\s+', '', (value or '').upper().strip())
+
+          international_growth=[]
+          vanguard_alias_dups=[]
+          for snap in catalog['monthSnapshots']:
+              groups=defaultdict(list)
+              for source in snap['sourceFilings']:
+                  text=' '.join(str(source.get(k) or '') for k in ('seriesName','normalizedSeriesName','registrant'))
+                  if 'INTERNATIONAL GROWTH' in text.upper():
+                      international_growth.append({'signalMonth':snap['signalMonth'],'source':source})
+                  if 'VANGUARD' in (source.get('registrant') or '').upper() or (source.get('normalizedSeriesName') or '').upper().startswith('VANGUARD '):
+                      key=(source.get('cik'), strip_vanguard(source.get('normalizedSeriesName')))
+                      groups[key].append(source)
+              for key, rows in groups.items():
+                  ids={row.get('canonicalIdentity') for row in rows}
+                  if len(ids)>1:
+                      vanguard_alias_dups.append({'signalMonth':snap['signalMonth'],'key':key,'identities':sorted(ids)})
+
+          ambiguous_assigned=[]
+          for filing in raw.get('filingAudit',[]):
+              for entry in filing.get('legacyAssignmentAudit') or []:
+                  if entry.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and entry.get('assignedIdentity'):
+                      ambiguous_assigned.append({'accession':filing.get('accession'),'entry':entry})
+
+          missing_parsed=[]
+          for snap in raw['monthSnapshots']:
+              for identity in snap.get('missingParsedSeries') or []:
+                  missing_parsed.append({'signalMonth':snap['signalMonth'],'identity':identity})
+
+          mapping_months=[]
+          for snap in mapping['monthSnapshots']:
+              mapping_months.append({
+                  'signalMonth':snap['signalMonth'],
+                  'sourceSeriesCount':snap['sourceSeriesCount'],
+                  'commonEquityHoldingCount':snap['commonEquityHoldingCount'],
+                  'uniqueMappedCount':snap['uniqueMappedCount'],
+                  'uniqueMappedCountRate':snap['uniqueMappedCountRate'],
+                  'uniqueMappedWeightRate':snap['uniqueMappedWeightRate'],
+                  'ambiguousCount':snap['ambiguousCount'],
+                  'ambiguousWeight':snap['ambiguousWeight'],
+                  'unmappedCount':snap['unmappedCount'],
+                  'unmappedWeight':snap['unmappedWeight'],
+              })
+
+          country_months=[]
+          for snap in country['monthSnapshots']:
+              country_months.append({
+                  'signalMonth':snap['signalMonth'],
+                  'counts':snap['countryClassificationCounts'],
+                  'weights':snap['countryClassificationWeights'],
+              })
+
+          universe_months=[]
+          for snap in universe['monthSnapshots']:
+              universe_months.append({
+                  'signalMonth':snap['signalMonth'],
+                  'sourceSeriesCount':snap['sourceSeriesCount'],
+                  'eligibleSourceSeriesCount':snap['eligibleSourceSeriesCount'],
+                  'universeSize':len(snap['symbols']),
+              })
+
+          hard_failures=[]
+          if catalog.get('ambiguousBridgeCount') != 0:
+              hard_failures.append('AMBIGUOUS_HYBRID_BRIDGE')
+          if international_growth:
+              hard_failures.append('VANGUARD_INTERNATIONAL_GROWTH_FALSE_IDENTITY_PRESENT')
+          if vanguard_alias_dups:
+              hard_failures.append('VANGUARD_ALIAS_DUPLICATION_PRESENT')
+          if raw.get('filingFetchErrorCount') != 0 or raw.get('filingFetchSuccessCount') != raw.get('uniqueSourceFilingCount'):
+              hard_failures.append('SOURCE_FILING_FETCH_INCOMPLETE')
+          if ambiguous_assigned:
+              hard_failures.append('AMBIGUOUS_LEGACY_MARKER_ASSIGNED')
+          if missing_parsed:
+              hard_failures.append('MISSING_PARSED_SERIES_REPORTED')
+          if any(row['ambiguousCount'] for row in mapping_months):
+              hard_failures.append('AMBIGUOUS_SECURITY_MAPPING')
+          if any(row['eligibleSourceSeriesCount'] <= 0 for row in universe_months):
+              hard_failures.append('NO_ELIGIBLE_SOURCE_SERIES')
+          if any(row['universeSize'] <= 0 for row in universe_months):
+              hard_failures.append('EMPTY_RECONSTRUCTED_UNIVERSE')
+
+          audit={
+              'purpose':'Return-independent structural Gate B audit for momentum_v2_9 H1 2006. No ranks, returns, CAGR, drawdown, or strategy outcomes are used to decide structural validity.',
+              'inputArtifacts':{
+                  'hybridHoldingsArtifactId':9982024795,
+                  'frozenNpxMasterArtifactId':9876020712,
+                  'baselineHistoricalCountryArtifactId':9944538015,
+                  'structuralHistoricalCountryArtifactId':9944797581,
+              },
+              'hybrid':{
+                  'legacyPositiveIdentityCount':catalog.get('legacyPositiveIdentityCount'),
+                  'postIdPositiveSeriesCount':catalog.get('postIdPositiveSeriesCount'),
+                  'exactUniqueBridgeCount':catalog.get('exactUniqueBridgeCount'),
+                  'ambiguousBridgeCount':catalog.get('ambiguousBridgeCount'),
+                  'internationalGrowthFalseIdentityCount':len(international_growth),
+                  'vanguardAliasDuplicateCount':len(vanguard_alias_dups),
+              },
+              'parsing':{
+                  'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),
+                  'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),
+                  'filingFetchErrorCount':raw.get('filingFetchErrorCount'),
+                  'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),
+                  'assetSectionCounts':raw.get('legacyAssetSectionCounts'),
+                  'ambiguousAssignedMarkerCount':len(ambiguous_assigned),
+                  'missingParsedSeriesCount':len(missing_parsed),
+                  'zeroHoldingTargetCount':sum(int(x.get('zeroHoldingTargetCount') or 0) for x in raw.get('filingAudit',[])),
+                  'noGroupedScheduleTargetCount':sum(int(x.get('noGroupedScheduleTargetCount') or 0) for x in raw.get('filingAudit',[])),
+              },
+              'mapping':{
+                  'matchMethodCounts':mapping.get('matchMethodCounts'),
+                  'months':mapping_months,
+              },
+              'country':{
+                  'unresolvedInputCount':country.get('unresolvedInputCount'),
+                  'resolvedUSCount':country.get('resolvedUSCount'),
+                  'resolvedNonUSCount':country.get('resolvedNonUSCount'),
+                  'remainingUnknownCount':country.get('remainingUnknownCount'),
+                  'months':country_months,
+              },
+              'universe':{'months':universe_months},
+              'hardFailures':hard_failures,
+              'gateBStructuralPass':not hard_failures,
+              'uncertaintyPolicy':'UNMAPPED, country UNKNOWN, non-US, non-COMMON_EQUITY, parser artifacts, and ineligible source series are excluded rather than inferred or outcome-tuned.',
+          }
+          (root/'momentum-v2-9-gate-b-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('GATE_B_AUDIT',json.dumps(audit))
+          if hard_failures:
+              raise SystemExit('Gate B structural hard failures: '+', '.join(hard_failures))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-gate-b-h1-2006
+          path: |
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/nq-hybrid-country-cache-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/momentum-v2-9-gate-b-audit-h1-2006.json
+          if-no-files-found: warn
