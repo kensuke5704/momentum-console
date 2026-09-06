@@ -1,0 +1,65 @@
+name: Research Momentum v2.9 Gate B Recovered Country H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - '.github/workflows/research-momentum-v2-9-gate-b-recovered-country-h1-2006.yml'
+      - 'scripts/research-country-recovery-merge-v29.py'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: research-momentum-v2-9-gate-b-recovered-country-h1-2006
+  cancel-in-progress: true
+jobs:
+  recovered-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRIOR_GATE_ARTIFACT_ID: '9987700449'
+      RECOVERY_ARTIFACT_ID: '9999422941'
+      HOLDINGS_ARTIFACT_ID: '9986815485'
+      MAPPING_ARTIFACT_ID: '9987093683'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen Gate inputs and recovery evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/g /tmp/r /tmp/h /tmp/m
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${PRIOR_GATE_ARTIFACT_ID}/zip" >/tmp/g.zip
+          unzip -q /tmp/g.zip -d /tmp/g
+          cp "$(find /tmp/g -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${RECOVERY_ARTIFACT_ID}/zip" >/tmp/r.zip
+          unzip -q /tmp/r.zip -d /tmp/r
+          cp "$(find /tmp/r -name 'country-master-once-recovery-v29.json' | head -n1)" data/research/country-master-once-recovery-v29.json
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" >/tmp/h.zip
+          unzip -q /tmp/h.zip -d /tmp/h
+          cp "$(find /tmp/h -name 'momentum-v2-9-authoritative-source-audit-v6-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+          cp "$(find /tmp/h -name 'momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+          printf '%s\n' "$HOLDINGS_ARTIFACT_ID" > data/research/authoritative-holdings-v8-artifact-id.txt
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${MAPPING_ARTIFACT_ID}/zip" >/tmp/m.zip
+          unzip -q /tmp/m.zip -d /tmp/m
+          cp "$(find /tmp/m -name 'nq-hybrid-structural-mapping-h1-2006.json' | head -n1)" data/research/nq-hybrid-structural-mapping-h1-2006.json
+      - name: Merge uniform PIT recovery into original strict UNKNOWN only
+        run: python3 scripts/research-country-recovery-merge-v29.py
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+      - name: Final Gate B v13 semantics unchanged
+        run: python3 scripts/research-momentum-v2-9-gate-b-v13-finalize.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-gate-b-recovered-country-h1-2006
+          path: |
+            data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+            data/research/country-master-once-recovery-v29.json
+          if-no-files-found: warn
