@@ -1,0 +1,100 @@
+name: Research Momentum v2.9 Authoritative Holdings Final v3 H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-authoritative-holdings-final-v3-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  holdings-final-v3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN_ID: "34022236877"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for authoritative source v3 and download
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${SOURCE_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${SOURCE_RUN_ID}" --jq '.conclusion // ""')
+            echo "source status=${status} conclusion=${conclusion}"
+            if [ "$status" = completed ]; then
+              [ "$conclusion" = success ] || { echo "authoritative source v3 failed"; exit 1; }
+              break
+            fi
+            sleep 5
+          done
+          artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${SOURCE_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name=="momentum-v2-9-authoritative-source-final-v3-h1-2006") | .id' | head -n1)
+          [ -n "$artifact_id" ] || { echo "source v3 artifact missing"; exit 1; }
+          mkdir -p data/research /tmp/src
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${artifact_id}/zip" > /tmp/src.zip
+          unzip -q /tmp/src.zip -d /tmp/src
+          cp "$(find /tmp/src -name 'sec-hybrid-etf-source-catalog-h1-2006.json' | head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          cp "$(find /tmp/src -name 'momentum-v2-9-authoritative-source-audit-v3-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-source-audit-v3-h1-2006.json
+          echo "$artifact_id" > data/research/authoritative-source-v3-artifact-id.txt
+
+      - name: Parse authoritative holdings v3
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          SOURCE_CATALOG_RUN_ID: ${{ env.SOURCE_RUN_ID }}
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006-v29final-parallel-v3.py
+
+      - name: Final holdings structural audit v3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re
+          from collections import Counter
+          from pathlib import Path
+          r=Path('data/research');raw=json.loads((r/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          zero={};ng={};bad=[];summary_agg=[];methods=Counter();months=[];amb=[]
+          bad_re=re.compile(r'RESPECTIVELY|CAPITAL SHARE TRANSACTIONS|NET INCREASE|BEGINNING OF PERIOD|END OF PERIOD|TAX COST|UNREALIZED|NET REALIZED AND UNREALIZED|NET CHANGE IN UNREALIZED',re.I)
+          for snap in raw['monthSnapshots']:
+            stat=Counter(x.get('parseStatus') for x in snap['sourceFilings']);common=0;common_sources=0
+            for f in snap['sourceFilings']:
+              if f.get('parseMethod'): methods[f['parseMethod']]+=1
+              if f.get('parseStatus')=='PARSED_ZERO_HOLDINGS': zero[f.get('canonicalIdentity')]=f
+              if f.get('parseStatus')=='NO_GROUPED_SCHEDULE': ng[f.get('canonicalIdentity')]=f
+              c=sum(h.get('legacyAssetSection')=='COMMON_EQUITY' for h in f.get('holdings',[]));common+=c;common_sources+=bool(c)
+              for h in f.get('holdings',[]):
+                desc=str(h.get('description') or '')
+                if bad_re.search(desc): bad.append({'identity':f.get('canonicalIdentity'),'description':desc})
+                if re.match(r'^\s*(?:OTHER|OTHER\s+SECURITIES)\b',desc,re.I): summary_agg.append({'identity':f.get('canonicalIdentity'),'description':desc})
+            months.append({'signalMonth':snap['signalMonth'],'sourceSeriesCount':len(snap['sourceFilings']),'parseStatusCounts':dict(stat),'commonEquityHoldingCount':common,'commonEquitySourceCount':common_sources})
+          for filing in raw.get('filingAudit',[]):
+            for e in filing.get('legacyAssignmentAudit') or []:
+              if e.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and e.get('assignedIdentity'): amb.append({'accession':filing.get('accession'),'entry':e})
+            for e in filing.get('seriesIdAssignmentAudit') or []:
+              if 'AMBIG' in str(e.get('assignmentRule') or '').upper() and e.get('seriesId'): amb.append({'accession':filing.get('accession'),'entry':e})
+          audit={'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),'filingFetchErrorCount':raw.get('filingFetchErrorCount'),'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),'assetSectionCounts':raw.get('legacyAssetSectionCounts'),'parseMethodCountsAcrossSnapshots':dict(methods),'uniqueZeroHoldingTargetCount':len(zero),'uniqueNoGroupedTargetCount':len(ng),'ambiguousAssignedMarkerCount':len(amb),'badFinancialTextHoldingCount':len(bad),'summaryAggregateHoldingCount':len(summary_agg),'zeroTargets':[{'canonicalIdentity':x.get('canonicalIdentity'),'seriesName':x.get('seriesName'),'sourceFilename':x.get('sourceFilename')} for x in zero.values()],'noGroupedTargets':[{'canonicalIdentity':x.get('canonicalIdentity'),'seriesName':x.get('seriesName'),'sourceFilename':x.get('sourceFilename')} for x in ng.values()],'badExamples':bad[:20],'summaryAggregateExamples':summary_agg[:20],'months':months}
+          (r/'momentum-v2-9-authoritative-holdings-audit-v3-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('HOLDINGS_AUDIT_V3',json.dumps({k:v for k,v in audit.items() if k not in {'zeroTargets','noGroupedTargets','badExamples','summaryAggregateExamples','months'}}),flush=True)
+          for m in months: print('MONTH',json.dumps(m),flush=True)
+          for x in audit['zeroTargets']: print('ZERO',json.dumps(x),flush=True)
+          for x in audit['noGroupedTargets']: print('NO_GROUPED',json.dumps(x),flush=True)
+          assert raw.get('filingFetchErrorCount')==0
+          assert not zero and not ng and not amb and not bad and not summary_agg
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-authoritative-holdings-final-v3-h1-2006
+          path: |
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-v3-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-v3-h1-2006.json
+            data/research/authoritative-source-v3-artifact-id.txt
+          if-no-files-found: warn
