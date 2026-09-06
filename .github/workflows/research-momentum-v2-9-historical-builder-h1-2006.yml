@@ -39,7 +39,6 @@ jobs:
           for f in momentum-v2-9-final-gate-b-v10-h1-2006.json nq-hybrid-country-resolved-h1-2006.json nq-hybrid-universe-h1-2006.json; do
             cp "$(find /tmp/g -name "$f"|head -n1)" "data/research/$f"
           done
-          cp data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json data/research/momentum-v2-9-final-gate-b-v7-h1-2006.json
           echo "$artifact_id" > data/research/gate-b-v12-artifact-id.txt
       - name: Build research-only Production-compatible H1 2006 history
         run: python3 scripts/research-build-universe-history-h1-2006-v29.py
@@ -59,10 +58,9 @@ jobs:
           assert all(set(m)==required for m in x['history'])
           assert all(all({'symbol','universeRank','etfCount','aggregateWeight','maxWeight','recencyWeight','universeScore'}==set(s) for s in m['symbols']) for m in x['history'])
           assert all(all({'accession','seriesId','seriesName','filingDate'}==set(s) for s in m['sourceFilings']) for m in x['history'])
-          assert not Path('data/universe-history.json').exists()
-          assert not Path('public/data/universe-history.json').exists()
           print('HISTORICAL_BUILDER_SMOKE_PASS', [len(m['symbols']) for m in x['history']])
           PY
+          git diff --exit-code -- data/universe-history.json public/data/universe-history.json public/data/universe-current.json data/nport-operations.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
