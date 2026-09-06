@@ -6,6 +6,8 @@ on:
     branches: ["research/momentum-v2-9-preid-fix-20260906"]
     paths:
       - ".github/workflows/research-momentum-v2-9-fixed-width-parser-test.yml"
+      - "scripts/research-nq-schedule-bound-parser-v29-v2.py"
+      - "scripts/research-nq-hybrid-grouping-v29.py"
 
 permissions:
   contents: read
@@ -21,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import importlib.util, json
+          import importlib.util, json, re
           from pathlib import Path
           root=Path('.')
           def load(name,path):
@@ -43,6 +45,7 @@ jobs:
             {'label':'ISHARES_R1000_VALUE','filename':'edgar/data/1100663/0001193125-05-176111.txt','form':'N-Q','company':'ISHARES TRUST','regime':'LEGACY','identity':'S000004345','normalized':'ISHARES RUSSELL 1000 VALUE INDEX FUND','min':20},
             {'label':'ISHARES_UMBRELLA_FALSE','filename':'edgar/data/930667/0001193125-06-014026.txt','form':'N-Q','company':'ISHARES INC','regime':'LEGACY','identity':'UMBRELLA','normalized':'ISHARES MSCI INDEX FUND','expect_no_grouped':True},
           ]
+          bad_re=re.compile(r'RESPECTIVELY|CAPITAL SHARE TRANSACTIONS|NET INCREASE|BEGINNING OF PERIOD|END OF PERIOD|TAX COST|UNREALIZED',re.I)
           results=[]
           for target in targets:
               submission,transport,_=hybrid.fetch_submission(target['filename'])
@@ -55,7 +58,8 @@ jobs:
                   grouped,audit=grouping.legacy_grouped_schedule_blocks(text,{target['identity']:{'normalizedSeriesName':target['normalized']}})
                   blocks=grouped.get(target['identity'],[])
               method,holdings,total=parser.parsed_holdings('\n'.join(blocks))
-              row={'label':target['label'],'blocks':len(blocks),'method':method,'holdings':len(holdings),'total':total,'sample':[h['description'] for h in holdings[:5]],'weightSum':sum(float(h.get('weight') or 0) for h in holdings)}
+              bad=[h['description'] for h in holdings if bad_re.search(h['description'])]
+              row={'label':target['label'],'blocks':len(blocks),'method':method,'holdings':len(holdings),'total':total,'sample':[h['description'] for h in holdings[:8]],'badDescriptions':bad[:8],'weightSum':sum(float(h.get('weight') or 0) for h in holdings)}
               print('RESULT',json.dumps(row),flush=True)
               results.append(row)
               if target.get('expect_no_grouped'):
@@ -66,6 +70,8 @@ jobs:
                   raise SystemExit(f"{target['label']}: no genuine schedule block")
               if len(holdings)<target['min']:
                   raise SystemExit(f"{target['label']}: parser below structural minimum {len(holdings)}")
+              if bad:
+                  raise SystemExit(f"{target['label']}: post-schedule financial/footnote text parsed as holdings: {bad[:3]}")
               if not (99.999 <= row['weightSum'] <= 100.001):
                   raise SystemExit(f"{target['label']}: weights do not normalize to 100")
           print('SUMMARY',json.dumps(results),flush=True)
