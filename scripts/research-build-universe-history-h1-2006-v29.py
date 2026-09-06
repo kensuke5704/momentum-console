@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 R = ROOT / "data/research"
-GATE = R / "momentum-v2-9-final-gate-b-v10-h1-2006.json"
+GATE = R / "momentum-v2-9-final-gate-b-v13-h1-2006.json"
 UNIVERSE = R / "nq-hybrid-universe-h1-2006.json"
 COUNTRY = R / "nq-hybrid-country-resolved-h1-2006.json"
 OUT = R / "universe-history-h1-2006-v29.json"
@@ -49,7 +49,9 @@ def filing_series_id(row: dict) -> str:
 def main() -> None:
     gate = json.loads(GATE.read_text())
     if gate.get("gateBPass") is not True or gate.get("universeReconstructionConfirmed") is not True:
-        raise SystemExit("Gate B is not PASS; historical builder is intentionally blocked")
+        raise SystemExit("Final Gate B v13 is not PASS; historical builder is intentionally blocked")
+    if gate.get("historicalCorpBridgePass") is not True:
+        raise SystemExit("Final Gate B v13 CORP semantic bridge is not PASS")
     if gate.get("stage21PerformanceConsulted") is not False or gate.get("productionModified") is not False:
         raise SystemExit("Gate B provenance invariant failed")
 
@@ -106,7 +108,7 @@ def main() -> None:
         previous_symbols = current_symbols
 
     output = {
-        "purpose": "Research-only Production-compatible UniverseMonth history smoke test after corrected Gate B PASS. No Production data file is written and no Stage21 performance is executed.",
+        "purpose": "Research-only Production-compatible UniverseMonth history smoke test after final Gate B v13 PASS. No Production data file is written and no Stage21 performance is executed.",
         "gateDecisionFile": str(GATE.relative_to(ROOT)),
         "inputUniverseFile": str(UNIVERSE.relative_to(ROOT)),
         "inputCountryFile": str(COUNTRY.relative_to(ROOT)),
