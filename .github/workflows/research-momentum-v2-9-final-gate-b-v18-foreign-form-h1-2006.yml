@@ -1,4 +1,4 @@
-name: Research Momentum v2.9 Final Gate B v19 Cover-State H1 2006
+name: Research Momentum v2.9 Final Gate B v20 24M-Lookback H1 2006
 on:
   workflow_dispatch:
   push:
@@ -14,12 +14,12 @@ jobs:
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      BASE_COUNTRY_ARTIFACT_ID: '9998542676'
+      BASE_COUNTRY_ARTIFACT_ID: '9998634891'
       HOLDINGS_ARTIFACT_ID: '9986815485'
       MAPPING_ARTIFACT_ID: '9987093683'
     steps:
       - uses: actions/checkout@v4
-      - name: Download exact v18 country, audits, mapping and cover-state shards
+      - name: Download exact v19 country, audits, mapping and 24m-lookback shards
         shell: bash
         run: |
           set -euo pipefail
@@ -36,15 +36,15 @@ jobs:
           gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${MAPPING_ARTIFACT_ID}/zip" >/tmp/m.zip
           unzip -q /tmp/m.zip -d /tmp/m
           cp "$(find /tmp/m -name 'nq-hybrid-structural-mapping-h1-2006.json' | head -n1)" data/research/nq-hybrid-structural-mapping-h1-2006.json
-          ids=(9998568434 9998567706 9998568075 9998568124 9998568141 9998568964 9998567785 9998567930)
+          ids=(9998803898 9998751213 9998781717 9998791507 9998794302 9998790768 9998791687 9998782026)
           for i in ${!ids[@]}; do
             mkdir -p "/tmp/s/$i"
             gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ids[$i]}/zip" >"/tmp/s/$i.zip"
             unzip -q "/tmp/s/$i.zip" -d "/tmp/s/$i"
-            cp "$(find "/tmp/s/$i" -name 'country-cover-state-recovery-v29-shard-*.json' | head -n1)" data/research/
+            cp "$(find "/tmp/s/$i" -name 'country-24m-lookback-recovery-v29-shard-*.json' | head -n1)" data/research/
           done
-      - name: Apply PIT filing-cover US state evidence
-        run: python3 scripts/research-country-apply-cover-state-recovery-v29.py
+      - name: Apply fixed 24-month PIT country evidence
+        run: python3 scripts/research-country-apply-24m-lookback-recovery-v29.py
       - name: Production-order source eligibility and Top80
         run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
       - name: Country UNKNOWN upper-bound sensitivity only
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: momentum-v2-9-final-gate-b-v19-cover-state-h1-2006
+          name: momentum-v2-9-final-gate-b-v20-24m-lookback-h1-2006
           path: |
             data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
             data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
