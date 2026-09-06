@@ -1,169 +1,98 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import glob
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-COUNTRY = ROOT / "data/research/nq-hybrid-country-resolved-h1-2006.json"
-RECOVERY_GLOB = str(ROOT / "data/research/country-recovery/country-filing-index-recovery-v29-shard-*.json")
+R = ROOT / "data/research"
+COUNTRY = R / "nq-hybrid-country-resolved-h1-2006.json"
+RECOVERY = R / "country-master-once-recovery-v29.json"
 OUT = COUNTRY
+ALLOWED_SOURCES = {"PIT_FOREIGN_PRIVATE_ISSUER_FORM", "PIT_FILING_DETAIL_ENTITY_STATE"}
+FOREIGN_FORMS = {"6-K", "6-K/A", "20-F", "20-F/A", "40-F", "40-F/A"}
 
 
-def key_from_audit(row: dict):
-    return ((row.get("ticker") or "").strip().upper(), row.get("securityId") or None, row.get("asOfReportDate") or None)
-
-
-def key_from_holding(row: dict, report_date: str | None):
-    return ((row.get("mappedTicker") or "").strip().upper(), row.get("mappedSecurityId") or None, report_date)
+def key(ticker, security_id, report_date):
+    return ((ticker or "").strip().upper(), security_id or None, report_date or None)
 
 
 def main() -> None:
     data = json.loads(COUNTRY.read_text())
-    files = sorted(glob.glob(RECOVERY_GLOB))
-    if len(files) != 8:
-        raise RuntimeError(f"Expected exactly 8 recovery shard files, found {len(files)}")
-
-    original_audit = data.get("resolutionAudit", [])
-    original_unknown = {key_from_audit(r) for r in original_audit if r.get("classification") == "UNKNOWN"}
-    original_non_unknown = {key_from_audit(r): r.get("classification") for r in original_audit if r.get("classification") in {"US", "NON_US"}}
-
+    recovery = json.loads(RECOVERY.read_text())
+    original = {key(r.get("ticker"), r.get("securityId"), r.get("asOfReportDate")): r for r in data.get("resolutionAudit", [])}
     promoted = {}
-    shard_audit = []
-    seen_recovery_keys = set()
-    for path in files:
-        shard = json.loads(Path(path).read_text())
-        shard_audit.append({
-            "path": Path(path).name,
-            "shardIndex": shard.get("shardIndex"),
-            "shardInputUnknownCount": shard.get("shardInputUnknownCount"),
-            "resolvedUSCount": shard.get("resolvedUSCount", 0),
-            "resolvedNonUSCount": shard.get("resolvedNonUSCount", 0),
-            "remainingUnknownCount": shard.get("remainingUnknownCount", 0),
-            "fetchErrorCount": shard.get("fetchErrorCount", 0),
-        })
-        for row in shard.get("results", []):
-            k = key_from_audit(row)
-            if k in seen_recovery_keys:
-                raise RuntimeError(f"Duplicate recovery key across shards: {k}")
-            seen_recovery_keys.add(k)
-            if k not in original_unknown:
-                raise RuntimeError(f"Recovery key was not an original UNKNOWN: {k}")
-            cls = row.get("classification")
-            if cls in {"US", "NON_US"}:
-                promoted[k] = row
+    for row in recovery.get("results", []):
+        cls = row.get("classification")
+        if cls not in {"US", "NON_US"}:
+            continue
+        source = row.get("resolutionSource")
+        if source not in ALLOWED_SOURCES:
+            raise RuntimeError(f"unapproved recovery source: {source}")
+        if source == "PIT_FOREIGN_PRIVATE_ISSUER_FORM" and (cls != "NON_US" or row.get("evidenceForm") not in FOREIGN_FORMS):
+            raise RuntimeError(f"invalid foreign-form recovery: {row}")
+        if row.get("evidenceDateFiled") and row.get("asOfReportDate") and row["evidenceDateFiled"] > row["asOfReportDate"]:
+            raise RuntimeError(f"future recovery evidence: {row}")
+        k = key(row.get("ticker"), row.get("securityId"), row.get("asOfReportDate"))
+        if k not in original or original[k].get("classification") != "UNKNOWN":
+            raise RuntimeError(f"recovery may promote original UNKNOWN only: {k}")
+        if k in promoted and promoted[k].get("classification") != cls:
+            raise RuntimeError(f"conflicting recovery evidence: {k}")
+        promoted[k] = row
 
-    if len(seen_recovery_keys) != len(original_unknown):
-        missing = sorted(original_unknown - seen_recovery_keys)[:10]
-        extra = sorted(seen_recovery_keys - original_unknown)[:10]
-        raise RuntimeError(
-            f"Recovery exact-key coverage mismatch: originalUnknown={len(original_unknown)} "
-            f"recoveryKeys={len(seen_recovery_keys)} missing={missing} extra={extra}"
-        )
-
-    # Promote only original UNKNOWN resolution-audit rows. Existing US/NON_US evidence is immutable.
     updated_audit = []
-    for row in original_audit:
-        k = key_from_audit(row)
-        if k in promoted:
-            p = promoted[k]
-            if row.get("classification") != "UNKNOWN":
-                raise RuntimeError(f"Attempt to overwrite non-UNKNOWN audit row: {k}")
-            nr = dict(row)
-            nr.update({
-                "classification": p["classification"],
-                "stateCode": p.get("stateCode"),
-                "resolutionSource": p.get("resolutionSource"),
-                "historicalEntityName": p.get("historicalEntityName"),
-                "evidenceForm": p.get("evidenceForm"),
-                "evidenceDateFiled": p.get("evidenceDateFiled"),
-                "evidenceIndexUrl": p.get("evidenceIndexUrl"),
-                "evidenceTransport": p.get("evidenceTransport"),
-                "recoveryEvidence": p,
-            })
-            updated_audit.append(nr)
-        else:
+    for row in data.get("resolutionAudit", []):
+        k = key(row.get("ticker"), row.get("securityId"), row.get("asOfReportDate"))
+        evidence = promoted.get(k)
+        if not evidence:
             updated_audit.append(row)
+            continue
+        nr = dict(row)
+        nr.update({
+            "classification": evidence["classification"],
+            "stateCode": evidence.get("stateCode"),
+            "resolutionSource": evidence.get("resolutionSource"),
+            "evidenceForm": evidence.get("evidenceForm"),
+            "evidenceDateFiled": evidence.get("evidenceDateFiled"),
+            "evidenceFilename": evidence.get("evidenceFilename"),
+            "recoveryEvidence": evidence,
+        })
+        updated_audit.append(nr)
 
-    snapshots = []
-    promoted_holding_count = 0
-    promoted_holding_weight = 0.0
+    snapshots=[]; promoted_occurrences=0; promoted_weight=0.0
     for snapshot in data.get("monthSnapshots", []):
-        month_counts = Counter()
-        month_weights = defaultdict(float)
-        filings = []
+        mc=Counter(); mw=defaultdict(float); filings=[]
         for filing in snapshot.get("sourceFilings", []):
-            report_date = filing.get("reportDate")
-            fcounts = Counter()
-            fweights = defaultdict(float)
-            holdings = []
-            for holding in filing.get("holdings", []):
-                row = dict(holding)
-                k = key_from_holding(row, report_date)
-                if row.get("countryClassification") == "UNKNOWN" and k in promoted:
-                    p = promoted[k]
-                    row["countryClassification"] = p["classification"]
-                    row["countryReason"] = "PIT_FILING_INDEX_ENTITY_STATE"
-                    row["countryResolutionEvidence"] = p
-                    promoted_holding_count += 1
-                    promoted_holding_weight += float(row.get("weight") or 0.0)
-                cls = row.get("countryClassification") or "UNKNOWN"
-                w = float(row.get("weight") or 0.0)
-                fcounts[cls] += 1
-                fweights[cls] += w
-                month_counts[cls] += 1
-                month_weights[cls] += w
-                holdings.append(row)
-            nf = dict(filing)
-            nf["holdings"] = holdings
-            nf["countryClassificationCounts"] = dict(fcounts)
-            nf["countryClassificationWeights"] = dict(fweights)
-            filings.append(nf)
-        ns = dict(snapshot)
-        ns["sourceFilings"] = filings
-        ns["countryClassificationCounts"] = dict(month_counts)
-        ns["countryClassificationWeights"] = dict(month_weights)
-        snapshots.append(ns)
+            fc=Counter(); fw=defaultdict(float); holdings=[]; report=filing.get("reportDate")
+            for h0 in filing.get("holdings", []):
+                h=dict(h0); cls=h.get("countryClassification") or "UNKNOWN"
+                if h.get("mappingStatus")=="MATCHED_UNIQUE" and cls=="UNKNOWN":
+                    evidence=promoted.get(key(h.get("mappedTicker"),h.get("mappedSecurityId"),report))
+                    if evidence:
+                        cls=evidence["classification"]
+                        h["countryClassification"]=cls
+                        h["countryReason"]=evidence["resolutionSource"]
+                        h["countryResolutionEvidence"]=evidence
+                        promoted_occurrences+=1; promoted_weight+=float(h.get("weight") or 0.0)
+                w=float(h.get("weight") or 0.0); fc[cls]+=1; fw[cls]+=w; mc[cls]+=1; mw[cls]+=w; holdings.append(h)
+            nf=dict(filing); nf["holdings"]=holdings; nf["countryClassificationCounts"]=dict(fc); nf["countryClassificationWeights"]=dict(fw); filings.append(nf)
+        ns=dict(snapshot); ns["sourceFilings"]=filings; ns["countryClassificationCounts"]=dict(mc); ns["countryClassificationWeights"]=dict(mw); snapshots.append(ns)
 
-    classes = Counter(r.get("classification", "UNKNOWN") for r in updated_audit)
-    output = dict(data)
-    output["resolutionAudit"] = updated_audit
-    output["monthSnapshots"] = snapshots
-    output["resolvedUSCount"] = classes["US"]
-    output["resolvedNonUSCount"] = classes["NON_US"]
-    output["remainingUnknownCount"] = classes["UNKNOWN"]
-    output["countryEvidenceRule"] = (
-        str(data.get("countryEvidenceRule") or "")
-        + " -> PIT_FILING_INDEX_ENTITY_STATE (original UNKNOWN only; exact historical CIK/name/accession evidence)"
-    )
-    output["filingIndexRecoveryAudit"] = {
-        "recoveryShardCount": len(files),
-        "originalUnknownKeyCount": len(original_unknown),
-        "recoveryExactKeyCount": len(seen_recovery_keys),
-        "promotedIdentityDateCount": len(promoted),
-        "promotedUSIdentityDateCount": sum(x.get("classification") == "US" for x in promoted.values()),
-        "promotedNonUSIdentityDateCount": sum(x.get("classification") == "NON_US" for x in promoted.values()),
-        "promotedHoldingCount": promoted_holding_count,
-        "promotedHoldingWeight": promoted_holding_weight,
-        "currentTickerFallbackAllowed": False,
-        "shards": shard_audit,
+    counts=Counter(r.get("classification") or "UNKNOWN" for r in updated_audit)
+    out=dict(data); out["resolutionAudit"]=updated_audit; out["monthSnapshots"]=snapshots
+    out["resolvedUSCount"]=counts["US"]; out["resolvedNonUSCount"]=counts["NON_US"]; out["remainingUnknownCount"]=counts["UNKNOWN"]
+    out["countryEvidenceRule"]=str(data.get("countryEvidenceRule") or "")+" -> UNIFORM_PIT_RECOVERY[FOREIGN_PRIVATE_ISSUER_FORM_OR_EXPLICIT_FILING_DETAIL_STATE]"
+    out["countryRecoveryAudit"]={
+        "sourceRunId":34067495049,"sourceArtifactId":9999422941,"promotedIdentityDateCount":len(promoted),
+        "promotedUSIdentityDateCount":sum(x["classification"]=="US" for x in promoted.values()),
+        "promotedNonUSIdentityDateCount":sum(x["classification"]=="NON_US" for x in promoted.values()),
+        "promotedHoldingOccurrenceCount":promoted_occurrences,"promotedHoldingWeightAcrossSnapshots":promoted_weight,
+        "currentTickerFallbackAllowed":False,"allowedSources":sorted(ALLOWED_SOURCES),
+        "policy":"Only original strict UNKNOWN exact identity/report-date keys are promoted by uniform return-independent PIT evidence; existing classifications are immutable."
     }
-    # Existing non-UNKNOWN classifications must remain exactly unchanged.
-    for row in updated_audit:
-        k = key_from_audit(row)
-        if k in original_non_unknown and row.get("classification") != original_non_unknown[k]:
-            raise RuntimeError(f"Existing classification changed: {k}")
+    OUT.write_text(json.dumps(out,indent=2)+"\n")
+    print("COUNTRY_RECOVERY_MERGE",json.dumps(out["countryRecoveryAudit"]),flush=True)
+    print("COUNTRY_RECOVERY_COUNTS",json.dumps({"US":counts["US"],"NON_US":counts["NON_US"],"UNKNOWN":counts["UNKNOWN"]}),flush=True)
 
-    OUT.write_text(json.dumps(output, indent=2) + "\n")
-    print("COUNTRY_RECOVERY_MERGE", json.dumps(output["filingIndexRecoveryAudit"]), flush=True)
-    print("COUNTRY_RECOVERY_COUNTS", json.dumps({
-        "US": output["resolvedUSCount"],
-        "NON_US": output["resolvedNonUSCount"],
-        "UNKNOWN": output["remainingUnknownCount"],
-    }), flush=True)
-
-
-if __name__ == "__main__":
-    main()
+if __name__=="__main__": main()
