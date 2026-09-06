@@ -80,8 +80,8 @@ def main() -> None:
                 "qualifiedNormalizedSeriesNames": qualified_names,
                 "rejectedNormalizedSeriesNames": sorted(set(record["candidateNormalizedSeriesNames"]) - set(qualified_names)),
                 "ambiguousAssignedMarkerCount": sum(
-                    x.get("assignmentRule") == "AMBIGUOUS_EXACT_TARGETS" and x.get("assignedIdentity")
-                    for x in assignment_audit
+                    1 for x in assignment_audit
+                    if x.get("assignmentRule") == "AMBIGUOUS_EXACT_TARGETS" and x.get("assignedIdentity") is not None
                 ),
             })
         except Exception as exc:
