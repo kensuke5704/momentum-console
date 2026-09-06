@@ -1,0 +1,38 @@
+name: Research Momentum v2.9 Country Primary-Cover Recovery
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - '.github/workflows/research-momentum-v2-9-country-primary-cover-recovery-v29.yml'
+      - 'scripts/research-country-primary-cover-recovery-v29.py'
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: research-momentum-v2-9-country-primary-cover-recovery-v29
+  cancel-in-progress: true
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COUNTRY_ARTIFACT_ID: '9987700449'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen strict country artifact once
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/c
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
+          unzip -q /tmp/c.zip -d /tmp/c
+          cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+      - name: Recover explicit PIT US jurisdiction from historical primary documents
+        run: python3 scripts/research-country-primary-cover-recovery-v29.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-primary-cover-recovery-v29
+          path: data/research/country-primary-cover-recovery-v29.json
+          if-no-files-found: error
