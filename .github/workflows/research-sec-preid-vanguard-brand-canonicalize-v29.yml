@@ -1,0 +1,35 @@
+name: Research SEC Pre-ID Vanguard Brand Canonicalize V29
+
+on:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-sec-preid-vanguard-brand-canonicalize-v29.yml"
+      - "scripts/research-sec-preid-vanguard-brand-canonicalize-2006.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  canonicalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download same-line repaired pre-ID artifact
+        run: |
+          mkdir -p data/research /tmp/preid
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9973330518/zip > /tmp/preid.zip
+          unzip -q /tmp/preid.zip -d /tmp/preid
+          cp /tmp/preid/sec-legacy-etf-series-source-preid-direct-2006.json data/research/sec-legacy-etf-series-source-preid-direct-v29fix2-2006.json
+      - name: Canonicalize Vanguard brand prefix in direct-bound pre-ID identities
+        run: python3 scripts/research-sec-preid-vanguard-brand-canonicalize-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-legacy-etf-series-source-preid-direct-v29fix2-canonical-2006
+          path: data/research/sec-legacy-etf-series-source-preid-direct-v29fix2-canonical-2006.json
+          if-no-files-found: error
