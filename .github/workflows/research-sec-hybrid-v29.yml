@@ -1,0 +1,40 @@
+name: Research SEC Hybrid Source Catalog V29
+
+on:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-sec-hybrid-v29.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  hybrid:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download canonical pre-ID and strict post-ID artifacts
+        run: |
+          mkdir -p data/research /tmp/pre /tmp/post
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9981960984/zip > /tmp/pre.zip
+          unzip -q /tmp/pre.zip -d /tmp/pre
+          cp /tmp/pre/sec-legacy-etf-series-source-preid-v29canonical-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963958301/zip > /tmp/post.zip
+          unzip -q /tmp/post.zip -d /tmp/post
+          cp /tmp/post/sec-id-era-strict-series-source-h1-2006.json data/research/
+      - name: Build exact deterministic hybrid catalog
+        env:
+          LEGACY_CATALOG_PATH: data/research/sec-legacy-etf-series-source-preid-v29canonical-2006.json
+          ID_CATALOG_PATH: data/research/sec-id-era-strict-series-source-h1-2006.json
+        run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-hybrid-etf-source-catalog-v29-h1-2006
+          path: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          if-no-files-found: error
