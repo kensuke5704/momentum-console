@@ -1,0 +1,67 @@
+name: Research Momentum v2.9 Schedule-Bound Parser Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-schedule-bound-parser-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test representative schedule-bound formats
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util, json
+          from pathlib import Path
+
+          root=Path('.')
+          def load(name,path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              module=importlib.util.module_from_spec(spec)
+              assert spec.loader is not None
+              spec.loader.exec_module(module)
+              return module
+
+          seg=load('seg',root/'scripts/research-nq-series-segmentation-2006.py')
+          diag=load('diag',root/'scripts/research-sec-complete-portfolio-title-diagnostic-h2-2005.py')
+          parser=load('bound',root/'scripts/research-nq-schedule-bound-parser-v29.py')
+
+          targets=[
+              ('POWERSHARES_DYNAMIC_MARKET','edgar/data/1209466/0001104659-06-020486.txt','N-Q','POWERSHARES EXCHANGE TRADED FUND TRUST','S000003023'),
+              ('ISHARES_SP100','edgar/data/1100663/0001193125-06-126674.txt','N-CSR','ISHARES TRUST','S000004306'),
+              ('VANGUARD_VALUE','edgar/data/36405/0000932471-06-000909.txt','N-Q','VANGUARD INDEX FUNDS','S000002840'),
+          ]
+          result=[]
+          for label,filename,form,company,sid in targets:
+              submission,transport=diag.fetch(filename)
+              primary,description,text,doctype=diag.primary_document(submission,form)
+              series=seg.meta.parse_series_contracts(submission,company)
+              grouped,audit=seg.grouped_schedule_blocks(text,series)
+              blocks=grouped.get(sid,[])
+              method,holdings,total=parser.parsed_holdings('\n'.join(blocks))
+              row={
+                  'label':label,'seriesId':sid,'blocks':len(blocks),'method':method,
+                  'holdings':len(holdings),'total':total,
+                  'topDescriptions':[x['description'] for x in holdings[:8]],
+                  'weightSum':sum(float(x.get('weight') or 0) for x in holdings),
+              }
+              result.append(row)
+              print('RESULT',json.dumps(row))
+              if not blocks:
+                  raise SystemExit(f'{label}: no exact Series-bound schedule blocks')
+              if len(holdings)<10:
+                  raise SystemExit(f'{label}: parser still below structural minimum: {len(holdings)}')
+              if not (99.999 <= row['weightSum'] <= 100.001):
+                  raise SystemExit(f'{label}: normalized weights do not sum to 100')
+          print('SUMMARY',json.dumps(result))
+          PY
