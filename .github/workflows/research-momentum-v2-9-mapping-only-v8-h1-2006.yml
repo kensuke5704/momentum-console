@@ -1,0 +1,34 @@
+name: Research Momentum v2.9 Mapping Only v8 H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-mapping-only-v8-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  mapping-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_ARTIFACT_ID: "9986815485"
+      NPX_ARTIFACT_ID: "9876020712"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authoritative holdings and frozen N-PX
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p data/research /tmp/h /tmp/n
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" >/tmp/h.zip; unzip -q /tmp/h.zip -d /tmp/h
+          cp "$(find /tmp/h -name 'nq-pit-holdings-hybrid-h1-2006.json'|head -n1)" data/research/nq-pit-holdings-hybrid-h1-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" >/tmp/n.zip; unzip -q /tmp/n.zip -d /tmp/n
+          cp "$(find /tmp/n -name 'npx-security-master-2006.json'|head -n1)" data/research/npx-security-master-2006.json
+      - name: Deterministic mapping memoized by exact description
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006-fast-v8.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: momentum-v2-9-mapping-only-v8-h1-2006
+          path: data/research/nq-hybrid-structural-mapping-h1-2006.json
+          if-no-files-found: error
