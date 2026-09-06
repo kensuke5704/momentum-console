@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from collections import Counter,defaultdict
+from collections import Counter
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -22,7 +22,10 @@ def audited(primary_text,targets):
     grouped,audit=_orig(primary_text,targets)
     c=Counter(x.get('assignmentRule') for x in audit)
     counts.update(c)
-    by_call.append({'summaryBlockRejectedMarkerCount':c.get('SUMMARY_SCHEDULE_NOT_COMPLETE_PORTFOLIO_BLOCK',0),'ambiguousAssignedMarkerCount':sum(x.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and x.get('assignedIdentity') for x in audit)})
+    by_call.append({
+        'summaryBlockRejectedMarkerCount':c.get('SUMMARY_SCHEDULE_NOT_COMPLETE_PORTFOLIO_BLOCK',0),
+        'ambiguousAssignedMarkerCount':sum(bool(x.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and x.get('assignedIdentity')) for x in audit),
+    })
     return grouped,audit
 
 grouping.legacy_grouped_schedule_blocks=audited
@@ -32,7 +35,6 @@ base.grouping=grouping
 def main():
     base.main()
     d=json.loads(OUT.read_text())
-    # The base qualifier's filing audit is in execution order, matching our grouping calls.
     audits=d.get('genuineScheduleAudit',[])
     for rec,extra in zip(audits,by_call): rec.update(extra)
     d['purpose']=(
