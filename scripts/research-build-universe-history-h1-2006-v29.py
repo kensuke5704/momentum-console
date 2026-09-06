@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 R = ROOT / "data/research"
-GATE = R / "momentum-v2-9-final-gate-b-v7-h1-2006.json"
+GATE = R / "momentum-v2-9-final-gate-b-v10-h1-2006.json"
 UNIVERSE = R / "nq-hybrid-universe-h1-2006.json"
 COUNTRY = R / "nq-hybrid-country-resolved-h1-2006.json"
 OUT = R / "universe-history-h1-2006-v29.json"
@@ -40,7 +40,10 @@ def filing_accession(row: dict) -> str:
 def filing_series_id(row: dict) -> str:
     # Pre-ID rows legitimately have no SEC Series ID. Preserve their frozen canonical
     # contemporaneous identity in the schema field rather than backfilling a future ID.
-    return str(row.get("seriesId") or row.get("canonicalIdentity") or row.get("legacyIdentity") or "")
+    value = row.get("seriesId") or row.get("canonicalIdentity") or row.get("legacyIdentity")
+    if not value:
+        raise RuntimeError("Historical source is missing both Series ID and canonical contemporaneous identity")
+    return str(value)
 
 
 def main() -> None:
@@ -103,7 +106,7 @@ def main() -> None:
         previous_symbols = current_symbols
 
     output = {
-        "purpose": "Research-only Production-compatible UniverseMonth history smoke test after Gate B PASS. No Production data file is read or written and no Stage21 performance is executed.",
+        "purpose": "Research-only Production-compatible UniverseMonth history smoke test after corrected Gate B PASS. No Production data file is written and no Stage21 performance is executed.",
         "gateDecisionFile": str(GATE.relative_to(ROOT)),
         "inputUniverseFile": str(UNIVERSE.relative_to(ROOT)),
         "inputCountryFile": str(COUNTRY.relative_to(ROOT)),
