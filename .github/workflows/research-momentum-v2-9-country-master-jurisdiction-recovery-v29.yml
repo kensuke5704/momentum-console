@@ -1,0 +1,37 @@
+name: Research Momentum v2.9 Country Master Jurisdiction Recovery
+on:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - '.github/workflows/research-momentum-v2-9-country-master-jurisdiction-recovery-v29.yml'
+      - 'scripts/research-country-master-jurisdiction-recovery-v29.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COUNTRY_ARTIFACT_ID: '9987700449'
+      MASTER_INPUT_ARTIFACT_ID: '9987637728'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download final Gate country and frozen historical SEC master rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/c /tmp/m
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
+          unzip -q /tmp/c.zip -d /tmp/c
+          cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${MASTER_INPUT_ARTIFACT_ID}/zip" >/tmp/m.zip
+          unzip -q /tmp/m.zip -d /tmp/m
+          cp "$(find /tmp/m -name 'sec-issuer-master-rows-2005-2006.json' | head -n1)" data/research/sec-issuer-master-rows-2005-2006.json
+      - name: Recover strict UNKNOWN from PIT SEC master jurisdiction suffixes
+        run: python3 scripts/research-country-master-jurisdiction-recovery-v29.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-master-jurisdiction-recovery-v29
+          path: data/research/country-master-jurisdiction-recovery-v29.json
+          if-no-files-found: error
