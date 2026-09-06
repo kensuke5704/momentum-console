@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import importlib.util,json,re,time
+import importlib.util,json,time
 from collections import defaultdict
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
@@ -10,13 +10,13 @@ OUT=ROOT/'data/research/country-index-headers-recovery-v29.json'
 def load(name,path):
  spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 base=load('base',ROOT/'scripts/research-sec-index-headers-country-pilot-2006.py')
+structural=load('structural',ROOT/'scripts/research-nq-npx-structural-mapping-2006.py')
 
 def exact_candidates(row,master_rows):
  report=row.get('asOfReportDate'); forms=[]
  for issuer in row.get('issuerVariants',[]):
-  for f in base.old.cleaned_forms(str(issuer)) if hasattr(base.old,'cleaned_forms') else [issuer]:
+  for f in structural.cleaned_forms(str(issuer)):
    if f and f not in forms: forms.append(f)
- # use the same normalization as the accepted historical resolver; require exactly one CIK across all exact forms
  by=defaultdict(list); matched_forms=[]
  for form in forms:
   target=base.normalize_company(form)
@@ -25,7 +25,6 @@ def exact_candidates(row,master_rows):
   for r in exact: by[str(r.get('cik') or '').zfill(10)].append(r)
  if len(by)!=1: return None,[],matched_forms
  cik=next(iter(by)); rows=sorted(by[cik],key=base.filing_sort_key)
- # de-dupe same accession
  seen=set();out=[]
  for r in rows:
   fn=r.get('filename')
@@ -58,7 +57,7 @@ def main():
    resolved+=1;us+=rec['classification']=='US';nonus+=rec['classification']=='NON_US'
   results.append(rec)
   if (i+1)%100==0: print('PROGRESS',json.dumps({'done':i+1,'resolved':resolved,'errors':errors}),flush=True)
- out={'purpose':'Return-independent PIT recovery of strict-country UNKNOWN identities using only official SEC accession index-headers pages. Classification requires historical exact issuer-form name -> exactly one CIK in pre-report-date SEC master index, then matching COMPANY DATA name+CIK+STATE OF INCORPORATION in the same historical accession header. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes are used.','inputUnknownCount':len(unknown),'historicalExactUniqueCikCount':sum(r['historicalExactCik'] is not None for r in results),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(unknown)-resolved,'transportErrorCount':errors,'masterYears':years,'masterIndexTransports':transports,'results':results}
+ out={'purpose':'Return-independent PIT recovery of strict-country UNKNOWN identities using only official SEC accession index-headers pages. Classification requires historical cleaned exact issuer-form name -> exactly one CIK in pre-report-date SEC master index, then matching COMPANY DATA name+CIK+STATE OF INCORPORATION in the same historical accession header. No current ticker metadata, fuzzy matching, US default, ranks, returns or strategy outcomes are used.','inputUnknownCount':len(unknown),'historicalExactUniqueCikCount':sum(r['historicalExactCik'] is not None for r in results),'resolvedCount':resolved,'resolvedUSCount':us,'resolvedNonUSCount':nonus,'remainingUnknownCount':len(unknown)-resolved,'transportErrorCount':errors,'masterYears':years,'masterIndexTransports':transports,'results':results}
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(out,indent=2)+'\n')
  print('SUMMARY',json.dumps({k:v for k,v in out.items() if k not in {'results','masterIndexTransports'}}),flush=True)
 if __name__=='__main__':main()
