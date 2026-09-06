@@ -1,0 +1,49 @@
+name: Research Momentum v2.9 Gate B v11 Decision Only H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-gate-b-v11-decision-only-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  gate-b-v11-decision-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EVIDENCE_RUN_ID: "34025816968"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for v9 evidence artifact and download
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 1200); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${EVIDENCE_RUN_ID}" --jq '.status')
+            echo "evidence status=${status}"
+            [ "$status" = completed ] && break
+            sleep 5
+          done
+          [ "$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${EVIDENCE_RUN_ID}" --jq '.status')" = completed ] || { echo "evidence wait timeout"; exit 1; }
+          artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${EVIDENCE_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name=="momentum-v2-9-final-gate-b-v9-h1-2006") | .id' | head -n1)
+          [ -n "$artifact_id" ] || { echo "v9 evidence artifact missing"; exit 1; }
+          mkdir -p data/research /tmp/e
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${artifact_id}/zip" >/tmp/e.zip
+          unzip -q /tmp/e.zip -d /tmp/e
+          for f in momentum-v2-9-authoritative-source-audit-v6-h1-2006.json momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json nq-hybrid-structural-mapping-h1-2006.json nq-hybrid-country-resolved-h1-2006.json nq-hybrid-universe-h1-2006.json nq-hybrid-universe-country-upper-bound-h1-2006.json; do
+            cp "$(find /tmp/e -name "$f"|head -n1)" "data/research/$f"
+          done
+          echo "9986815485" > data/research/authoritative-holdings-v8-artifact-id.txt
+          echo "$artifact_id" > data/research/gate-b-v9-evidence-artifact-id.txt
+      - name: Corrected final Gate B decision only
+        run: python3 scripts/research-momentum-v2-9-gate-b-v10-h1-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-gate-b-v11-decision-only-h1-2006
+          path: |
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/gate-b-v9-evidence-artifact-id.txt
+          if-no-files-found: warn
