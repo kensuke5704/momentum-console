@@ -1,0 +1,104 @@
+name: Research Momentum v2.9 Full Parser Fast H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-full-parser-fast-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_QUALIFIED_ARTIFACT_ID: "9982681844"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download source-qualified hybrid catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/source
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${SOURCE_QUALIFIED_ARTIFACT_ID}/zip" > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp "$(find /tmp/source -type f -name 'sec-hybrid-etf-source-catalog-h1-2006.json' | head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          cp "$(find /tmp/source -type f -name 'sec-id-era-strict-series-source-h1-2006-v29qualified.json' | head -n1)" data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+      - name: Parse full hybrid with schedule-bound parser and cached section attribution
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          SOURCE_CATALOG_RUN_ID: "34011699479"
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006-v29parsefast.py
+      - name: Audit full parser coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          root=Path('data/research')
+          raw=json.loads((root/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          zero={}; no_grouped={}; months=[]; methods=Counter()
+          for snap in raw['monthSnapshots']:
+              status=Counter(row.get('parseStatus') for row in snap['sourceFilings'])
+              regime=Counter((row.get('identityRegime'),row.get('parseStatus')) for row in snap['sourceFilings'])
+              for row in snap['sourceFilings']:
+                  if row.get('parseMethod'): methods[row['parseMethod']]+=1
+                  if row.get('parseStatus')=='PARSED_ZERO_HOLDINGS': zero[row.get('canonicalIdentity')]=row
+                  if row.get('parseStatus')=='NO_GROUPED_SCHEDULE': no_grouped[row.get('canonicalIdentity')]=row
+              months.append({
+                  'signalMonth':snap['signalMonth'],
+                  'catalogSourceSeriesCount':snap['catalogSourceSeriesCount'],
+                  'parsedSourceSeriesCount':sum(row.get('parseStatus')=='PARSED' for row in snap['sourceFilings']),
+                  'parseStatusCounts':dict(status),
+                  'parseStatusByRegime':{f'{k[0]}::{k[1]}':v for k,v in sorted(regime.items())},
+              })
+          ambiguous_assigned=[]
+          for filing in raw.get('filingAudit',[]):
+              for entry in filing.get('legacyAssignmentAudit') or []:
+                  if entry.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and entry.get('assignedIdentity'):
+                      ambiguous_assigned.append({'accession':filing.get('accession'),'entry':entry})
+          audit={
+              'purpose':'Authoritative full H1 2006 parser audit. Same Series/title schedule boundaries as the frozen hybrid extractor; schedule-bound parsing fixes only table-start format handling and section normalization is cached without semantic changes.',
+              'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),
+              'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),
+              'filingFetchErrorCount':raw.get('filingFetchErrorCount'),
+              'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),
+              'assetSectionCounts':raw.get('legacyAssetSectionCounts'),
+              'parseMethodCountsAcrossSnapshots':dict(methods),
+              'uniqueZeroHoldingTargetCount':len(zero),
+              'uniqueNoGroupedTargetCount':len(no_grouped),
+              'ambiguousAssignedMarkerCount':len(ambiguous_assigned),
+              'zeroTargets':[{
+                  'canonicalIdentity':row.get('canonicalIdentity'),'identityRegime':row.get('identityRegime'),
+                  'seriesId':row.get('seriesId'),'legacyIdentity':row.get('legacyIdentity'),
+                  'seriesName':row.get('seriesName'),'registrant':row.get('registrant'),'form':row.get('form'),
+                  'filingDate':row.get('filingDate'),'accession':row.get('accession'),
+                  'sourceFilename':row.get('sourceFilename'),'schedulePages':row.get('schedulePages')
+              } for row in sorted(zero.values(),key=lambda x:(x.get('registrant') or '',x.get('seriesName') or ''))],
+              'months':months,
+          }
+          (root/'momentum-v2-9-full-parser-fast-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('AUDIT',json.dumps({k:v for k,v in audit.items() if k not in {'zeroTargets','months'}}))
+          for row in months: print('MONTH',json.dumps(row))
+          for row in audit['zeroTargets']: print('ZERO',json.dumps(row))
+          if raw.get('filingFetchErrorCount'): raise SystemExit('filing fetch errors remain')
+          if no_grouped: raise SystemExit(f'qualified source produced NO_GROUPED target(s): {len(no_grouped)}')
+          if ambiguous_assigned: raise SystemExit('ambiguous legacy marker was assigned')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-full-parser-fast-h1-2006
+          path: |
+            data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/momentum-v2-9-full-parser-fast-audit-h1-2006.json
+          if-no-files-found: warn
