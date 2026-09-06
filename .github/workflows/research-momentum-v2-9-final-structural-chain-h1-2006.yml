@@ -1,0 +1,240 @@
+name: Research Momentum v2.9 Final Structural Chain H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-final-structural-chain-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  structural-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FULL_PARSER_RUN_ID: "34011952449"
+      NPX_ARTIFACT_ID: "9876020712"
+      BASE_COUNTRY_ARTIFACT_ID: "9944538015"
+      STRUCT_COUNTRY_ARTIFACT_ID: "9944797581"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for authoritative full parser run and download artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${FULL_PARSER_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${FULL_PARSER_RUN_ID}" --jq '.conclusion // ""')
+            echo "parser status=${status} conclusion=${conclusion}"
+            if [ "$status" = "completed" ]; then
+              [ "$conclusion" = "success" ] || { echo "authoritative parser run failed"; exit 1; }
+              break
+            fi
+            sleep 10
+          done
+          status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${FULL_PARSER_RUN_ID}" --jq '.status')
+          [ "$status" = "completed" ] || { echo "parser run did not complete in bounded wait"; exit 1; }
+          artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${FULL_PARSER_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name=="momentum-v2-9-full-parser-h1-2006") | .id' | head -n1)
+          [ -n "$artifact_id" ] || { echo "full parser artifact not found"; exit 1; }
+          mkdir -p data/research /tmp/parser
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${artifact_id}/zip" > /tmp/parser.zip
+          unzip -q /tmp/parser.zip -d /tmp/parser
+          cp "$(find /tmp/parser -type f -name 'nq-pit-holdings-hybrid-h1-2006.json' | head -n1)" data/research/nq-pit-holdings-hybrid-h1-2006.json
+          cp "$(find /tmp/parser -type f -name 'sec-hybrid-etf-source-catalog-h1-2006.json' | head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          cp "$(find /tmp/parser -type f -name 'momentum-v2-9-full-parser-audit-h1-2006.json' | head -n1)" data/research/momentum-v2-9-full-parser-audit-h1-2006.json
+          echo "$artifact_id" > data/research/full-parser-artifact-id.txt
+
+      - name: Download frozen N-PX and historical country evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/npx /tmp/base /tmp/struct
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp "$(find /tmp/npx -type f -name 'npx-security-master-2006.json' | head -n1)" data/research/npx-security-master-2006.json
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${BASE_COUNTRY_ARTIFACT_ID}/zip" > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp "$(find /tmp/base -type f -name 'sec-submission-header-country-full-merged-2006.json' | head -n1)" data/research/sec-submission-header-country-full-merged-2006.json
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${STRUCT_COUNTRY_ARTIFACT_ID}/zip" > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp "$(find /tmp/struct -type f -name 'structural-new-matches-submission-header-country-2006.json' | head -n1)" data/research/structural-new-matches-submission-header-country-2006.json
+
+      - name: COMMON_EQUITY and frozen deterministic N-PX mapping
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006.py
+
+      - name: Conservative historical country cache
+        run: python3 scripts/research-nq-hybrid-country-cache-h1-2006.py
+
+      - name: Resolve remaining mapped UNKNOWN with PIT SEC headers
+        run: python3 scripts/research-nq-hybrid-country-resolve-h1-2006.py
+
+      - name: Primary Production-order Universe
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+
+      - name: Country upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+
+      - name: Build structural sensitivity audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, math
+          from collections import Counter
+          from pathlib import Path
+
+          root=Path('data/research')
+          raw=json.loads((root/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          parser=json.loads((root/'momentum-v2-9-full-parser-audit-h1-2006.json').read_text())
+          mapping=json.loads((root/'nq-hybrid-structural-mapping-h1-2006.json').read_text())
+          country=json.loads((root/'nq-hybrid-country-resolved-h1-2006.json').read_text())
+          primary=json.loads((root/'nq-hybrid-universe-h1-2006.json').read_text())
+          upper=json.loads((root/'nq-hybrid-universe-country-upper-bound-h1-2006.json').read_text())
+          catalog=json.loads((root/'sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          parser_artifact_id=int((root/'full-parser-artifact-id.txt').read_text().strip())
+
+          def rank_stats(a,b):
+              ar={row['symbol']:row['universeRank'] for row in a}
+              br={row['symbol']:row['universeRank'] for row in b}
+              common=sorted(set(ar)&set(br))
+              k=min(len(a),len(b),80)
+              overlap=len(common)/k if k else 1.0
+              if len(common)<2:
+                  rho=1.0 if len(common)==len(ar)==len(br) else None
+              else:
+                  n=len(common)
+                  d2=sum((ar[s]-br[s])**2 for s in common)
+                  rho=1-(6*d2)/(n*(n*n-1))
+              top2=[row['symbol'] for row in a[:2]]
+              top2_retained=sum(symbol in br for symbol in top2)/len(top2) if top2 else 1.0
+              return {'k':k,'overlap':overlap,'commonCount':len(common),'spearman':rho,'primaryTop2':top2,'top2Retention':top2_retained}
+
+          raw_month={row['signalMonth']:row for row in raw['monthSnapshots']}
+          map_month={row['signalMonth']:row for row in mapping['monthSnapshots']}
+          country_month={row['signalMonth']:row for row in country['monthSnapshots']}
+          primary_month={row['signalMonth']:row for row in primary['monthSnapshots']}
+          upper_month={row['signalMonth']:row for row in upper['monthSnapshots']}
+
+          months=[]
+          for month in sorted(primary_month):
+              r=raw_month[month]; m=map_month[month]; c=country_month[month]; p=primary_month[month]; u=upper_month[month]
+              parsed=sum(row.get('parseStatus')=='PARSED' for row in r['sourceFilings'])
+              zero=sum(row.get('parseStatus')=='PARSED_ZERO_HOLDINGS' for row in r['sourceFilings'])
+              no_grouped=sum(row.get('parseStatus')=='NO_GROUPED_SCHEDULE' for row in r['sourceFilings'])
+              unique=m['uniqueMappedCount']; ec=m['commonEquityHoldingCount']
+              mapped_known=0; mapped_total=0; mapped_known_weight=0.0; mapped_weight=0.0
+              for filing in c['sourceFilings']:
+                  for h in filing.get('holdings',[]):
+                      if h.get('mappingStatus')!='MATCHED_UNIQUE':
+                          continue
+                      mapped_total+=1
+                      w=float(h.get('weight') or 0.0); mapped_weight+=w
+                      if h.get('countryClassification') in {'US','NON_US'}:
+                          mapped_known+=1; mapped_known_weight+=w
+              months.append({
+                  'signalMonth':month,
+                  'sourceSeriesCount':r['catalogSourceSeriesCount'],
+                  'parsedSourceSeriesCount':parsed,
+                  'zeroHoldingSourceSeriesCount':zero,
+                  'noGroupedSourceSeriesCount':no_grouped,
+                  'commonEquityHoldingCount':ec,
+                  'uniqueMappedCount':unique,
+                  'uniqueMappedCountRate':unique/ec if ec else None,
+                  'uniqueMappedWeightRate':m.get('uniqueMappedWeightRate'),
+                  'ambiguousMappingCount':m.get('ambiguousCount'),
+                  'ambiguousMappingWeight':m.get('ambiguousWeight'),
+                  'unmappedCount':m.get('unmappedCount'),
+                  'unmappedWeight':m.get('unmappedWeight'),
+                  'mappedCountryKnownCountRate':mapped_known/mapped_total if mapped_total else None,
+                  'mappedCountryKnownWeightRate':mapped_known_weight/mapped_weight if mapped_weight else None,
+                  'eligibleSourceSeriesCount':p['eligibleSourceSeriesCount'],
+                  'primaryUniverseSize':len(p['symbols']),
+                  'countryUpperBoundUniverseSize':len(u['symbols']),
+                  'countryUpperBoundComparison':rank_stats(p['symbols'],u['symbols']),
+              })
+
+          assignment_ambiguous_assigned=0
+          for filing in raw.get('filingAudit',[]):
+              for entry in filing.get('legacyAssignmentAudit') or []:
+                  if entry.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and entry.get('assignedIdentity'):
+                      assignment_ambiguous_assigned+=1
+
+          structural_conflicts=[]
+          if catalog.get('ambiguousBridgeCount'):
+              structural_conflicts.append('AMBIGUOUS_HYBRID_BRIDGE')
+          if raw.get('filingFetchErrorCount'):
+              structural_conflicts.append('HOLDINGS_FETCH_ERRORS')
+          if assignment_ambiguous_assigned:
+              structural_conflicts.append('AMBIGUOUS_LEGACY_MARKER_AUTO_ASSIGNED')
+          if parser.get('uniqueNoGroupedTargetCount'):
+              structural_conflicts.append('QUALIFIED_SOURCE_WITHOUT_GROUPED_SCHEDULE')
+          if any(row['eligibleSourceSeriesCount']==0 for row in months):
+              structural_conflicts.append('NO_ELIGIBLE_SOURCES_IN_MONTH')
+          if any(row['primaryUniverseSize']==0 for row in months):
+              structural_conflicts.append('EMPTY_PRIMARY_UNIVERSE')
+
+          audit={
+              'purpose':'Return-independent final H1 2006 structural reconstruction and conservative sensitivity. Ambiguous/unmapped security identities and country UNKNOWN are excluded, never auto-imputed.',
+              'inputArtifacts':{
+                  'fullParserArtifactId':parser_artifact_id,
+                  'frozenNpxMasterArtifactId':9876020712,
+                  'baselineHistoricalCountryArtifactId':9944538015,
+                  'structuralHistoricalCountryArtifactId':9944797581,
+              },
+              'identity':{
+                  'legacyPositiveIdentityCount':catalog.get('legacyPositiveIdentityCount'),
+                  'postIdPositiveSeriesCount':catalog.get('postIdPositiveSeriesCount'),
+                  'exactUniqueBridgeCount':catalog.get('exactUniqueBridgeCount'),
+                  'ambiguousBridgeCount':catalog.get('ambiguousBridgeCount'),
+              },
+              'parsing':{
+                  'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),
+                  'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),
+                  'filingFetchErrorCount':raw.get('filingFetchErrorCount'),
+                  'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),
+                  'assetSectionCounts':raw.get('legacyAssetSectionCounts'),
+                  'uniqueZeroHoldingTargetCount':parser.get('uniqueZeroHoldingTargetCount'),
+                  'uniqueNoGroupedTargetCount':parser.get('uniqueNoGroupedTargetCount'),
+                  'ambiguousAssignedMarkerCount':assignment_ambiguous_assigned,
+              },
+              'mappingMethodCounts':mapping.get('matchMethodCounts'),
+              'country':{
+                  'unresolvedInputCount':country.get('unresolvedInputCount'),
+                  'resolvedUSCount':country.get('resolvedUSCount'),
+                  'resolvedNonUSCount':country.get('resolvedNonUSCount'),
+                  'remainingUnknownCount':country.get('remainingUnknownCount'),
+              },
+              'months':months,
+              'structuralConflicts':structural_conflicts,
+              'stage21PerformanceConsulted':False,
+              'uncertaintyPolicy':'Ambiguous/unmapped security mappings, country UNKNOWN, non-US, non-COMMON_EQUITY, and ineligible source series are excluded from the primary Universe. Country upper bound reclassifies only already uniquely mapped UNKNOWN as US for sensitivity.',
+          }
+          (root/'momentum-v2-9-final-structural-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('FINAL_AUDIT',json.dumps({k:v for k,v in audit.items() if k!='months'}))
+          for month in months:
+              print('MONTH',json.dumps(month))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-final-structural-chain-h1-2006
+          path: |
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/momentum-v2-9-full-parser-audit-h1-2006.json
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/nq-hybrid-country-cache-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+            data/research/momentum-v2-9-final-structural-audit-h1-2006.json
+          if-no-files-found: warn
