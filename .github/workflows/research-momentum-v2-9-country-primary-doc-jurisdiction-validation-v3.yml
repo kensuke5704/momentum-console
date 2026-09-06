@@ -1,0 +1,32 @@
+name: Research Momentum v2.9 Country Primary Doc Jurisdiction Validation v3
+on:
+  push:
+    paths:
+      - '.github/workflows/research-momentum-v2-9-country-primary-doc-jurisdiction-validation-v3.yml'
+      - 'scripts/research-country-primary-doc-jurisdiction-validation-v3.py'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COUNTRY_ARTIFACT_ID: '9987700449'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download final Gate country artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/c
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
+          unzip -q /tmp/c.zip -d /tmp/c
+          cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+      - name: Validate primary filing-document jurisdiction evidence
+        run: python3 scripts/research-country-primary-doc-jurisdiction-validation-v3.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-primary-doc-jurisdiction-validation-v3
+          path: data/research/country-primary-doc-jurisdiction-validation-v3.json
+          if-no-files-found: error
