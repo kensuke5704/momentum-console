@@ -1,0 +1,95 @@
+name: Research Momentum v2.9 Final Gate B v19 Master-Reconstructed Filing Index H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-final-gate-b-v19-master-reconstructed-filing-index-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: research-momentum-v2-9-final-gate-b-v19-master-reconstructed-filing-index-h1-2006
+  cancel-in-progress: true
+jobs:
+  merge-and-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RECOVERY_RUN_ID: "34031860415"
+      OLD_GATE_ARTIFACT_ID: "9987700449"
+      HOLDINGS_ARTIFACT_ID: "9986815485"
+      MAPPING_ARTIFACT_ID: "9987093683"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for exact master-reconstructed recovery run and download eight shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research/country-recovery /tmp/recovery
+          completed=0
+          for i in $(seq 1 300); do
+            status=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RECOVERY_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RECOVERY_RUN_ID}" --jq '.conclusion // ""')
+            echo "RECOVERY_RUN status=${status} conclusion=${conclusion}"
+            if [ "$status" = "completed" ]; then
+              [ "$conclusion" = "success" ] || { echo "Recovery run did not succeed"; exit 1; }
+              completed=1
+              break
+            fi
+            sleep 15
+          done
+          [ "$completed" = "1" ] || { echo "Recovery run did not complete within bounded wait"; exit 1; }
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${RECOVERY_RUN_ID}/artifacts?per_page=100" > /tmp/recovery/artifacts.json
+          python3 - <<'PY'
+          import json
+          a=json.load(open('/tmp/recovery/artifacts.json'))['artifacts']
+          names={x['name']:x['id'] for x in a}
+          expected=[f'country-filing-index-recovery-v29-{i}' for i in range(8)]
+          missing=[x for x in expected if x not in names]
+          if missing: raise SystemExit('missing recovery artifacts: '+repr(missing))
+          open('/tmp/recovery/ids.tsv','w').write('\n'.join(f'{n}\t{names[n]}' for n in expected)+'\n')
+          PY
+          while IFS=$'\t' read -r name aid; do
+            mkdir -p "/tmp/recovery/${name}"
+            gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${aid}/zip" > "/tmp/recovery/${name}.zip"
+            unzip -q "/tmp/recovery/${name}.zip" -d "/tmp/recovery/${name}"
+            cp "$(find "/tmp/recovery/${name}" -name 'country-filing-index-recovery-v29-shard-*.json' | head -n1)" data/research/country-recovery/
+          done < /tmp/recovery/ids.tsv
+          test "$(find data/research/country-recovery -name 'country-filing-index-recovery-v29-shard-*.json' | wc -l)" -eq 8
+      - name: Download authoritative Gate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/g /tmp/h /tmp/m
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${OLD_GATE_ARTIFACT_ID}/zip" >/tmp/g.zip
+          unzip -q /tmp/g.zip -d /tmp/g
+          cp "$(find /tmp/g -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" >/tmp/h.zip
+          unzip -q /tmp/h.zip -d /tmp/h
+          cp "$(find /tmp/h -name 'momentum-v2-9-authoritative-source-audit-v6-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+          cp "$(find /tmp/h -name 'momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+          echo "$HOLDINGS_ARTIFACT_ID" > data/research/authoritative-holdings-v8-artifact-id.txt
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${MAPPING_ARTIFACT_ID}/zip" >/tmp/m.zip
+          unzip -q /tmp/m.zip -d /tmp/m
+          cp "$(find /tmp/m -name 'nq-hybrid-structural-mapping-h1-2006.json' | head -n1)" data/research/nq-hybrid-structural-mapping-h1-2006.json
+      - name: Merge only exact PIT filing-index recoveries
+        run: python3 scripts/research-country-recovery-merge-v29.py
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+      - name: Final preregistered Gate B v13 semantics
+        run: python3 scripts/research-momentum-v2-9-gate-b-v13-finalize.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-final-gate-b-v19-master-reconstructed-filing-index-h1-2006
+          path: |
+            data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+            data/research/country-recovery/*.json
+          if-no-files-found: warn
