@@ -1,0 +1,32 @@
+name: Research v2.9 iShares Zero Target Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-nq-v29-ishares-zero-target-diagnostic.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: "9984264840"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authoritative source catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/src
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > /tmp/src.zip
+          unzip -q /tmp/src.zip -d /tmp/src
+          cp "$(find /tmp/src -name 'sec-hybrid-etf-source-catalog-h1-2006.json' | head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+      - name: Diagnose grouped schedule grammars
+        run: python3 scripts/research-nq-v29-ishares-zero-target-diagnostic.py
