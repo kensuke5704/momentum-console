@@ -1,0 +1,138 @@
+name: Research Momentum v2.9 Full Parser H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-full-parser-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_QUALIFIED_ARTIFACT_ID: "9982681844"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download source-qualified hybrid catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/source
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${SOURCE_QUALIFIED_ARTIFACT_ID}/zip" > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp "$(find /tmp/source -type f -name 'sec-hybrid-etf-source-catalog-h1-2006.json' | head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          cp "$(find /tmp/source -type f -name 'sec-id-era-strict-series-source-h1-2006-v29qualified.json' | head -n1)" data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+
+      - name: Parse full hybrid with schedule-bound parser
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          SOURCE_CATALOG_RUN_ID: "34011699479"
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006-v29parse.py
+
+      - name: Audit full parser coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          root=Path('data/research')
+          raw=json.loads((root/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          months=[]
+          zero_unique={}
+          no_grouped_unique={}
+          parse_methods=Counter()
+          registrant_zero=Counter()
+          form_zero=Counter()
+          for snap in raw['monthSnapshots']:
+              status=Counter()
+              regime=Counter()
+              for row in snap['sourceFilings']:
+                  st=row.get('parseStatus')
+                  status[st]+=1
+                  regime[(row.get('identityRegime'),st)]+=1
+                  if row.get('parseMethod'):
+                      parse_methods[row['parseMethod']]+=1
+                  if st=='PARSED_ZERO_HOLDINGS':
+                      key=row.get('canonicalIdentity')
+                      zero_unique[key]={
+                          'canonicalIdentity':key,
+                          'identityRegime':row.get('identityRegime'),
+                          'seriesId':row.get('seriesId'),
+                          'legacyIdentity':row.get('legacyIdentity'),
+                          'seriesName':row.get('seriesName'),
+                          'registrant':row.get('registrant'),
+                          'form':row.get('form'),
+                          'filingDate':row.get('filingDate'),
+                          'accession':row.get('accession'),
+                          'sourceFilename':row.get('sourceFilename'),
+                          'schedulePages':row.get('schedulePages'),
+                      }
+                      registrant_zero[row.get('registrant') or '']+=1
+                      form_zero[row.get('form') or '']+=1
+                  elif st=='NO_GROUPED_SCHEDULE':
+                      no_grouped_unique[row.get('canonicalIdentity')]=row
+              months.append({
+                  'signalMonth':snap['signalMonth'],
+                  'catalogSourceSeriesCount':snap['catalogSourceSeriesCount'],
+                  'parseStatusCounts':dict(status),
+                  'parseStatusByRegime':{f'{k[0]}::{k[1]}':v for k,v in sorted(regime.items())},
+              })
+
+          ambiguous_assigned=[]
+          for filing in raw.get('filingAudit',[]):
+              for entry in filing.get('legacyAssignmentAudit') or []:
+                  if entry.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and entry.get('assignedIdentity'):
+                      ambiguous_assigned.append({'accession':filing.get('accession'),'entry':entry})
+
+          audit={
+              'purpose':'Full H1 2006 schedule-bound parser coverage after source-occurrence qualification. Parser format rules are independent of Universe ranks and returns.',
+              'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),
+              'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),
+              'filingFetchErrorCount':raw.get('filingFetchErrorCount'),
+              'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),
+              'assetSectionCounts':raw.get('legacyAssetSectionCounts'),
+              'parseMethodCountsAcrossSnapshots':dict(parse_methods),
+              'uniqueZeroHoldingTargetCount':len(zero_unique),
+              'uniqueNoGroupedTargetCount':len(no_grouped_unique),
+              'ambiguousAssignedMarkerCount':len(ambiguous_assigned),
+              'zeroByRegistrantAcrossSnapshots':dict(registrant_zero),
+              'zeroByFormAcrossSnapshots':dict(form_zero),
+              'zeroTargets':sorted(zero_unique.values(),key=lambda x:(x['registrant'] or '',x['seriesName'] or '')),
+              'months':months,
+          }
+          (root/'momentum-v2-9-full-parser-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('AUDIT',json.dumps({k:v for k,v in audit.items() if k not in {'zeroTargets','months'}}))
+          for month in months:
+              print('MONTH',json.dumps(month))
+          for row in audit['zeroTargets']:
+              print('ZERO',json.dumps(row))
+
+          if raw.get('filingFetchErrorCount'):
+              raise SystemExit('filing fetch errors remain')
+          if no_grouped_unique:
+              raise SystemExit(f'qualified source produced NO_GROUPED target(s): {len(no_grouped_unique)}')
+          if ambiguous_assigned:
+              raise SystemExit('ambiguous legacy marker was assigned')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-full-parser-h1-2006
+          path: |
+            data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/momentum-v2-9-full-parser-audit-h1-2006.json
+          if-no-files-found: warn
