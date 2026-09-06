@@ -1,0 +1,26 @@
+name: Research v2.9 iShares Retained Zero Diagnostic v2
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-nq-v29-ishares-retained-zero-diagnostic-v2.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_ARTIFACT_ID: "9985882210"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download source v3
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p data/research /tmp/s
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > /tmp/s.zip; unzip -q /tmp/s.zip -d /tmp/s
+          cp "$(find /tmp/s -name 'sec-hybrid-etf-source-catalog-h1-2006.json'|head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+      - name: Diagnose
+        run: python3 scripts/research-nq-v29-ishares-retained-zero-diagnostic-v2.py
