@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+from bisect import bisect_left
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -31,11 +32,6 @@ REPORT_LABEL_RE = re.compile(
 
 
 def html_first_clean_v4(combined: str) -> tuple[str, list[dict], float]:
-    """Preserve valid HTML rows, but reject deterministic report/temporal labels.
-
-    The filter is based only on filing structure and text type. If no valid HTML
-    security rows remain, the already-validated fixed-width parser is used.
-    """
     trimmed = parser.corrected.trim_series_schedule(combined)
     html_rows = parser.base.parse_bound_html_holdings(trimmed)
     if html_rows:
@@ -67,7 +63,7 @@ def html_first_clean_v4(combined: str) -> tuple[str, list[dict], float]:
 
 
 def annotate_sections_fast_exact(holdings: list[dict], combined: str) -> tuple[list[dict], dict, dict]:
-    """Logic-equivalent asset-section attribution with first-position caching."""
+    """Logic-equivalent section attribution with exact first-position and bisect caches."""
     vis = hybrid.seg.visible(combined)
     nv = hybrid.ec.ntext(vis)
     positions = []
@@ -75,6 +71,8 @@ def annotate_sections_fast_exact(holdings: list[dict], combined: str) -> tuple[l
         for match in pattern.finditer(nv):
             positions.append((match.start(), section))
     positions.sort()
+    section_positions = [p for p, _ in positions]
+    section_names = [s for _, s in positions]
 
     alias_first_pos: dict[str, int] = {}
     counts = Counter()
@@ -93,14 +91,10 @@ def annotate_sections_fast_exact(holdings: list[dict], combined: str) -> tuple[l
                 best_alias = alias
 
         section = "UNKNOWN"
-        if best_pos is not None:
-            prior_section = None
-            for p, s in positions:
-                if p >= best_pos:
-                    break
-                prior_section = s
-            if prior_section is not None:
-                section = prior_section
+        if best_pos is not None and section_positions:
+            idx = bisect_left(section_positions, best_pos) - 1
+            if idx >= 0:
+                section = section_names[idx]
 
         row = {**holding, "legacyAssetSection": section}
         if best_alias:
