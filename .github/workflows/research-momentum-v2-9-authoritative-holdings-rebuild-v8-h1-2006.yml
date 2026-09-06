@@ -1,0 +1,42 @@
+name: Research Momentum v2.9 Authoritative Holdings Rebuild v8 H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-authoritative-holdings-rebuild-v8-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  holdings-rebuild-v8:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FAILED_V5_ARTIFACT_ID: "9986602363"
+      SOURCE_V6_ARTIFACT_ID: "9986725265"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fully parsed v5 record pool and corrected source v6
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p data/research /tmp/old /tmp/src
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${FAILED_V5_ARTIFACT_ID}/zip" >/tmp/old.zip; unzip -q /tmp/old.zip -d /tmp/old
+          cp "$(find /tmp/old -name 'nq-pit-holdings-hybrid-h1-2006.json'|head -n1)" data/research/nq-pit-holdings-hybrid-v5-failed.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${SOURCE_V6_ARTIFACT_ID}/zip" >/tmp/src.zip; unzip -q /tmp/src.zip -d /tmp/src
+          cp "$(find /tmp/src -name 'sec-hybrid-etf-source-catalog-h1-2006.json'|head -n1)" data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          cp "$(find /tmp/src -name 'momentum-v2-9-authoritative-source-audit-v6-h1-2006.json'|head -n1)" data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+      - name: Deterministic exact-source-record rebuild and structural sanitize
+        run: python3 scripts/research-nq-authoritative-holdings-rebuild-from-v5-v8.py
+      - name: Final structural audit
+        run: python3 scripts/research-nq-authoritative-holdings-audit-v5.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-authoritative-holdings-rebuild-v8-h1-2006
+          path: |
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+          if-no-files-found: warn
