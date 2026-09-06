@@ -1,0 +1,56 @@
+name: Research Momentum v2.9 Final Gate B v14 Resolution Cache H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-final-gate-b-v14-resolution-cache-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  gate-b-v14:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_ARTIFACT_ID: "9986815485"
+      NPX_ARTIFACT_ID: "9876020712"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download audited authoritative holdings v8
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p data/research /tmp/h
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" >/tmp/h.zip; unzip -q /tmp/h.zip -d /tmp/h
+          for f in nq-pit-holdings-hybrid-h1-2006.json sec-hybrid-etf-source-catalog-h1-2006.json momentum-v2-9-authoritative-source-audit-v6-h1-2006.json momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json; do cp "$(find /tmp/h -name "$f"|head -n1)" "data/research/$f"; done
+          echo "$HOLDINGS_ARTIFACT_ID" > data/research/authoritative-holdings-v8-artifact-id.txt
+      - name: Download frozen N-PX master
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p /tmp/npx
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" >/tmp/npx.zip; unzip -q /tmp/npx.zip -d /tmp/npx
+          cp "$(find /tmp/npx -name 'npx-security-master-2006.json'|head -n1)" data/research/npx-security-master-2006.json
+      - name: COMMON_EQUITY and frozen deterministic N-PX mapping memoized by exact description
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006-fast-v8.py
+      - name: Strict PIT country with exact issuer-query, master and submission caches
+        run: python3 scripts/research-nq-hybrid-country-strict-v5-indexed-resolution-cache.py
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+      - name: Final Gate B v13 semantics
+        run: python3 scripts/research-momentum-v2-9-gate-b-v13-finalize.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-final-gate-b-v14-resolution-cache-h1-2006
+          path: |
+            data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+          if-no-files-found: warn
