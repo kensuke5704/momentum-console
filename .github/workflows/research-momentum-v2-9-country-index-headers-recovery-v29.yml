@@ -4,6 +4,9 @@ on:
     paths:
       - '.github/workflows/research-momentum-v2-9-country-index-headers-recovery-v29.yml'
       - 'scripts/research-country-index-headers-recovery-v29.py'
+concurrency:
+  group: research-country-index-headers-recovery-v29
+  cancel-in-progress: true
 permissions:
   actions: read
   contents: read
