@@ -1,0 +1,55 @@
+name: Research SEC Hybrid Holdings V29 H1 2006
+
+on:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-sec-hybrid-holdings-v29.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  holdings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authoritative v29 hybrid catalog
+        run: |
+          mkdir -p data/research /tmp/hybrid
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9981976567/zip > /tmp/hybrid.zip
+          unzip -q /tmp/hybrid.zip -d /tmp/hybrid
+          cp /tmp/hybrid/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+      - name: Syntax-check hybrid holdings extractor
+        run: python3 -m py_compile scripts/research-nq-pit-holdings-hybrid-h1-2006.py
+      - name: Extract raw holdings only for hybrid-catalog sources
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          SOURCE_CATALOG_RUN_ID: "34009374006"
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006.py
+      - name: Structural audit
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('data/research/sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          h=json.loads(Path('data/research/nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          print('HYBRID_SUMMARY',json.dumps({k:c[k] for k in ('legacyPositiveIdentityCount','postIdPositiveSeriesCount','exactUniqueBridgeCount','ambiguousBridgeCount')}))
+          for cs,hs in zip(c['monthSnapshots'],h['monthSnapshots']):
+              assert cs['signalMonth']==hs['signalMonth']
+              print('MONTH_AUDIT',json.dumps({'signalMonth':cs['signalMonth'],'catalog':cs['sourceSeriesCount'],'legacy':cs['legacySourceCount'],'seriesId':cs['seriesIdSourceCount'],'parsed':hs['parsedSourceSeriesCount'],'legacyParsed':hs['parsedLegacySourceCount'],'seriesIdParsed':hs['parsedSeriesIdSourceCount'],'missing':len(hs['missingParsedSeries'])}))
+          print('HOLDINGS_SUMMARY',json.dumps({'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],'filingFetchSuccessCount':h['filingFetchSuccessCount'],'filingFetchErrorCount':h['filingFetchErrorCount'],'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],'legacyAssetSectionCounts':h['legacyAssetSectionCounts']}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-hybrid-holdings-v29-h1-2006
+          path: |
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+          if-no-files-found: warn
