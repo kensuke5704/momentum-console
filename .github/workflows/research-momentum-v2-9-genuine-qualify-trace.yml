@@ -1,0 +1,44 @@
+name: Research Momentum v2.9 Genuine Qualify Trace
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-genuine-qualify-trace.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trace three failing filings
+        run: |
+          python3 - <<'PY'
+          import importlib.util, traceback
+          from pathlib import Path
+          root=Path('.')
+          def load(name,path):
+              s=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+          h=load('hybrid',root/'scripts/research-nq-pit-holdings-hybrid-h1-2006.py')
+          g=load('grouping',root/'scripts/research-nq-hybrid-grouping-v29.py')
+          cases=[
+            ('edgar/data/930667/0001193125-05-218209.txt','N-CSRS',['ISHARES MSCI AUSTRALIA INDEX FUND']),
+            ('edgar/data/1209466/0001047469-05-019099.txt','N-CSR',['POWERSHARES DYNAMIC MARKET PORTFOLIO']),
+            ('edgar/data/1209466/0001047469-06-000199.txt','N-CSRS',['POWERSHARES DYNAMIC MARKET PORTFOLIO']),
+          ]
+          for filename,form,names in cases:
+              print('CASE',filename,flush=True)
+              try:
+                  submission,transport,attempts=h.fetch_submission(filename)
+                  primary,description,text,doctype=h.h2diag.primary_document(submission,form)
+                  targets={n:{'normalizedSeriesName':n} for n in names}
+                  grouped,audit=g.legacy_grouped_schedule_blocks(text,targets)
+                  print('OK',len(audit),{k:len(v) for k,v in grouped.items()},flush=True)
+              except Exception:
+                  traceback.print_exc()
+          PY
