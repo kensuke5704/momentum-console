@@ -1,0 +1,74 @@
+name: Research Momentum v2.9 Remaining Zero Format Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-remaining-zero-format-diagnostic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect representative remaining zero formats
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util, json
+          from pathlib import Path
+
+          root=Path('.')
+          def load(name,path):
+              spec=importlib.util.spec_from_file_location(name,path)
+              module=importlib.util.module_from_spec(spec)
+              assert spec.loader is not None
+              spec.loader.exec_module(module)
+              return module
+
+          hybrid=load('hybrid',root/'scripts/research-nq-pit-holdings-hybrid-h1-2006.py')
+          bound=load('bound',root/'scripts/research-nq-schedule-bound-parser-v29.py')
+          diag=hybrid.h2diag
+          pilot=hybrid.seg.nqpilot
+
+          targets=[
+            {'label':'POWERSHARES_NCSRS','filename':'edgar/data/1209466/0001047469-06-000199.txt','form':'N-CSRS','company':'POWERSHARES EXCHANGE TRADED FUND TRUST','regime':'LEGACY','identity':'S000003023','normalized':'POWERSHARES DYNAMIC MARKET PORTFOLIO'},
+            {'label':'STREETTRACKS_NCSRS','filename':'edgar/data/1168164/0000950135-06-003771.txt','form':'N-CSRS','company':'STREETTRACKS INDEX SHARES FUNDS (Formerly Fresco Index Shares Funds)','regime':'SERIES','identity':'S000006392','seriesId':'S000006392'},
+            {'label':'VANGUARD_INTL_NCSR','filename':'edgar/data/857489/0000932471-05-001803.txt','form':'N-CSR','company':'VANGUARD INTERNATIONAL EQUITY INDEX FUNDS','regime':'LEGACY','identity':'S000005786','normalized':'EMERGING MARKETS STOCK INDEX FUND'},
+            {'label':'VANGUARD_WORLD_NCSR','filename':'edgar/data/52848/0000932471-05-001615.txt','form':'N-CSR','company':'VANGUARD WORLD FUNDS','regime':'LEGACY','identity':'S000004441','normalized':'MATERIALS INDEX FUND'},
+            {'label':'FIRST_TRUST_NQ','filename':'edgar/data/1329377/0000875626-05-002016.txt','form':'N-Q','company':'FIRST TRUST EXCHANGE-TRADED FUND','regime':'LEGACY','identity':'FT','normalized':'FIRST TRUST DOW JONES SELECT MICROCAP INDEXSM FUND'},
+            {'label':'ISHARES_INC_NQ','filename':'edgar/data/930667/0001193125-06-014026.txt','form':'N-Q','company':'ISHARES INC','regime':'LEGACY','identity':'ISHINC','normalized':'ISHARES MSCI INDEX FUND'},
+            {'label':'ISHARES_TRUST_NCSRS','filename':'edgar/data/1100663/0001193125-06-003352.txt','form':'N-CSRS','company':'ISHARES TRUST','regime':'LEGACY','identity':'ISHLV','normalized':'ISHARES MORNINGSTAR LARGE VALUE INDEX FUND'},
+          ]
+
+          for target in targets:
+              submission,transport,_=hybrid.fetch_submission(target['filename'])
+              primary,description,text,doctype=diag.primary_document(submission,target['form'])
+              if target['regime']=='SERIES':
+                  all_series=hybrid.seg.meta.parse_series_contracts(submission,target['company'])
+                  grouped,audit=hybrid.seg.grouped_schedule_blocks(text,all_series)
+                  blocks=grouped.get(target['seriesId'],[])
+              else:
+                  row={'normalizedSeriesName':target['normalized']}
+                  grouped,audit=hybrid.legacy_grouped_schedule_blocks(text,{target['identity']:row})
+                  blocks=grouped.get(target['identity'],[])
+              combined='\n'.join(blocks)
+              method,holdings,total=bound.parsed_holdings(combined)
+              html_rows=pilot.html_rows(bound.corrected.trim_series_schedule(combined))
+              plain=pilot.plain_lines(bound.corrected.trim_series_schedule(combined))
+              print('TARGET',json.dumps({
+                  **{k:target.get(k) for k in ['label','filename','form','company','regime','identity','normalized','seriesId']},
+                  'primary':primary,'primaryType':doctype,'blocks':len(blocks),'combinedLength':len(combined),
+                  'method':method,'parsedHoldings':len(holdings),'parsedValue':total,
+                  'htmlRows':len(html_rows),'plainLines':len(plain),
+                  'assignmentRules':sorted({x.get('assignmentRule') for x in audit}),
+              }))
+              for i,row in enumerate(html_rows[:45]): print(target['label'],'HTML',i,json.dumps(row))
+              for i,line in enumerate([x for x in plain if x][:90]): print(target['label'],'PLAIN',i,repr(line[:500]))
+          PY
