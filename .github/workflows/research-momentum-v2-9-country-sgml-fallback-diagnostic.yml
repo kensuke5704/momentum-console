@@ -1,0 +1,33 @@
+name: Research Momentum v2.9 Country SGML Fallback Diagnostic
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-country-sgml-fallback-diagnostic.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      COUNTRY_ARTIFACT_ID: "9987700449"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download v17 strict country output
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p data/research /tmp/c
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
+          unzip -q /tmp/c.zip -d /tmp/c
+          cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json'|head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+      - name: Compare flat vs SGML headers on strict UNKNOWN sample
+        run: python3 scripts/research-country-sgml-fallback-diagnostic-v29.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: country-sgml-fallback-diagnostic-v29
+          path: data/research/country-sgml-fallback-diagnostic-v29.json
+          if-no-files-found: warn
