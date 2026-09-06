@@ -1,0 +1,74 @@
+name: Research Momentum v2.9 Final Gate B Master Jurisdiction Recovery H1 2006
+on:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - '.github/workflows/research-momentum-v2-9-final-gate-b-master-jurisdiction-recovery-h1-2006.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BASE_GATE_ARTIFACT_ID: '9987700449'
+      GATE_INPUTS_ARTIFACT_ID: '9987637728'
+      MASTER_JURISDICTION_RECOVERY_ARTIFACT_ID: '9988362360'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen Gate inputs and conservative PIT recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/g /tmp/i /tmp/r
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${BASE_GATE_ARTIFACT_ID}/zip" >/tmp/g.zip
+          unzip -q /tmp/g.zip -d /tmp/g
+          cp "$(find /tmp/g -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${GATE_INPUTS_ARTIFACT_ID}/zip" >/tmp/i.zip
+          unzip -q /tmp/i.zip -d /tmp/i
+          for f in \
+            momentum-v2-9-authoritative-source-audit-v6-h1-2006.json \
+            momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json \
+            nq-hybrid-structural-mapping-h1-2006.json \
+            authoritative-holdings-v8-artifact-id.txt; do
+            cp "$(find /tmp/i -name "$f" | head -n1)" "data/research/$f"
+          done
+
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${MASTER_JURISDICTION_RECOVERY_ARTIFACT_ID}/zip" >/tmp/r.zip
+          unzip -q /tmp/r.zip -d /tmp/r
+          cp "$(find /tmp/r -name 'country-master-jurisdiction-recovery-v29.json' | head -n1)" data/research/country-master-jurisdiction-recovery-v29.json
+
+      - name: Merge recognized-US historical SEC master jurisdiction evidence
+        run: python3 scripts/research-country-master-jurisdiction-merge-v29.py
+
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+
+      - name: Final Gate B v13 unchanged semantics
+        run: python3 scripts/research-momentum-v2-9-gate-b-v13-finalize.py
+
+      - name: Assert production remains untouched
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- data/universe-history.json || exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-final-gate-b-master-jurisdiction-recovery-h1-2006
+          path: |
+            data/research/country-master-jurisdiction-merge-audit-v29.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
+          if-no-files-found: warn
