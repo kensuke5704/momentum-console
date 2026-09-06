@@ -1,0 +1,134 @@
+name: Research Momentum v2.9 Final Gate B v17 PIT Carry Shards H1 2006
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-final-gate-b-v17-pit-carry-shards-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare-country-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_ARTIFACT_ID: "9986815485"
+      MAPPING_ARTIFACT_ID: "9987093683"
+      NPX_ARTIFACT_ID: "9876020712"
+      OLD_GATE_COUNTRY_ARTIFACT_ID: "9982673914"
+      BASELINE_COUNTRY_ARTIFACT_ID: "9944538015"
+      STRUCTURAL_COUNTRY_ARTIFACT_ID: "9944797581"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact final inputs and accepted historical evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research/accepted-country-evidence /tmp/h /tmp/m /tmp/n /tmp/c1 /tmp/c2 /tmp/c3
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" >/tmp/h.zip
+          unzip -q /tmp/h.zip -d /tmp/h
+          for f in momentum-v2-9-authoritative-source-audit-v6-h1-2006.json momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json; do
+            cp "$(find /tmp/h -name "$f"|head -n1)" "data/research/$f"
+          done
+          echo "$HOLDINGS_ARTIFACT_ID" > data/research/authoritative-holdings-v8-artifact-id.txt
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${MAPPING_ARTIFACT_ID}/zip" >/tmp/m.zip
+          unzip -q /tmp/m.zip -d /tmp/m
+          cp "$(find /tmp/m -name 'nq-hybrid-structural-mapping-h1-2006.json'|head -n1)" data/research/nq-hybrid-structural-mapping-h1-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" >/tmp/n.zip
+          unzip -q /tmp/n.zip -d /tmp/n
+          cp "$(find /tmp/n -name 'npx-security-master-2006.json'|head -n1)" data/research/npx-security-master-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${OLD_GATE_COUNTRY_ARTIFACT_ID}/zip" >/tmp/c1.zip
+          unzip -q /tmp/c1.zip -d /tmp/c1
+          cp "$(find /tmp/c1 -name 'nq-hybrid-country-resolved-h1-2006.json'|head -n1)" data/research/accepted-country-evidence/old-gate-strict-country.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${BASELINE_COUNTRY_ARTIFACT_ID}/zip" >/tmp/c2.zip
+          unzip -q /tmp/c2.zip -d /tmp/c2
+          cp "$(find /tmp/c2 -name 'sec-submission-header-country-full-merged-2006.json'|head -n1)" data/research/accepted-country-evidence/baseline-strict-submission-evidence.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${STRUCTURAL_COUNTRY_ARTIFACT_ID}/zip" >/tmp/c3.zip
+          unzip -q /tmp/c3.zip -d /tmp/c3
+          cp "$(find /tmp/c3 -name 'structural-new-matches-submission-header-country-2006.json'|head -n1)" data/research/accepted-country-evidence/structural-strict-submission-evidence.json
+      - name: Fetch official 2005-2006 SEC issuer-form master rows once
+        run: |
+          python3 - <<'PY'
+          import importlib.util,json
+          from pathlib import Path
+          p=Path('scripts/research-sec-index-headers-country-pilot-2006.py')
+          spec=importlib.util.spec_from_file_location('master_source',p)
+          m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          rows,transports=m.load_master([2005,2006])
+          Path('data/research/sec-issuer-master-rows-2005-2006.json').write_text(json.dumps({'years':[2005,2006],'transports':transports,'rows':rows})+'\n')
+          print('MASTER_PREP',json.dumps({'rows':len(rows),'issuerFormRows':sum(r['form'] in m.ISSUER_FORMS for r in rows)}))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-shard-inputs-v17
+          path: |
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/npx-security-master-2006.json
+            data/research/accepted-country-evidence/*.json
+            data/research/sec-issuer-master-rows-2005-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+            data/research/authoritative-holdings-v8-artifact-id.txt
+
+  resolve-country-shard:
+    needs: prepare-country-inputs
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      COUNTRY_SHARD_INDEX: ${{ matrix.shard }}
+      COUNTRY_SHARD_COUNT: "8"
+      STRICT_COUNTRY_ACCEPTED_EVIDENCE_DIR: "data/research/accepted-country-evidence"
+      STRICT_COUNTRY_SHARD_RESOLVER_SCRIPT: "research-nq-hybrid-country-strict-v5-pit-evidence-carry.py"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: country-shard-inputs-v17
+          path: data/research
+      - name: Resolve PIT-verified strict historical country shard
+        run: python3 scripts/research-nq-hybrid-country-strict-v5-shard.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-resolution-v17-${{ matrix.shard }}
+          path: data/research/country-shards/country-resolution-shard-*.json
+
+  merge-and-gate:
+    needs: [prepare-country-inputs, resolve-country-shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: country-shard-inputs-v17
+          path: data/research
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: country-resolution-v17-*
+          path: data/research/country-shards
+          merge-multiple: true
+      - name: Merge strict country shards with exact key coverage
+        run: python3 scripts/research-nq-hybrid-country-strict-v5-merge-shards.py
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+      - name: Final Gate B v13 semantics
+        run: python3 scripts/research-momentum-v2-9-gate-b-v13-finalize.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-final-gate-b-v17-pit-carry-shards-h1-2006
+          path: |
+            data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+          if-no-files-found: warn
