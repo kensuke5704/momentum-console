@@ -1,0 +1,107 @@
+name: Research Momentum v2.9 Authoritative H1 2006 v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-authoritative-h1-2006-v2.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  authoritative:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREID_CANONICAL_ARTIFACT_ID: "9981960984"
+      POSTID_QUALIFIED_ARTIFACT_ID: "9982681844"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen source inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/pre /tmp/post
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${PREID_CANONICAL_ARTIFACT_ID}/zip" > /tmp/pre.zip
+          unzip -q /tmp/pre.zip -d /tmp/pre
+          cp "$(find /tmp/pre -type f -name 'sec-legacy-etf-series-source-preid-v29canonical-2006.json' | head -n1)" data/research/sec-legacy-etf-series-source-preid-v29canonical-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${POSTID_QUALIFIED_ARTIFACT_ID}/zip" > /tmp/post.zip
+          unzip -q /tmp/post.zip -d /tmp/post
+          cp "$(find /tmp/post -type f -name 'sec-id-era-strict-series-source-h1-2006-v29qualified.json' | head -n1)" data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+      - name: Requalify pre-ID genuine schedules
+        env:
+          PREID_CATALOG_PATH: data/research/sec-legacy-etf-series-source-preid-v29canonical-2006.json
+        run: python3 scripts/research-sec-preid-genuine-schedule-qualify-v29.py
+      - name: Rebuild exact-unique hybrid catalog
+        env:
+          LEGACY_CATALOG_PATH: data/research/sec-legacy-etf-series-source-preid-v29genuine-2006.json
+          ID_CATALOG_PATH: data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+        run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+      - name: Source audit
+        run: |
+          python3 - <<'PY'
+          import json,re
+          from collections import defaultdict
+          from pathlib import Path
+          r=Path('data/research')
+          pre=json.loads((r/'sec-legacy-etf-series-source-preid-v29genuine-2006.json').read_text())
+          hy=json.loads((r/'sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          by=defaultdict(set)
+          for x in pre['positiveIdentities']:
+              if x.get('registrant','').upper().startswith('VANGUARD'):
+                  n=x.get('normalizedSeriesName',''); by[(x['cik'],re.sub(r'^VANGUARD\s+','',n))].add(n)
+          aliases=[{'key':k,'names':sorted(v)} for k,v in by.items() if len(v)>1]
+          audit={'prePositiveIdentityCount':pre['positiveIdentityCount'],'preSourceOccurrenceCount':pre['sourceOccurrenceCount'],'rejectedIdentityIds':pre['genuineRejectedIdentityIds'],'umbrellaCount':sum(x.get('normalizedSeriesName')=='ISHARES MSCI INDEX FUND' for x in pre['positiveIdentities']),'internationalGrowthCount':sum(x.get('normalizedSeriesName')=='INTERNATIONAL GROWTH FUND' for x in pre['positiveIdentities']),'vanguardAliasGroupCount':len(aliases),'exactUniqueBridgeCount':hy['exactUniqueBridgeCount'],'ambiguousBridgeCount':hy['ambiguousBridgeCount'],'months':[{k:s[k] for k in ('signalMonth','sourceSeriesCount','legacySourceCount','seriesIdSourceCount','suppressedLegacyCount')} for s in hy['monthSnapshots']]}
+          (r/'momentum-v2-9-authoritative-source-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('SOURCE_AUDIT',json.dumps(audit))
+          assert pre['genuineScheduleFetchErrorCount']==0
+          assert audit['umbrellaCount']==audit['internationalGrowthCount']==audit['vanguardAliasGroupCount']==hy['ambiguousBridgeCount']==0
+          PY
+      - name: Parse authoritative holdings
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          SOURCE_CATALOG_RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006-v29final.py
+      - name: Holdings audit
+        run: |
+          python3 - <<'PY'
+          import json,re
+          from collections import Counter
+          from pathlib import Path
+          r=Path('data/research'); raw=json.loads((r/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          zero={}; no_grouped={}; bad=[]; months=[]
+          bad_re=re.compile(r'RESPECTIVELY|CAPITAL SHARE TRANSACTIONS|NET INCREASE|BEGINNING OF PERIOD|END OF PERIOD|TAX COST|UNREALIZED',re.I)
+          for s in raw['monthSnapshots']:
+              status=Counter(x.get('parseStatus') for x in s['sourceFilings']); ce=0; ces=0
+              for x in s['sourceFilings']:
+                  if x.get('parseStatus')=='PARSED_ZERO_HOLDINGS': zero[x['canonicalIdentity']]=x
+                  if x.get('parseStatus')=='NO_GROUPED_SCHEDULE': no_grouped[x['canonicalIdentity']]=x
+                  c=sum(h.get('legacyAssetSection')=='COMMON_EQUITY' for h in x.get('holdings',[])); ce+=c; ces+=bool(c)
+                  bad.extend({'identity':x['canonicalIdentity'],'description':h.get('description')} for h in x.get('holdings',[]) if bad_re.search(str(h.get('description') or '')))
+              months.append({'signalMonth':s['signalMonth'],'sourceSeriesCount':len(s['sourceFilings']),'parseStatusCounts':dict(status),'commonEquityHoldingCount':ce,'commonEquitySourceCount':ces})
+          ambiguous=sum(1 for f in raw.get('filingAudit',[]) for e in (f.get('legacyAssignmentAudit') or []) if e.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and e.get('assignedIdentity') is not None)
+          audit={'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),'filingFetchErrorCount':raw.get('filingFetchErrorCount'),'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),'assetSectionCounts':raw.get('legacyAssetSectionCounts'),'uniqueZeroHoldingTargetCount':len(zero),'uniqueNoGroupedTargetCount':len(no_grouped),'ambiguousAssignedMarkerCount':ambiguous,'badFinancialTextHoldingCount':len(bad),'zeroTargets':[{'canonicalIdentity':x.get('canonicalIdentity'),'seriesName':x.get('seriesName'),'registrant':x.get('registrant'),'form':x.get('form')} for x in zero.values()],'noGroupedTargets':[{'canonicalIdentity':x.get('canonicalIdentity'),'seriesName':x.get('seriesName'),'registrant':x.get('registrant'),'form':x.get('form')} for x in no_grouped.values()],'badExamples':bad[:20],'months':months}
+          (r/'momentum-v2-9-authoritative-holdings-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('HOLDINGS_AUDIT',json.dumps({k:v for k,v in audit.items() if k not in {'zeroTargets','noGroupedTargets','badExamples','months'}}))
+          for m in months: print('MONTH',json.dumps(m))
+          for x in audit['zeroTargets']: print('ZERO',json.dumps(x))
+          for x in audit['noGroupedTargets']: print('NO_GROUPED',json.dumps(x))
+          assert raw.get('filingFetchErrorCount')==0
+          assert not no_grouped and not zero and ambiguous==0 and not bad
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-authoritative-h1-2006-v2
+          path: |
+            data/research/sec-legacy-etf-series-source-preid-v29genuine-2006.json
+            data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-h1-2006.json
+          if-no-files-found: warn
