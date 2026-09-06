@@ -1,0 +1,139 @@
+name: Research Momentum v2.9 Source Qualification H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-source-qualification-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qualify-and-parse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRE_ID_ARTIFACT_ID: "9981960984"
+      POST_ID_ARTIFACT_ID: "9963958301"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download canonical pre-ID and frozen post-ID catalogs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/pre /tmp/post
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${PRE_ID_ARTIFACT_ID}/zip" > /tmp/pre.zip
+          unzip -q /tmp/pre.zip -d /tmp/pre
+          cp "$(find /tmp/pre -type f -name 'sec-legacy-etf-series-source-preid-v29canonical-2006.json' | head -n1)" data/research/preid.json
+
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${POST_ID_ARTIFACT_ID}/zip" > /tmp/post.zip
+          unzip -q /tmp/post.zip -d /tmp/post
+          cp "$(find /tmp/post -type f -name 'sec-id-era-strict-series-source-h1-2006.json' | head -n1)" data/research/postid.json
+
+      - name: Qualify post-ID source occurrence per exact Series schedule
+        env:
+          POST_ID_CATALOG_PATH: data/research/postid.json
+        run: python3 scripts/research-sec-id-era-source-occurrence-qualify-v29.py
+
+      - name: Build corrected hybrid PIT catalog
+        env:
+          LEGACY_CATALOG_PATH: data/research/preid.json
+          ID_CATALOG_PATH: data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+        run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+
+      - name: Parse raw holdings from corrected hybrid catalog only
+        env:
+          CATALOG_PATH: data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+          SOURCE_CATALOG_RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/research-nq-pit-holdings-hybrid-h1-2006.py
+
+      - name: Structural parsing audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          root=Path('data/research')
+          post=json.loads((root/'sec-id-era-strict-series-source-h1-2006-v29qualified.json').read_text())
+          hybrid=json.loads((root/'sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          raw=json.loads((root/'nq-pit-holdings-hybrid-h1-2006.json').read_text())
+
+          months=[]
+          for snap in raw['monthSnapshots']:
+              status=Counter(row.get('parseStatus') for row in snap['sourceFilings'])
+              by_regime=Counter((row.get('identityRegime'),row.get('parseStatus')) for row in snap['sourceFilings'])
+              months.append({
+                  'signalMonth':snap['signalMonth'],
+                  'catalogSourceSeriesCount':snap['catalogSourceSeriesCount'],
+                  'parsedSourceSeriesCount':snap['parsedSourceSeriesCount'],
+                  'parseStatusCounts':dict(status),
+                  'parseStatusByRegime':{f'{k[0]}::{k[1]}':v for k,v in sorted(by_regime.items())},
+                  'missingParsedSeriesCount':len(snap.get('missingParsedSeries') or []),
+              })
+
+          ambiguous_assigned=[]
+          for filing in raw.get('filingAudit',[]):
+              for entry in filing.get('legacyAssignmentAudit') or []:
+                  if entry.get('assignmentRule')=='AMBIGUOUS_EXACT_TARGETS' and entry.get('assignedIdentity'):
+                      ambiguous_assigned.append({'accession':filing.get('accession'),'entry':entry})
+
+          audit={
+              'purpose':'Schedule-qualified source and raw-holdings parsing audit for momentum_v2_9 H1 2006. Source replacement is based only on same-filing exact Series schedule assignment; no holdings outcomes or performance are used.',
+              'postId':{
+                  'positiveSeriesCount':post.get('positiveSeriesCount'),
+                  'preQualificationSourceOccurrenceCount':post.get('preQualificationSourceOccurrenceCount'),
+                  'qualifiedSourceOccurrenceCount':post.get('sourceOccurrenceCount'),
+                  'removedSourceOccurrenceCount':post.get('removedSourceOccurrenceCount'),
+                  'sourceQualificationFetchErrorCount':post.get('sourceQualificationFetchErrorCount'),
+              },
+              'hybrid':{
+                  'legacyPositiveIdentityCount':hybrid.get('legacyPositiveIdentityCount'),
+                  'postIdPositiveSeriesCount':hybrid.get('postIdPositiveSeriesCount'),
+                  'exactUniqueBridgeCount':hybrid.get('exactUniqueBridgeCount'),
+                  'ambiguousBridgeCount':hybrid.get('ambiguousBridgeCount'),
+              },
+              'raw':{
+                  'uniqueSourceFilingCount':raw.get('uniqueSourceFilingCount'),
+                  'filingFetchSuccessCount':raw.get('filingFetchSuccessCount'),
+                  'filingFetchErrorCount':raw.get('filingFetchErrorCount'),
+                  'uniqueParsedHoldingCount':raw.get('uniqueParsedHoldingCount'),
+                  'assetSectionCounts':raw.get('legacyAssetSectionCounts'),
+                  'ambiguousAssignedMarkerCount':len(ambiguous_assigned),
+                  'zeroHoldingTargetCount':sum(int(x.get('zeroHoldingTargetCount') or 0) for x in raw.get('filingAudit',[])),
+                  'noGroupedScheduleTargetCount':sum(int(x.get('noGroupedScheduleTargetCount') or 0) for x in raw.get('filingAudit',[])),
+              },
+              'months':months,
+          }
+          (root/'momentum-v2-9-source-qualification-audit-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('AUDIT',json.dumps(audit))
+
+          if post.get('sourceQualificationFetchErrorCount'):
+              raise SystemExit('post-ID source qualification fetch errors')
+          if hybrid.get('ambiguousBridgeCount'):
+              raise SystemExit('ambiguous hybrid bridge')
+          if raw.get('filingFetchErrorCount'):
+              raise SystemExit('raw filing fetch errors')
+          if ambiguous_assigned:
+              raise SystemExit('ambiguous legacy marker was assigned')
+          if any(month['missingParsedSeriesCount'] for month in months):
+              raise SystemExit('missing parsed series records')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-source-qualified-h1-2006
+          path: |
+            data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-pit-holdings-hybrid-h1-2006.json
+            data/research/momentum-v2-9-source-qualification-audit-h1-2006.json
+          if-no-files-found: warn
