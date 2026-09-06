@@ -1,0 +1,198 @@
+name: Research Momentum v2.9 Final Gate B v5 H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths:
+      - ".github/workflows/research-momentum-v2-9-final-gate-b-v5-h1-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate-b-v5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_RUN_ID: "34023411403"
+      NPX_ARTIFACT_ID: "9876020712"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for authoritative holdings v5 and download
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 600); do
+            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.status')
+            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.conclusion // ""')
+            echo "holdings status=${status} conclusion=${conclusion}"
+            if [ "$status" = completed ]; then
+              [ "$conclusion" = success ] || { echo "authoritative holdings v5 failed"; exit 1; }
+              break
+            fi
+            sleep 5
+          done
+          status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.status')
+          [ "$status" = completed ] || { echo "authoritative holdings v5 wait timeout"; exit 1; }
+          artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name=="momentum-v2-9-authoritative-holdings-final-v5-h1-2006") | .id' | head -n1)
+          [ -n "$artifact_id" ] || { echo "holdings v5 artifact missing"; exit 1; }
+          mkdir -p data/research /tmp/h
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${artifact_id}/zip" > /tmp/h.zip
+          unzip -q /tmp/h.zip -d /tmp/h
+          for f in nq-pit-holdings-hybrid-h1-2006.json sec-hybrid-etf-source-catalog-h1-2006.json momentum-v2-9-authoritative-source-audit-v5-h1-2006.json momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json; do
+            cp "$(find /tmp/h -name "$f" | head -n1)" "data/research/$f"
+          done
+          echo "$artifact_id" > data/research/authoritative-holdings-v5-artifact-id.txt
+
+      - name: Download frozen N-PX master only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/npx
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${NPX_ARTIFACT_ID}/zip" > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp "$(find /tmp/npx -name 'npx-security-master-2006.json' | head -n1)" data/research/npx-security-master-2006.json
+
+      - name: COMMON_EQUITY and frozen deterministic N-PX mapping
+        run: python3 scripts/research-nq-hybrid-structural-mapping-h1-2006.py
+
+      - name: Strict PIT country without current ticker fallback
+        run: python3 scripts/research-nq-hybrid-country-strict-v5-h1-2006.py
+
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+
+      - name: Final Gate B v5 structural decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=Path('data/research')
+          sa=json.loads((r/'momentum-v2-9-authoritative-source-audit-v5-h1-2006.json').read_text())
+          pa=json.loads((r/'momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json').read_text())
+          mp=json.loads((r/'nq-hybrid-structural-mapping-h1-2006.json').read_text())
+          co=json.loads((r/'nq-hybrid-country-resolved-h1-2006.json').read_text())
+          pr=json.loads((r/'nq-hybrid-universe-h1-2006.json').read_text())
+          up=json.loads((r/'nq-hybrid-universe-country-upper-bound-h1-2006.json').read_text())
+          aid=int((r/'authoritative-holdings-v5-artifact-id.txt').read_text())
+
+          allowed={'BASELINE_EXACT','BASELINE_ADR_BASE_UNIQUE','STRUCTURAL_SUFFIX_EXACT','UNIQUE_LONG_PREFIX'}
+          methods=set(mp.get('matchMethodCounts') or {})
+          unexpected=sorted(methods-allowed)
+
+          def compare(a,b):
+            ar={x['symbol']:x['universeRank'] for x in a}; br={x['symbol']:x['universeRank'] for x in b}
+            common=set(ar)&set(br); k=min(len(a),len(b),80)
+            overlap=len(common)/k if k else 1.0
+            if len(common)>=2:
+              n=len(common); d2=sum((ar[s]-br[s])**2 for s in common); rho=1-(6*d2)/(n*(n*n-1))
+            else:
+              rho=1.0 if len(common)==len(ar)==len(br) else None
+            top=[x['symbol'] for x in a[:2]]
+            retention=sum(s in br for s in top)/len(top) if top else 1.0
+            return {'overlap':overlap,'spearman':rho,'top2Retention':retention,'commonCount':len(common),'k':k,'primaryTop2':top}
+
+          mm={x['signalMonth']:x for x in mp['monthSnapshots']}
+          cm={x['signalMonth']:x for x in co['monthSnapshots']}
+          pm={x['signalMonth']:x for x in pr['monthSnapshots']}
+          um={x['signalMonth']:x for x in up['monthSnapshots']}
+          months=[]
+          for month in sorted(pm):
+            m=mm[month]; c=cm[month]; p=pm[month]; u=um[month]
+            mapped=known=0; mapped_w=known_w=0.0
+            for filing in c['sourceFilings']:
+              for h in filing.get('holdings',[]):
+                if h.get('mappingStatus')!='MATCHED_UNIQUE': continue
+                mapped+=1; w=float(h.get('weight') or 0); mapped_w+=w
+                if h.get('countryClassification') in {'US','NON_US'}:
+                  known+=1; known_w+=w
+            months.append({
+              'signalMonth':month,
+              'commonEquityHoldingCount':m['commonEquityHoldingCount'],
+              'uniqueMappedCount':m['uniqueMappedCount'],
+              'uniqueMappedCountRate':m['uniqueMappedCountRate'],
+              'uniqueMappedWeightRate':m['uniqueMappedWeightRate'],
+              'ambiguousCount':m['ambiguousCount'],
+              'ambiguousWeight':m['ambiguousWeight'],
+              'unmappedCount':m['unmappedCount'],
+              'unmappedWeight':m['unmappedWeight'],
+              'mappedCountryKnownCountRate':known/mapped if mapped else None,
+              'mappedCountryKnownWeightRate':known_w/mapped_w if mapped_w else None,
+              'eligibleSourceSeriesCount':p['eligibleSourceSeriesCount'],
+              'primaryUniverseSize':len(p['symbols']),
+              'upperUniverseSize':len(u['symbols']),
+              'upperComparison':compare(p['symbols'],u['symbols']),
+            })
+
+          conflicts=[]
+          if any(sa.get(k) for k in ('umbrellaIdentityCount','internationalGrowthCount','vanguardAliasGroupCount','iSharesTrailingFundAliasGroupCount','ambiguousBridgeCount')):
+            conflicts.append('SOURCE_IDENTITY_OR_BRIDGE')
+          if sa.get('summaryScheduleRejectedBlockMarkerCount',0)<=0:
+            conflicts.append('SUMMARY_SOURCE_RULE_NOT_EVIDENCED')
+          parser_fields=('filingFetchErrorCount','missingCurrentSourceKeyCount','extraOutputSourceKeyCount','uniqueZeroHoldingTargetCount','uniqueNoGroupedTargetCount','ambiguousAssignedMarkerCount','badFinancialTextHoldingCount','temporalLabelHoldingCount','summaryAggregateHoldingCount')
+          if any(pa.get(k) for k in parser_fields):
+            conflicts.append('PARSER_STRUCTURAL_ERROR')
+          if unexpected:
+            conflicts.append('UNAPPROVED_NPX_MAPPING_METHOD')
+          if co.get('currentTickerFallbackAllowed') is not False or co.get('currentTickerFallbackCount') != 0:
+            conflicts.append('CURRENT_TICKER_COUNTRY_FALLBACK')
+          if any(x['eligibleSourceSeriesCount']==0 or x['primaryUniverseSize']==0 for x in months):
+            conflicts.append('EMPTY_SOURCE_OR_UNIVERSE')
+
+          stable=all(
+            x['upperComparison']['overlap']>=0.70
+            and (x['upperComparison']['spearman'] is None or x['upperComparison']['spearman']>=0.75)
+            and x['upperComparison']['top2Retention']>=0.80
+            for x in months
+          )
+          if not stable:
+            conflicts.append('COUNTRY_UPPER_BOUND_MATERIAL')
+
+          out={
+            'purpose':'Final return-independent Gate B v5 decision for Momentum v2.9 H1 2006 historical Universe reconstruction.',
+            'authoritativeHoldingsArtifactId':aid,
+            'frozenNpxMasterArtifactId':9876020712,
+            'sourceIdentity':sa,
+            'parsing':{k:pa.get(k) for k in ('uniqueSourceFilingCount','filingFetchSuccessCount','filingFetchErrorCount','uniqueParsedHoldingCount','assetSectionCounts','parseMethodCountsAcrossSnapshots','catalogKeyCount','outputKeyCount','missingCurrentSourceKeyCount','extraOutputSourceKeyCount','uniqueZeroHoldingTargetCount','uniqueNoGroupedTargetCount','ambiguousAssignedMarkerCount','badFinancialTextHoldingCount','temporalLabelHoldingCount','summaryAggregateHoldingCount')},
+            'mappingMethodCounts':mp.get('matchMethodCounts'),
+            'unexpectedMappingMethods':unexpected,
+            'mappingUncertaintyPolicy':'AMBIGUOUS_AND_UNMAPPED_EXCLUDED_NOT_AUTO_ASSIGNED',
+            'country':{k:co.get(k) for k in ('countryEvidenceRule','currentTickerFallbackAllowed','currentTickerFallbackCount','unresolvedInputCount','resolvedUSCount','resolvedNonUSCount','remainingUnknownCount')},
+            'countryUncertaintyPolicy':'UNKNOWN_EXCLUDED_PRIMARY; MAPPED_UNKNOWN_TO_US_ONLY_IN_UPPER_BOUND_SENSITIVITY',
+            'months':months,
+            'countryUpperBoundSensitivityStable':stable,
+            'structuralConflicts':conflicts,
+            'gateBPass':not conflicts,
+            'universeReconstructionConfirmed':not conflicts,
+            'stage21PerformanceConsulted':False,
+            'productionModified':False,
+          }
+          (r/'momentum-v2-9-final-gate-b-v5-h1-2006.json').write_text(json.dumps(out,indent=2)+'\n')
+          print('GATE_B_V5',json.dumps({k:v for k,v in out.items() if k!='months'}),flush=True)
+          for x in months: print('MONTH',json.dumps(x),flush=True)
+          if conflicts:
+            raise SystemExit('Gate B v5 blockers: '+','.join(conflicts))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-final-gate-b-v5-h1-2006
+          path: |
+            data/research/momentum-v2-9-final-gate-b-v5-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-v5-h1-2006.json
+            data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+          if-no-files-found: warn
