@@ -4,7 +4,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,15 +12,26 @@ MAPPING = R / "nq-hybrid-structural-mapping-h1-2006.json"
 NPX = R / "npx-security-master-2006.json"
 MASTER = R / "sec-issuer-master-rows-2005-2006.json"
 OUTDIR = R / "country-shards"
+RESOLVER_SCRIPT = os.environ.get(
+    "STRICT_COUNTRY_SHARD_RESOLVER_SCRIPT",
+    "research-nq-hybrid-country-strict-v5-seeded-evidence-cache.py",
+)
 
 spec = importlib.util.spec_from_file_location(
-    "seeded_country",
-    ROOT / "scripts/research-nq-hybrid-country-strict-v5-seeded-evidence-cache.py",
+    "country_resolver",
+    ROOT / "scripts" / RESOLVER_SCRIPT,
 )
-seeded = importlib.util.module_from_spec(spec)
+resolver = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
-spec.loader.exec_module(seeded)
-strict = seeded.strict
+spec.loader.exec_module(resolver)
+strict = resolver.strict
+resolve_one = (
+    getattr(resolver, "pit_carry_resolve", None)
+    or getattr(resolver, "seeded_resolve", None)
+    or getattr(resolver, "cached_exact_historical_resolve", None)
+)
+if resolve_one is None:
+    raise RuntimeError(f"resolver {RESOLVER_SCRIPT} exposes no supported exact historical resolver")
 
 
 def collect_unresolved(mapping: dict, npx: dict) -> dict:
@@ -65,7 +75,7 @@ def main() -> None:
     selected = [(k, row) for pos, (k, row) in enumerate(ordered) if pos % shard_count == shard_index]
     results = []
     for _, row in selected:
-        result = seeded.seeded_resolve(row, master_rows) if row.get("issuerVariants") and row.get("asOfReportDate") else {**row, "classification": "UNKNOWN", "attempts": []}
+        result = resolve_one(row, master_rows) if row.get("issuerVariants") and row.get("asOfReportDate") else {**row, "classification": "UNKNOWN", "attempts": []}
         results.append(result)
         print("STRICT_COUNTRY_SHARD", json.dumps({
             "shardIndex": shard_index,
@@ -79,6 +89,7 @@ def main() -> None:
     out = {
         "shardIndex": shard_index,
         "shardCount": shard_count,
+        "resolverScript": RESOLVER_SCRIPT,
         "unresolvedTotalCount": len(unresolved),
         "selectedCount": len(selected),
         "resolutionAudit": results,
@@ -92,7 +103,7 @@ def main() -> None:
         "resolvedNonUSCount": sum(x.get("classification") == "NON_US" for x in results),
         "remainingUnknownCount": sum(x.get("classification") == "UNKNOWN" for x in results),
         "acceptedEvidenceReuseCount": sum(bool(x.get("acceptedEvidenceReuse")) for x in results),
-        "freshResolutionCount": seeded.fresh_count,
+        "resolverScript": RESOLVER_SCRIPT,
     }), flush=True)
 
 
