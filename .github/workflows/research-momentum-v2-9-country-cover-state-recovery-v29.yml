@@ -1,10 +1,9 @@
-name: Research Momentum v2.9 Country Cover-State Recovery
+name: Research Momentum v2.9 Country CIK-Header State Recovery
 on:
   push:
     branches: ["research/momentum-v2-9-preid-fix-20260906"]
     paths:
       - '.github/workflows/research-momentum-v2-9-country-cover-state-recovery-v29.yml'
-      - 'scripts/research-country-cover-state-recovery-v29.py'
 permissions:
   actions: read
   contents: read
@@ -17,12 +16,12 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
-      COUNTRY_ARTIFACT_ID: '9998542676'
+      COUNTRY_ARTIFACT_ID: '9998634891'
       SHARD_INDEX: ${{ matrix.shard }}
       SHARD_COUNT: '8'
     steps:
       - uses: actions/checkout@v4
-      - name: Download v18 strict country artifact
+      - name: Download v19 strict country artifact
         shell: bash
         run: |
           set -euo pipefail
@@ -30,10 +29,10 @@ jobs:
           gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
           unzip -q /tmp/c.zip -d /tmp/c
           cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
-      - name: Recover strict UNKNOWN from historical filing cover state
-        run: python3 scripts/research-country-cover-state-recovery-v29.py
+      - name: Recover strict UNKNOWN from exact historical CIK header state
+        run: python3 scripts/research-country-cik-header-state-recovery-v29.py
       - uses: actions/upload-artifact@v4
         with:
-          name: country-cover-state-recovery-v29-${{ matrix.shard }}
-          path: data/research/country-cover-state-recovery-v29-shard-${{ matrix.shard }}.json
+          name: country-cik-header-state-recovery-v29-${{ matrix.shard }}
+          path: data/research/country-cik-header-state-recovery-v29-shard-${{ matrix.shard }}.json
           if-no-files-found: error
