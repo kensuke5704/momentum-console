@@ -1,0 +1,96 @@
+name: Research Momentum v2.9 Authoritative Source Final v6 H1 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-authoritative-source-final-v6-h1-2006.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-final-v6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREID_CANONICAL_ARTIFACT_ID: "9981960984"
+      POSTID_QUALIFIED_ARTIFACT_ID: "9982681844"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen source inputs
+        shell: bash
+        run: |
+          set -euo pipefail; mkdir -p data/research /tmp/pre /tmp/post
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${PREID_CANONICAL_ARTIFACT_ID}/zip" > /tmp/pre.zip; unzip -q /tmp/pre.zip -d /tmp/pre
+          cp "$(find /tmp/pre -name 'sec-legacy-etf-series-source-preid-v29canonical-2006.json'|head -n1)" data/research/sec-legacy-etf-series-source-preid-v29canonical-2006.json
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${POSTID_QUALIFIED_ARTIFACT_ID}/zip" > /tmp/post.zip; unzip -q /tmp/post.zip -d /tmp/post
+          cp "$(find /tmp/post -name 'sec-id-era-strict-series-source-h1-2006-v29qualified.json'|head -n1)" data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+      - name: Canonicalize exact same-filing iShares X vs X FUND aliases
+        env:
+          PREID_ISHARES_INPUT_PATH: data/research/sec-legacy-etf-series-source-preid-v29canonical-2006.json
+          PREID_ISHARES_OUTPUT_PATH: data/research/sec-legacy-etf-series-source-preid-v29canonical-ishares-2006.json
+        run: python3 scripts/research-sec-preid-ishares-fund-suffix-canonicalize-2006-v2.py
+      - name: Requalify pre-ID complete portfolios
+        env:
+          PREID_CATALOG_PATH: data/research/sec-legacy-etf-series-source-preid-v29canonical-ishares-2006.json
+        run: python3 scripts/research-sec-preid-genuine-schedule-qualify-v29-v3.py
+      - name: Requalify post-ID sources with final Series boundaries
+        env:
+          POSTID_INPUT_PATH: data/research/sec-id-era-strict-series-source-h1-2006-v29qualified.json
+          POSTID_OUTPUT_PATH: data/research/sec-id-era-strict-series-source-h1-2006-v29boundary-v6.json
+        run: python3 scripts/research-sec-id-era-series-source-boundary-requalify-v29-v6.py
+      - name: Rebuild exact unique hybrid catalog
+        env:
+          LEGACY_CATALOG_PATH: data/research/sec-legacy-etf-series-source-preid-v29genuine-2006.json
+          ID_CATALOG_PATH: data/research/sec-id-era-strict-series-source-h1-2006-v29boundary-v6.json
+        run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+      - name: Source v6 structural audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re
+          from collections import defaultdict
+          from pathlib import Path
+          r=Path('data/research')
+          p=json.loads((r/'sec-legacy-etf-series-source-preid-v29genuine-2006.json').read_text())
+          i=json.loads((r/'sec-id-era-strict-series-source-h1-2006-v29boundary-v6.json').read_text())
+          h=json.loads((r/'sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          pos=p['positiveIdentities'];vang=defaultdict(set);ish=defaultdict(set)
+          for x in pos:
+            n=x.get('normalizedSeriesName','')
+            if x.get('registrant','').upper().startswith('VANGUARD'): vang[(x['cik'],re.sub(r'^VANGUARD\s+','',n))].add(n)
+            if x.get('registrant','').upper().startswith('ISHARES'): ish[(x['cik'],re.sub(r'\s+FUND$','',n))].add(n)
+          audit={
+            'finalLegacyPositiveIdentityCount':p['positiveIdentityCount'],
+            'finalLegacySourceOccurrenceCount':p['sourceOccurrenceCount'],
+            'postIdPositiveSeriesCount':h['postIdPositiveSeriesCount'],
+            'postIdPreBoundarySourceOccurrenceCount':i.get('preBoundarySourceOccurrenceCount'),
+            'postIdBoundarySourceOccurrenceCount':i.get('sourceOccurrenceCount'),
+            'postIdBoundaryRemovedSourceOccurrenceCount':i.get('boundaryRemovedSourceOccurrenceCount'),
+            'postIdBoundaryRemovedSeriesAccessionPairs':i.get('boundaryRemovedSeriesAccessionPairs'),
+            'postIdBoundaryQualificationFetchErrorCount':i.get('boundaryQualificationFetchErrorCount'),
+            'umbrellaIdentityCount':sum(x.get('normalizedSeriesName')=='ISHARES MSCI INDEX FUND' for x in pos),
+            'internationalGrowthCount':sum(x.get('normalizedSeriesName')=='INTERNATIONAL GROWTH FUND' for x in pos),
+            'vanguardAliasGroupCount':sum(len(v)>1 for v in vang.values()),
+            'iSharesTrailingFundAliasGroupCount':sum(len(v)>1 for v in ish.values()),
+            'exactUniqueBridgeCount':h['exactUniqueBridgeCount'],
+            'ambiguousBridgeCount':h['ambiguousBridgeCount'],
+            'months':[{k:s[k] for k in ('signalMonth','sourceSeriesCount','legacySourceCount','seriesIdSourceCount','suppressedLegacyCount')} for s in h['monthSnapshots']],
+          }
+          (r/'momentum-v2-9-authoritative-source-audit-v6-h1-2006.json').write_text(json.dumps(audit,indent=2)+'\n')
+          print('SOURCE_AUDIT_V6',json.dumps(audit),flush=True)
+          assert p.get('genuineScheduleFetchErrorCount')==0 and p.get('ambiguousAssignedMarkerCount')==0
+          assert i.get('boundaryQualificationFetchErrorCount')==0
+          assert not any(audit[k] for k in ('umbrellaIdentityCount','internationalGrowthCount','vanguardAliasGroupCount','iSharesTrailingFundAliasGroupCount','ambiguousBridgeCount'))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: momentum-v2-9-authoritative-source-final-v6-h1-2006
+          path: |
+            data/research/sec-legacy-etf-series-source-preid-v29genuine-2006.json
+            data/research/sec-id-era-strict-series-source-h1-2006-v29boundary-v6.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+          if-no-files-found: error
