@@ -29,6 +29,13 @@ START_HEADINGS = (
     "STATEMENT OF NET ASSETS",
     "SCHEDULE OF SECURITIES",
 )
+END_HEADING_RE = re.compile(
+    r"^(?:STATEMENTS? OF OPERATIONS|STATEMENTS? OF CHANGES IN NET ASSETS|"
+    r"STATEMENTS? OF ASSETS AND LIABILITIES|STATEMENTS? OF CASH FLOWS|"
+    r"FINANCIAL HIGHLIGHTS|NOTES? TO FINANCIAL STATEMENTS)",
+    re.I,
+)
+END_TOTAL_RE = re.compile(r"^(?:TOTAL INVESTMENTS?|NET ASSETS?)\b", re.I)
 LEADING_QTY_RE = re.compile(
     r"^\s*(\d[\d,]*(?:\.\d+)?)\s+(.+?)\s+(?:([A-Z]{3})\s+)?\$?\s*(\(?\d[\d,]*(?:\.\d+)?\)?)\s*$",
     re.I,
@@ -48,12 +55,14 @@ HEADER_RE = re.compile(
 BAD_TEXT_RE = re.compile(
     r"\b(?:UNAUDITED|SEE NOTES? TO|NOTES? TO (?:THE )?(?:SCHEDULE|STATEMENT|PORTFOLIO)|"
     r"EXPENSES? ARE CALCULATED|AVERAGE ANNUAL TOTAL RETURNS?|FEDERAL INCOME TAXES|"
-    r"FOREIGN CURRENCY TRANSLATION|TAX COST|UNREALIZED APPRECIATION|UNREALIZED DEPRECIATION)\b",
+    r"FOREIGN CURRENCY TRANSLATION|TAX COST|UNREALIZED APPRECIATION|UNREALIZED DEPRECIATION|"
+    r"CAPITAL SHARE TRANSACTIONS?|NET INCREASE|BEGINNING OF PERIOD|END OF PERIOD|RESPECTIVELY)\b",
     re.I,
 )
 
 
 def clean_desc(value: str) -> str:
+    value = re.sub(r"\bTABLE OF CONTENTS\b", " ", value, flags=re.I)
     value = pilot.clean_desc(value)
     value = re.sub(r"\.{2,}", " ", value)
     return " ".join(value.split())
@@ -116,7 +125,10 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
     - issuer, quantity and market value on consecutive lines, with optional '$' line;
     - continuation issuer text followed by a numeric tail on the next line.
 
-    No ticker, future Series metadata, country inference, ranks, returns or strategy outcomes are used.
+    Parsing starts only at an accepted complete-holdings heading and stops at total
+    investments/net assets or the next non-holdings financial-statement heading. No
+    ticker, future Series metadata, country inference, ranks, returns or strategy
+    outcomes are used.
     """
     lines = pilot.plain_lines(text)
     holdings: list[dict] = []
@@ -138,6 +150,11 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
         if not started:
             continue
 
+        if END_HEADING_RE.search(line) or (END_TOTAL_RE.search(line) and len(holdings) >= 5):
+            started = False
+            pending_desc = ""
+            pending_qty = None
+            continue
         if up.startswith(("NOTES TO ", "NOTE TO ", "ITEM 2.", "ITEM 3.", "ITEM 4.")):
             started = False
             pending_desc = ""
@@ -162,10 +179,13 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
         m = pilot.TAIL_RE.match(line)
         if m:
             prefix, qty_raw, _currency, value_raw = m.groups()
+            had_toc = bool(re.search(r"TABLE OF CONTENTS", prefix, re.I))
             desc = clean_desc(prefix)
             qty = pilot.parse_number(qty_raw)
             value = pilot.parse_number(value_raw)
             if qty is not None and qty > 0 and value is not None and value > 0:
+                if had_toc and pending_desc:
+                    desc = clean_desc(pending_desc + " " + desc)
                 if security_text(desc):
                     emit(holdings, desc, qty, value)
                     pending_desc = ""
@@ -201,7 +221,6 @@ def parse_bound_plain_holdings(text: str) -> list[dict]:
         desc = clean_desc(line)
         if security_text(desc):
             if pending_desc and pending_qty is None:
-                # Consecutive textual lines are a wrapped security description.
                 pending_desc = clean_desc(pending_desc + " " + desc)
             else:
                 pending_desc = desc
