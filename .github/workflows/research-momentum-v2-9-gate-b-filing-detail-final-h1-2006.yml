@@ -19,7 +19,7 @@ jobs:
       ORIGINAL_GATE_ARTIFACT_ID: "9987700449"
       HOLDINGS_ARTIFACT_ID: "9986815485"
       MAPPING_ARTIFACT_ID: "9987093683"
-      DETAIL_RUN_ID: "34084801039"
+      DETAIL_RUN_ID: "34084934273"
     steps:
       - uses: actions/checkout@v4
       - name: Download frozen authoritative Gate inputs
