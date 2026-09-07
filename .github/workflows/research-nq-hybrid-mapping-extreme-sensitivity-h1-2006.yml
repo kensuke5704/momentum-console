@@ -1,0 +1,48 @@
+name: Research N-Q Hybrid Mapping Extreme Sensitivity H1 2006
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-nq-hybrid-mapping-extreme-sensitivity-h1-2006.py
+      - .github/workflows/research-nq-hybrid-mapping-extreme-sensitivity-h1-2006.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  sensitivity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download strict PIT Gate B artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/gateb
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10012280475/zip > /tmp/gateb.zip
+          unzip -q /tmp/gateb.zip -d /tmp/gateb
+          cp /tmp/gateb/nq-hybrid-country-pit-h1-2006.json data/research/
+          cp /tmp/gateb/nq-hybrid-gate-b-h1-2006.json data/research/
+          python3 - <<'PY'
+          import json
+          p='data/research/nq-hybrid-gate-b-h1-2006.json'
+          d=json.load(open(p))
+          assert d['catalogSha256']=='e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801'
+          assert d['countryUpperBoundSensitivityPass'] is True
+          PY
+      - run: python3 -m py_compile scripts/research-nq-hybrid-mapping-extreme-sensitivity-h1-2006.py
+      - run: python3 scripts/research-nq-hybrid-mapping-extreme-sensitivity-h1-2006.py
+      - name: Require extreme sensitivity pass
+        run: |
+          python3 - <<'PY'
+          import json
+          d=json.load(open('data/research/nq-hybrid-mapping-extreme-sensitivity-h1-2006.json'))
+          assert d['pass'] is True, d
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-hybrid-mapping-extreme-sensitivity-h1-2006
+          path: data/research/nq-hybrid-mapping-extreme-sensitivity-h1-2006.json
+          if-no-files-found: error
