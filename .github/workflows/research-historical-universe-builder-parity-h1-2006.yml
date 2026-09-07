@@ -1,0 +1,56 @@
+name: Research Historical Universe Builder Parity H1 2006
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-historical-universe-builder.py
+      - .github/workflows/research-historical-universe-builder-parity-h1-2006.yml
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download accepted Gate B artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/gateb
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10012280475/zip > /tmp/gateb.zip
+          unzip -q /tmp/gateb.zip -d /tmp/gateb
+          cp /tmp/gateb/nq-hybrid-country-pit-h1-2006.json data/research/
+          cp /tmp/gateb/nq-hybrid-gate-b-h1-2006.json data/research/
+      - run: python3 -m py_compile scripts/research-historical-universe-builder.py
+      - name: Build frozen H1 historical Universe
+        run: |
+          python3 scripts/research-historical-universe-builder.py \
+            --input data/research/nq-hybrid-country-pit-h1-2006.json \
+            --output data/research/historical-universe-builder-h1-2006.json \
+            --expected-catalog-sha e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801
+      - name: Require exact accepted-primary parity
+        run: |
+          python3 - <<'PY'
+          import json
+          accepted=json.load(open('data/research/nq-hybrid-gate-b-h1-2006.json'))
+          built=json.load(open('data/research/historical-universe-builder-h1-2006.json'))
+          assert built['catalogSha256']==accepted['catalogSha256']
+          aa=accepted['monthSnapshots']; bb=built['monthSnapshots']
+          assert len(aa)==len(bb)==6
+          summary=[]
+          for a,b in zip(aa,bb):
+              assert a['signalMonth']==b['signalMonth']
+              assert a['asOf']==b['asOf']
+              assert a['primaryEligibleSourceSeriesCount']==b['eligibleSourceSeriesCount'], (a['signalMonth'],a['primaryEligibleSourceSeriesCount'],b['eligibleSourceSeriesCount'])
+              assert a['primarySymbols']==b['symbols'], a['signalMonth']
+              summary.append({'signalMonth':a['signalMonth'],'eligible':b['eligibleSourceSeriesCount'],'universeSize':len(b['symbols']),'top2':[x['symbol'] for x in b['symbols'][:2]]})
+          print('EXACT_PARITY',json.dumps(summary))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-universe-builder-parity-h1-2006
+          path: data/research/historical-universe-builder-h1-2006.json
+          if-no-files-found: error
