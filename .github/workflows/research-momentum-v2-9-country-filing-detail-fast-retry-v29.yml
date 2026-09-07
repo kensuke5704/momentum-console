@@ -1,0 +1,46 @@
+name: Research Momentum v2.9 Country Filing-Detail Fast Retry
+on:
+  push:
+    paths:
+      - '.github/workflows/research-momentum-v2-9-country-filing-detail-fast-retry-v29.yml'
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: research-momentum-v2-9-country-filing-detail-fast-retry-v29
+  cancel-in-progress: true
+jobs:
+  recover:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { shard: 0, artifact: 9988363468 }
+          - { shard: 1, artifact: 9988349197 }
+          - { shard: 6, artifact: 9988364713 }
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHARD_INDEX: ${{ matrix.shard }}
+      INPUT_ARTIFACT_ID: ${{ matrix.artifact }}
+      COUNTRY_RECOVERY_POLICY: 'HISTORICAL_EXACT_CIK_PLUS_PRE_REPORT_ACCESSION_DETAIL_STATE_ONLY'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact historical-CIK candidate artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/input
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${INPUT_ARTIFACT_ID}/zip" >/tmp/input.zip
+          unzip -q /tmp/input.zip -d /tmp/input
+          src="$(find /tmp/input -name "country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json" | head -n1)"
+          test -n "$src"
+          cp "$src" "data/research/country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json"
+      - name: Recover strict UNKNOWN with transport-only parallelism
+        run: python3 scripts/research-country-filing-detail-recovery-parallel-v29.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-filing-detail-recovery-v29-${{ matrix.shard }}
+          path: data/research/country-filing-detail-recovery-v29-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
