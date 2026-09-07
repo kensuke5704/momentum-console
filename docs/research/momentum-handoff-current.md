@@ -14,6 +14,7 @@ This is the canonical handoff for the historical-Universe reconstruction.
 - Broad 2006–2018 Stage21 performance is still prohibited until a separate post-builder validation is explicitly defined and passed.
 - Historical reconstruction must remain point-in-time. Country filing evidence must satisfy `evidenceDateFiled <= signal date`.
 - No fuzzy/edit-distance ticker repair, current-country backfill, or future Series/Class backfill.
+- UNKNOWN country is not imputed US in the primary reconstruction.
 
 ## 2. Production Universe semantics frozen for history
 
@@ -30,6 +31,8 @@ Order matters:
 6. retain `etfCount >= 2 || maxWeight >= 4`;
 7. score `3*log1p(etfCount)+0.5*log1p(aggregateWeight)+0.5*log1p(recencyWeight)`;
 8. Top80.
+
+Production source-name exclusions remain frozen and must not be relaxed during historical extension.
 
 ## 3. Gate A — PASS
 
@@ -51,6 +54,8 @@ Gate B uses the same practical thresholds as Gate A:
 - Top2 individual retention >= 0.80
 - both Top2 retained in >= 0.70 of evaluated months.
 
+The obsolete early hybrid “4/6” criterion is non-authoritative and must not be reused.
+
 ### Direct transition source fidelity
 - LRGE: 92.9% constituent / 95.9% weight
 - GFIN: 94.2% / 97.4%
@@ -67,11 +72,11 @@ Gate B uses the same practical thresholds as Gate A:
 - ambiguous bridges 0
 - monthly source counts Jan–Jun: 192 / 204 / 267 / 270 / 273 / 279.
 
-Bridge rule is frozen: same CIK + exact normalized Series/Fund name + uniqueness on both sides. No ticker/fuzzy/outcome inference.
+Bridge rule is frozen: same CIK + exact normalized Series/Fund name + uniqueness on both sides. No ticker inference, fuzzy rename, holdings/rank/return/outcome inference, or trust-global sibling binding.
 
 ### Raw holdings
 Run `34089965073`, artifact `10006530879`:
-- source filings 50
+- unique source filings 50
 - fetch success 50/50
 - unique parsed holdings **17,353**
 - explicit `COMMON_EQUITY` 11,339
@@ -88,24 +93,28 @@ Allowed primary mapping only:
 
 Raw mapping uncertainty remains visible; ambiguity is nonzero. Monthly mapped COMMON_EQUITY weight rates are approximately 65.01%, 69.21%, 79.10%, 79.10%, 76.59%, 74.83%.
 
+Do not repeat older incorrect 93–95% raw mapping-weight coverage claims.
+
 ### Country
 Strict PIT country run `34104858455`, artifact `10012280475`.
 
 Rules:
 - explicit historical country section where present
-- alphabetic CINS / explicit ADR-GDR => NON_US
-- historical SEC filing-time state/country only when `evidenceDateFiled <= signal date`
+- alphabetic CINS / explicit ADR-GDR-ADS-depositary-receipt => NON_US
+- frozen historical SEC filing-time state/country only when `evidenceDateFiled <= signal date`
 - current ticker metadata may seed CIK only
 - current state/country is never historical evidence
 - unresolved => UNKNOWN in primary.
 
-Country UNKNOWN-as-US upper-bound sensitivity:
+Canonical Actions-run country UNKNOWN-as-US upper-bound sensitivity:
 - median overlap 0.8855357143
 - minimum 0.8695652174
 - median Spearman 0.9564368674
 - Top2 individual retention 0.9166666667
 - both Top2 monthly retention 0.8333333333
 - PASS.
+
+A locally downloaded copy was once observed with slightly different month/aggregate values. Do not mix that stale/local state with the accepted checkpoint; if metrics are externally reported, prefer the committed Gate B checkpoint and Actions run, or redownload the artifact fresh.
 
 ### CORP bridge
 - transition EC+US cohort: 226/226 CORP
@@ -129,22 +138,24 @@ Both raw-normalized-exact and accepted-cleaned-exact variants:
 
 Therefore: **Gate B = PASS. Universe reconstruction is confirmed at the structural/source-fidelity gate level.**
 
-## 5. Frozen historical Universe builder core — implemented and parity passed
+## 5. Frozen historical Universe builder core — implemented and exact parity passed
 
 Files:
 - `scripts/research-historical-universe-builder.py`
 - `.github/workflows/research-historical-universe-builder-parity-h1-2006.yml`
 
-Parity run `34126348051`: SUCCESS.
+Parity run `34126348051`: SUCCESS.  
+Artifact `10020226749`: `historical-universe-builder-parity-h1-2006`.
 
 The builder consumes already-resolved historical filing snapshots only. It does not discover sources, repair identities, resolve country, use fuzzy mapping, or inspect strategy outcomes.
 
 H1-2006 parity requirement was exact, not threshold-based:
 - 6/6 signal months
+- exact signal month / as-of alignment
 - exact eligible source Series count
-- exact full primary Universe rows including rank and score.
+- exact full primary Universe rows including rank, score, and symbol-level metrics.
 
-All comparisons passed.
+All comparisons passed. The downstream historical Universe builder core is therefore frozen against the accepted H1 Gate B output.
 
 ## 6. Historical boundary and source rules that remain frozen
 
@@ -154,7 +165,10 @@ All comparisons passed.
 - Complete holdings in the legacy era include `N-Q`, `N-Q/A`, `N-CSR`, `N-CSR/A`, `N-CSRS`, `N-CSRS/A`; later transition forms may also matter.
 - An amendment replaces a holdings source only if the amendment itself contains a complete portfolio schedule.
 - Broad Creation-Unit/exchange language is candidate prefilter only. Final ETF evidence must describe the issuer's own Fund/Portfolio/Shares.
-- Do not restore trust-global sibling binding; it produced conventional Vanguard false positives.
+- Do not restore trust-global sibling binding; it produced conventional Vanguard sibling false positives.
+- Source-name exclusions must match Production.
+- Source eligibility is evaluated only after COMMON_EQUITY -> US -> CORP filtering.
+- For H2 2006 PIT country work, historical SEC evidence may use only filings available by each signal date; do not use 2007 evidence.
 
 ## 7. Rejected paths — do not revive
 
@@ -171,26 +185,57 @@ All comparisons passed.
 - current company state/country as PIT evidence
 - strategy performance/ranks as reconstruction tuning signals.
 
-## 8. Current status / next work
+## 8. Current status
 
-Completed:
+Completed and closed:
 - Gate A
 - transition fidelity
 - authoritative H1-2006 market-wide source catalog
 - raw holdings extraction
-- deterministic mapping
+- deterministic structural mapping
 - strict PIT country
 - CORP materiality bridge
 - source eligibility / breadth reconstruction
 - country and mapping residual sensitivities
 - Gate B PASS
-- frozen historical builder core with exact H1 parity.
+- frozen historical Universe builder core with exact H1 parity.
 
-Current next step is **source-bridge period extension**, beginning with 2006 H2, while reusing the frozen builder and all frozen identity/country/eligibility rules. This is data-lineage expansion, not strategy optimization.
+Not yet completed:
+- 2006 H2 source catalog
+- H2 holdings extraction
+- H2 structural mapping
+- H2 strict PIT country
+- H2 builder output / extension validation
+- any broad 2006–2018 Stage21 performance.
 
-Do not run broad 2006–2018 Stage21 performance yet. Before that, define and pass a separate post-builder validation covering period-extension causality/completeness and implementation invariants.
+## 9. Active next task — 2006 H2 source-bridge period extension
 
-## 9. Key artifacts / runs
+This is the current resumption point.
+
+1. Identify the exact workflow/run/generator script lineage that produced post-ID artifact `9963958301`.
+2. Reuse that exact strict Series-source implementation; change the period only from H1 to 2006 Jul–Dec.
+3. Freeze all classification semantics:
+   - strict issuer-own operational ETF evidence
+   - contemporaneous Series identity
+   - no trust-global siblings
+   - no registrant-name-as-Series identity
+   - no fuzzy/ticker/rank/return/outcome inference
+   - same complete-portfolio/amendment semantics.
+4. Generate H2 source catalog on the research branch and audit:
+   - positive Series
+   - source occurrences
+   - identity conflicts
+   - source/prospectus errors
+   - Jul–Dec month-end source counts
+   - conventional Vanguard sibling false positives.
+5. Only after source catalog validation, extend the frozen holdings parser to H2.
+6. Then extend structural mapping and strict PIT country using the same frozen H1 rules.
+7. Feed resolved H2 snapshots into `scripts/research-historical-universe-builder.py` without changing builder semantics.
+8. Define and pass a separate **period-extension validation** covering causality/completeness and implementation invariants before any broad historical Stage21 performance.
+
+Do not invent a new “Gate C” label unless it is explicitly defined and committed first.
+
+## 10. Key artifacts / runs
 
 - frozen N-PX master: `9876020712`
 - repaired pre-ID: run `33977286028`, artifact `9972690542`
@@ -199,4 +244,15 @@ Do not run broad 2006–2018 Stage21 performance yet. Before that, define and pa
 - structural mapping: run `34090287022`, artifact `10006580498`
 - strict PIT country / H1 Gate B: run `34104858455`, artifact `10012280475`
 - mapping extreme sensitivity: run `34125899895`, artifact `10020057970`
-- historical builder H1 exact parity: run `34126348051`.
+- historical builder H1 exact parity: run `34126348051`, artifact `10020226749`.
+
+## 11. Relevant commits
+
+- strict PIT country / Gate B pipeline: `c11a6064086ba26c1b785d0ac882070f6d473dc3`, `f49494f720366676d401f1173fae2fb5e2212088`
+- mapping sensitivity implementation: `aee7e5b68e8526901856fc542ee68456aac8ded1`, `2463b1e10b75a5a49fbd4a8b811415e9532d9127`, `e86107604256d37388b76b4f03e71eebd871319a`
+- Gate B formal PASS checkpoint: `84a75335ee82b0941f1d7a01a3393e962b6e6cdd`
+- frozen historical builder core: `e51c38ac8925672bb300185937a8739f3ee33ac2`
+- H1 exact-parity workflow: `30b5d55111dc4d19a27228d6e3e9fc05577c0891`
+- prior canonical handoff refresh: `6d40ed089add9550a89818f666cdf9a08954400b`
+
+Production/main remains frozen throughout this work.
