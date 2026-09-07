@@ -1,0 +1,98 @@
+name: Research Momentum v2.9 Gate B Cover Recovery Final H1 2006
+on:
+  push:
+    branches: ["research/momentum-v2-9-preid-fix-20260906"]
+    paths: [".github/workflows/research-momentum-v2-9-gate-b-cover-recovery-final-h1-2006.yml"]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: research-momentum-v2-9-gate-b-cover-recovery-final-h1-2006
+  cancel-in-progress: true
+jobs:
+  merge-and-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORIGINAL_GATE_ARTIFACT_ID: "9987700449"
+      HOLDINGS_ARTIFACT_ID: "9986815485"
+      MAPPING_ARTIFACT_ID: "9987093683"
+      COVER_RUN_ID: "34084131917"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen authoritative Gate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/g /tmp/h /tmp/m data/research/country-cover-recovery
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ORIGINAL_GATE_ARTIFACT_ID}/zip" >/tmp/g.zip
+          unzip -q /tmp/g.zip -d /tmp/g
+          cp "$(find /tmp/g -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${HOLDINGS_ARTIFACT_ID}/zip" >/tmp/h.zip
+          unzip -q /tmp/h.zip -d /tmp/h
+          cp "$(find /tmp/h -name 'momentum-v2-9-authoritative-source-audit-v6-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-source-audit-v6-h1-2006.json
+          cp "$(find /tmp/h -name 'momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json' | head -n1)" data/research/momentum-v2-9-authoritative-holdings-audit-v5-h1-2006.json
+          echo "$HOLDINGS_ARTIFACT_ID" > data/research/authoritative-holdings-v8-artifact-id.txt
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${MAPPING_ARTIFACT_ID}/zip" >/tmp/m.zip
+          unzip -q /tmp/m.zip -d /tmp/m
+          cp "$(find /tmp/m -name 'nq-hybrid-structural-mapping-h1-2006.json' | head -n1)" data/research/nq-hybrid-structural-mapping-h1-2006.json
+      - name: Wait for exact filing-cover recovery artifacts and download all eight
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 270); do
+            payload="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${COVER_RUN_ID}")"
+            status="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])' <<<"$payload")"
+            conclusion="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("conclusion") or "")' <<<"$payload")"
+            echo "COVER_RUN status=$status conclusion=$conclusion"
+            if [ "$status" = "completed" ]; then
+              test "$conclusion" = "success"
+              break
+            fi
+            sleep 5
+          done
+          test "$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${COVER_RUN_ID}" --jq .status)" = "completed"
+          test "$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${COVER_RUN_ID}" --jq .conclusion)" = "success"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${COVER_RUN_ID}/artifacts?per_page=100" >/tmp/cover-artifacts.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/cover-artifacts.json'))
+          by={a['name']:a['id'] for a in d.get('artifacts',[]) if not a.get('expired')}
+          expected=[f'country-filing-cover-recovery-v29-{i}' for i in range(8)]
+          missing=[x for x in expected if x not in by]
+          if missing: raise SystemExit('missing cover artifacts: '+','.join(missing))
+          open('/tmp/cover-artifact-ids.json','w').write(json.dumps({x:by[x] for x in expected}))
+          print('COVER_ARTIFACTS',json.dumps({x:by[x] for x in expected}))
+          PY
+          python3 - <<'PY'
+          import json,subprocess,zipfile,os
+          ids=json.load(open('/tmp/cover-artifact-ids.json'))
+          os.makedirs('data/research/country-cover-recovery',exist_ok=True)
+          for name,aid in ids.items():
+              z=f'/tmp/{name}.zip'
+              with open(z,'wb') as f:
+                  subprocess.run(['gh','api',f'/repos/{os.environ["GITHUB_REPOSITORY"]}/actions/artifacts/{aid}/zip'],stdout=f,check=True)
+              with zipfile.ZipFile(z) as zz:
+                  zz.extractall('data/research/country-cover-recovery')
+          PY
+      - name: Exact-key merge conservative filing-cover country evidence
+        run: python3 scripts/research-country-cover-merge-v29.py
+      - name: Production-order source eligibility and Top80
+        run: python3 scripts/research-nq-hybrid-universe-h1-2006.py
+      - name: Country UNKNOWN upper-bound sensitivity only
+        run: python3 scripts/research-nq-hybrid-country-upper-bound-v29.py
+      - name: Final Gate B v13 unchanged semantics
+        run: python3 scripts/research-momentum-v2-9-gate-b-v13-finalize.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: momentum-v2-9-gate-b-cover-recovery-final-h1-2006
+          path: |
+            data/research/nq-hybrid-country-resolved-h1-2006.json
+            data/research/nq-hybrid-universe-h1-2006.json
+            data/research/nq-hybrid-universe-country-upper-bound-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v10-h1-2006.json
+            data/research/momentum-v2-9-final-gate-b-v13-h1-2006.json
+          if-no-files-found: warn
