@@ -17,11 +17,13 @@ jobs:
       matrix:
         shard: [0,1,2,3,4,5,6,7]
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
       COUNTRY_ARTIFACT_ID: '9987700449'
       SHARD_INDEX: ${{ matrix.shard }}
       SHARD_COUNT: '8'
+      COUNTRY_RECOVERY_POLICY: 'HISTORICAL_EXACT_CIK_PLUS_PRE_REPORT_ACCESSION_DETAIL_STATE_ONLY'
     steps:
       - uses: actions/checkout@v4
       - name: Download final Gate country artifact
