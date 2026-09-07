@@ -17,37 +17,49 @@ jobs:
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
-      HOLDINGS_RUN_ID: "33950735883"
+      HOLDINGS_RUN_ID: "34089965073"
       NPX_ARTIFACT_ID: "9876020712"
+      EXPECTED_CATALOG_SHA256: "e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for hybrid holdings run and download artifact
+      - name: Download authoritative hybrid holdings artifact
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p data/research /tmp/hybrid /tmp/npx
-          for i in $(seq 1 100); do
-            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.status')
-            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.conclusion // ""')
-            echo "holdings status=${status} conclusion=${conclusion} poll=${i}"
-            if [ "$status" = "completed" ]; then
-              test "$conclusion" = "success"
-              break
-            fi
-            sleep 30
-          done
           status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.status')
           conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}" --jq '.conclusion // ""')
           test "$status" = "completed"
           test "$conclusion" = "success"
-
           hybrid_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${HOLDINGS_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "sec-hybrid-source-and-holdings-h1-2006") | .id' | head -n1)
           test -n "$hybrid_id"
           gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${hybrid_id}/zip" > /tmp/hybrid.zip
           unzip -q /tmp/hybrid.zip -d /tmp/hybrid
           cp /tmp/hybrid/nq-pit-holdings-hybrid-h1-2006.json data/research/
           cp /tmp/hybrid/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+
+      - name: Verify authoritative input lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${EXPECTED_CATALOG_SHA256}  data/research/sec-hybrid-etf-source-catalog-h1-2006.json" | sha256sum -c -
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('data/research/sec-hybrid-etf-source-catalog-h1-2006.json').read_text())
+          h=json.loads(Path('data/research/nq-pit-holdings-hybrid-h1-2006.json').read_text())
+          assert [s['sourceSeriesCount'] for s in c['monthSnapshots']] == [192,204,267,270,273,279]
+          assert c['exactUniqueBridgeCount'] == 111 and c['ambiguousBridgeCount'] == 0
+          assert h['filingFetchErrorCount'] == 0
+          assert h['filingFetchSuccessCount'] == h['uniqueSourceFilingCount'] == 50
+          assert all(len(s.get('missingParsedSeries', [])) == 0 for s in h['monthSnapshots'])
+          print('INPUT_HOLDINGS', json.dumps({
+              'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],
+              'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],
+              'monthlyParsedSourceSeriesCount':[s['parsedSourceSeriesCount'] for s in h['monthSnapshots']],
+          }))
+          PY
 
       - name: Download frozen N-PX security master
         shell: bash
@@ -95,4 +107,5 @@ jobs:
             data/research/nq-hybrid-structural-mapping-h1-2006.json
             data/research/nq-pit-holdings-hybrid-h1-2006.json
             data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/npx-security-master-2006.json
           if-no-files-found: warn
