@@ -17,37 +17,22 @@ jobs:
     timeout-minutes: 55
     env:
       GH_TOKEN: ${{ github.token }}
-      PREID_RUN_ID: "33950337808"
+      PREID_ARTIFACT_ID: "9972690542"
       ID_ARTIFACT_ID: "9963958301"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for authoritative pre-ID run and download clean merged catalog
+      - name: Download authoritative pre-ID and post-ID catalogs
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p data/research /tmp/pre /tmp/post
-          for i in $(seq 1 80); do
-            status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.status')
-            conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.conclusion // ""')
-            echo "preid status=${status} conclusion=${conclusion} poll=${i}"
-            if [ "$status" = "completed" ]; then
-              test "$conclusion" = "success"
-              break
-            fi
-            sleep 30
-          done
-          status=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.status')
-          conclusion=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}" --jq '.conclusion // ""')
-          test "$status" = "completed"
-          test "$conclusion" = "success"
 
-          preid_artifact_id=$(gh api "/repos/kensuke5704/momentum-console/actions/runs/${PREID_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "sec-legacy-etf-series-source-preid-2006-sharded") | .id' | head -n1)
-          test -n "$preid_artifact_id"
-          echo "PREID_ARTIFACT_ID=${preid_artifact_id}" >> "$GITHUB_ENV"
-          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${preid_artifact_id}/zip" > /tmp/pre.zip
+          gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${PREID_ARTIFACT_ID}/zip" > /tmp/pre.zip
           unzip -q /tmp/pre.zip -d /tmp/pre
-          cp /tmp/pre/sec-legacy-etf-series-source-preid-2006.json data/research/
+          pre=$(find /tmp/pre -type f -name 'sec-legacy-etf-series-source-preid-direct-2006.json' | head -n1)
+          test -n "$pre"
+          cp "$pre" data/research/sec-legacy-etf-series-source-preid-2006.json
 
           gh api "/repos/kensuke5704/momentum-console/actions/artifacts/${ID_ARTIFACT_ID}/zip" > /tmp/post.zip
           unzip -q /tmp/post.zip -d /tmp/post
@@ -55,7 +40,7 @@ jobs:
           test -n "$post"
           cp "$post" data/research/sec-id-era-strict-series-source-h1-2006.json
 
-      - name: Audit clean pre-ID identities before hybrid merge
+      - name: Audit authoritative pre-ID identities before hybrid merge
         shell: bash
         run: |
           set -euo pipefail
@@ -87,6 +72,8 @@ jobs:
           }))
           if d.get('candidateRegistrantCount') != 47:
               raise SystemExit('candidate registrant invariant failed')
+          if d['positiveIdentityCount'] != 192:
+              raise SystemExit('authoritative pre-ID positive identity count changed')
           if bad:
               print('BAD_REGISTRANT_IDENTITIES',json.dumps(bad))
               raise SystemExit(2)
@@ -94,6 +81,34 @@ jobs:
 
       - name: Build hybrid PIT source catalog
         run: python3 scripts/research-sec-hybrid-etf-source-catalog-h1-2006.py
+
+      - name: Verify authoritative hybrid population
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          p=Path('data/research/sec-hybrid-etf-source-catalog-h1-2006.json')
+          d=json.loads(p.read_text())
+          expected=[192,204,267,270,273,279]
+          actual=[s['sourceSeriesCount'] for s in d['monthSnapshots']]
+          summary={
+              'legacyPositiveIdentityCount':d['legacyPositiveIdentityCount'],
+              'postIdPositiveSeriesCount':d['postIdPositiveSeriesCount'],
+              'exactUniqueBridgeCount':d['exactUniqueBridgeCount'],
+              'ambiguousBridgeCount':d['ambiguousBridgeCount'],
+              'monthlySourceSeriesCounts':actual,
+              'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),
+          }
+          print('AUTHORITATIVE_HYBRID',json.dumps(summary))
+          assert d['legacyPositiveIdentityCount']==192
+          assert d['postIdPositiveSeriesCount']==198
+          assert d['exactUniqueBridgeCount']==111
+          assert d['ambiguousBridgeCount']==0
+          assert actual==expected
+          assert summary['sha256']=='e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801'
+          PY
 
       - name: Syntax-check hybrid holdings extractor
         run: python3 -m py_compile scripts/research-nq-pit-holdings-hybrid-h1-2006.py
