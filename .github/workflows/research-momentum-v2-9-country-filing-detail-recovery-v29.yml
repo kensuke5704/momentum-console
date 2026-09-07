@@ -15,25 +15,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0,1,2,3,4,5,6,7]
+        include:
+          - { shard: 0, artifact: 9988363468 }
+          - { shard: 1, artifact: 9988349197 }
+          - { shard: 2, artifact: 9988404099 }
+          - { shard: 3, artifact: 9988338820 }
+          - { shard: 4, artifact: 9988333329 }
+          - { shard: 5, artifact: 9988356053 }
+          - { shard: 6, artifact: 9988364713 }
+          - { shard: 7, artifact: 9988328174 }
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      COUNTRY_ARTIFACT_ID: '9987700449'
       SHARD_INDEX: ${{ matrix.shard }}
-      SHARD_COUNT: '8'
+      INPUT_ARTIFACT_ID: ${{ matrix.artifact }}
       COUNTRY_RECOVERY_POLICY: 'HISTORICAL_EXACT_CIK_PLUS_PRE_REPORT_ACCESSION_DETAIL_STATE_ONLY'
     steps:
       - uses: actions/checkout@v4
-      - name: Download final Gate country artifact
+      - name: Download exact historical-CIK candidate artifact
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p data/research /tmp/c
-          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${COUNTRY_ARTIFACT_ID}/zip" >/tmp/c.zip
-          unzip -q /tmp/c.zip -d /tmp/c
-          cp "$(find /tmp/c -name 'nq-hybrid-country-resolved-h1-2006.json' | head -n1)" data/research/nq-hybrid-country-resolved-h1-2006.json
+          mkdir -p data/research /tmp/input
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${INPUT_ARTIFACT_ID}/zip" >/tmp/input.zip
+          unzip -q /tmp/input.zip -d /tmp/input
+          src="$(find /tmp/input -name "country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json" | head -n1)"
+          test -n "$src"
+          cp "$src" "data/research/country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json"
       - name: Recover strict UNKNOWN from historical SEC filing-detail pages
         run: python3 scripts/research-country-filing-detail-recovery-v29.py
       - uses: actions/upload-artifact@v4
