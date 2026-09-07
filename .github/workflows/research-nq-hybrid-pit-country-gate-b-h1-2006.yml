@@ -1,0 +1,109 @@
+name: Research N-Q Hybrid PIT Country Gate B H1 2006
+
+on:
+  push:
+    branches: [research/nq-npx-mapping-2006-20260903]
+    paths:
+      - scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py
+      - .github/workflows/research-nq-hybrid-pit-country-gate-b-h1-2006.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  resolve-country:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/mapping /tmp/base /tmp/struct
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10006580498/zip > /tmp/mapping.zip
+          unzip -q /tmp/mapping.zip -d /tmp/mapping
+          cp /tmp/mapping/nq-hybrid-structural-mapping-h1-2006.json data/research/
+          cp /tmp/mapping/npx-security-master-2006.json data/research/
+          cp /tmp/mapping/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-submission-header-country-2006.json data/research/
+          test "$(sha256sum data/research/sec-hybrid-etf-source-catalog-h1-2006.json | awk '{print $1}')" = "e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801"
+      - name: Compile research pipeline
+        run: python3 -m py_compile scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py
+      - name: Resolve PIT country shard
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_COUNT: 8
+        run: python3 scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py --mode resolve-shard
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-hybrid-country-pit-shard-${{ matrix.shard }}
+          path: data/research/hybrid-country-shards/nq-hybrid-country-pit-shard-*.json
+          if-no-files-found: warn
+
+  merge-gate-b:
+    needs: resolve-country
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download frozen inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/mapping /tmp/base /tmp/struct
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10006580498/zip > /tmp/mapping.zip
+          unzip -q /tmp/mapping.zip -d /tmp/mapping
+          cp /tmp/mapping/nq-hybrid-structural-mapping-h1-2006.json data/research/
+          cp /tmp/mapping/npx-security-master-2006.json data/research/
+          cp /tmp/mapping/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-submission-header-country-2006.json data/research/
+          test "$(sha256sum data/research/sec-hybrid-etf-source-catalog-h1-2006.json | awk '{print $1}')" = "e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nq-hybrid-country-pit-shard-*
+          path: data/research/hybrid-country-shards
+          merge-multiple: true
+      - name: Merge country and run Gate B structural diagnostic
+        run: python3 scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py --mode merge
+      - name: Assert production-order lineage
+        run: |
+          python3 - <<'PY'
+          import json
+          p=json.load(open('data/research/nq-hybrid-gate-b-h1-2006.json'))
+          assert p['catalogSha256']=='e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801'
+          assert p['productionEligibilityOrder']==['COMMON_EQUITY','US','CORP','SOURCE_ELIGIBILITY']
+          print(json.dumps(p['countryUpperBoundSensitivitySummary'],indent=2))
+          print('countryUpperBoundSensitivityPass',p['countryUpperBoundSensitivityPass'])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-hybrid-pit-country-gate-b-h1-2006
+          path: |
+            data/research/nq-hybrid-country-pit-h1-2006.json
+            data/research/nq-hybrid-gate-b-h1-2006.json
+            data/research/sec-hybrid-etf-source-catalog-h1-2006.json
+            data/research/nq-hybrid-structural-mapping-h1-2006.json
+            data/research/sec-submission-header-country-full-merged-2006.json
+            data/research/structural-new-matches-submission-header-country-2006.json
+            data/research/hybrid-country-shards/*.json
+          if-no-files-found: warn
