@@ -1,0 +1,26 @@
+name: Research SEC Complete Portfolio Inventory Through H2 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2006-20260908"]
+    paths:
+      - "scripts/research-sec-complete-portfolio-inventory-through-h2-2006.py"
+      - ".github/workflows/research-sec-complete-portfolio-inventory-through-h2-2006.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build cumulative complete-portfolio inventory through H2 2006
+        run: python3 scripts/research-sec-complete-portfolio-inventory-through-h2-2006.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-complete-portfolio-inventory-through-h2-2006
+          path: data/research/sec-complete-portfolio-inventory-through-h2-2006.json
+          if-no-files-found: error
