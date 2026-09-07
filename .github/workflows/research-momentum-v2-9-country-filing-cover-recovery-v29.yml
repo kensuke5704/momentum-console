@@ -38,8 +38,9 @@ jobs:
           mkdir -p data/research /tmp/input
           gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${INPUT_ARTIFACT_ID}/zip" >/tmp/input.zip
           unzip -q /tmp/input.zip -d /tmp/input
-          cp "$(find /tmp/input -name 'country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json' | head -n1)" \
-             "data/research/country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json"
+          src="$(find /tmp/input -name "country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json" | head -n1)"
+          test -n "$src"
+          cp "$src" "data/research/country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json"
       - name: Recover country from historical filing cover pages
         run: python3 scripts/research-country-filing-cover-recovery-v29.py
       - uses: actions/upload-artifact@v4
