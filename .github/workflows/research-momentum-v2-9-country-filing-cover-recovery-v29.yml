@@ -1,0 +1,49 @@
+name: Research Momentum v2.9 Country Filing-Cover Recovery
+on:
+  push:
+    paths:
+      - '.github/workflows/research-momentum-v2-9-country-filing-cover-recovery-v29.yml'
+      - 'scripts/research-country-filing-cover-recovery-v29.py'
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: research-momentum-v2-9-country-filing-cover-recovery-v29
+  cancel-in-progress: true
+jobs:
+  recover:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { shard: 0, artifact: 9988363468 }
+          - { shard: 1, artifact: 9988349197 }
+          - { shard: 2, artifact: 9988404099 }
+          - { shard: 3, artifact: 9988338820 }
+          - { shard: 4, artifact: 9988333329 }
+          - { shard: 5, artifact: 9988356053 }
+          - { shard: 6, artifact: 9988364713 }
+          - { shard: 7, artifact: 9988328174 }
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHARD_INDEX: ${{ matrix.shard }}
+      INPUT_ARTIFACT_ID: ${{ matrix.artifact }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact historical-CIK recovery input
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/input
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${INPUT_ARTIFACT_ID}/zip" >/tmp/input.zip
+          unzip -q /tmp/input.zip -d /tmp/input
+          cp "$(find /tmp/input -name 'country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json' | head -n1)" \
+             "data/research/country-index-headers-recovery-v29-shard-${SHARD_INDEX}.json"
+      - name: Recover country from historical filing cover pages
+        run: python3 scripts/research-country-filing-cover-recovery-v29.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: country-filing-cover-recovery-v29-${{ matrix.shard }}
+          path: data/research/country-filing-cover-recovery-v29-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
