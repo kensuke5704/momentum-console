@@ -20,6 +20,7 @@ jobs:
       HOLDINGS_ARTIFACT_ID: "9986815485"
       MAPPING_ARTIFACT_ID: "9987093683"
       COVER_RUN_ID: "34084131917"
+      COVER_MERGE_POLICY: "EXPLICIT_US_STATE_OR_RECOGNIZED_FOREIGN_JURISDICTION_ONLY"
     steps:
       - uses: actions/checkout@v4
       - name: Download frozen authoritative Gate inputs
