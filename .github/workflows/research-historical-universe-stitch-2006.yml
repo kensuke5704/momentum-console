@@ -1,0 +1,75 @@
+name: Research Historical Universe Stitch 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2006-20260908"]
+    paths:
+      - "scripts/research-historical-universe-stitch-2006.py"
+      - ".github/workflows/research-historical-universe-stitch-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  stitch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download fixed H1 and H2 validated Universe artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/h1 /tmp/h2
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10020226749/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/historical-universe-builder-h1-2006.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10039694610/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+          cp /tmp/h2/historical-universe-builder-h2-2006.json data/research/
+
+      - name: Assert frozen builder blob remains unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-historical-universe-builder.py)" = "1357402f34dfea1c1dbdcaac7de5078b680eb5c3"
+
+      - name: Compile stitch
+        run: python3 -m py_compile scripts/research-historical-universe-stitch-2006.py
+
+      - name: Stitch exact validated H1 and H2 outputs
+        run: python3 scripts/research-historical-universe-stitch-2006.py
+
+      - name: Require exact twelve-month coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('data/research/historical-universe-builder-2006.json').read_text())
+          months=x['monthSnapshots']
+          assert [m['signalMonth'] for m in months]==[f'2006-{i:02d}' for i in range(1,13)]
+          assert len(months)==12
+          assert len({m['signalMonth'] for m in months})==12
+          assert x['builderGitBlob']=='1357402f34dfea1c1dbdcaac7de5078b680eb5c3'
+          assert [s['artifactId'] for s in x['segments']]==[10020226749,10039694610]
+          print('STITCH_AUDIT',json.dumps({
+              'months':12,
+              'eligibleSourceSeriesCounts':[m['eligibleSourceSeriesCount'] for m in months],
+              'universeSizes':[len(m['symbols']) for m in months],
+          }))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-universe-builder-2006
+          path: data/research/historical-universe-builder-2006.json
+          if-no-files-found: error
