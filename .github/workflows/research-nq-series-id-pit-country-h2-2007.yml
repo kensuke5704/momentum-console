@@ -1,0 +1,264 @@
+name: Research N-Q Series-ID PIT Country H2 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2007-20260908"]
+    paths:
+      - "docs/research/h2-2007-country-pit-issuer-variant-validation-definition.md"
+      - "scripts/research-nq-series-id-pit-country-h2-2007.py"
+      - ".github/workflows/research-nq-series-id-pit-country-h2-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  resolve-country:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CATALOG_ARTIFACT_ID: 10041257985
+      SOURCE_CATALOG_SHA256: 9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631
+      MAPPING_RUN_ID: 34190421577
+      MAPPING_ARTIFACT_ID: 10042002365
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative country implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py)" = "7b830b0e851b0d5349a5c6049e8889f171b791e0"
+          test "$(git hash-object scripts/research-nq-series-id-pit-country-h1-2007.py)" = "483c3ee8979c9ff38c5600b071e6bd489697a32a"
+
+      - name: Download fixed H2 mapping and N-PX PIT inputs
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190421577
+          name: nq-series-id-structural-mapping-h2-2007
+          path: /tmp/mapping
+
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190105652
+          name: npx-pit-master-h2-2007
+          path: /tmp/npx
+
+      - name: Download frozen static country evidence and source catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/base /tmp/struct /tmp/source
+          cp /tmp/mapping/nq-series-id-structural-mapping-h2-2007.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-audit.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-12.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-submission-header-country-2006.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041257985/zip > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp /tmp/source/sec-id-era-strict-series-source-h2-2007.json data/research/
+          test "$(sha256sum data/research/sec-id-era-strict-series-source-h2-2007.json | awk '{print $1}')" = "$SOURCE_CATALOG_SHA256"
+
+      - name: Verify fixed PIT lineage before country resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h2-2007.json').read_text())
+          n=json.loads(Path('data/research/npx-pit-master-h2-2007-2007-12.json').read_text())
+          a=json.loads(Path('data/research/npx-pit-master-h2-2007-audit.json').read_text())
+          expected=[
+              ('2007-07','2007-07-31',465),('2007-08','2007-08-31',469),('2007-09','2007-09-28',499),
+              ('2007-10','2007-10-31',518),('2007-11','2007-11-30',531),('2007-12','2007-12-31',533),
+          ]
+          assert m['sourceCatalogArtifactId']==10041257985
+          assert m['sourceCatalogSha256']=='9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631'
+          assert m['npxPitRunId']==34190105652 and m['npxPitArtifactId']==10041975282
+          assert [(s['signalMonth'],s['asOf'],s['sourceSeriesCount']) for s in m['monthSnapshots']]==expected
+          assert a['status']=='PASS' and a['fetchErrorCount']==0 and a['violations']==[]
+          assert n['signalMonth']=='2007-12' and n['asOf']=='2007-12-31' and n['baseArtifactId']==9876020712
+          for r in n['records']:
+              admitted=r.get('admittedAtSignal')
+              if admitted:
+                  fd=r.get('sourceFilingDate')
+                  assert isinstance(fd,str) and fd.startswith('2007-')
+                  assert isinstance(admitted,str) and fd<=admitted
+          print('COUNTRY_INPUT_AUDIT',json.dumps({'mappingArtifactId':10042002365,'npxPitArtifactId':10041975282,'months':6}))
+          PY
+
+      - name: Compile H2 country wrapper
+        run: python3 -m py_compile scripts/research-nq-series-id-pit-country-h2-2007.py
+
+      - name: Resolve strict PIT country shard
+        run: python3 scripts/research-nq-series-id-pit-country-h2-2007.py --mode resolve-shard --shard-index ${{ matrix.shard }} --shard-count 8
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-country-h2-2007-shard-${{ matrix.shard }}
+          path: data/research/series-id-country-h2-2007-shards/nq-hybrid-country-pit-shard-*.json
+          if-no-files-found: error
+
+  merge-country:
+    needs: resolve-country
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CATALOG_ARTIFACT_ID: 10041257985
+      SOURCE_CATALOG_SHA256: 9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631
+      MAPPING_RUN_ID: 34190421577
+      MAPPING_ARTIFACT_ID: 10042002365
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative country implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py)" = "7b830b0e851b0d5349a5c6049e8889f171b791e0"
+          test "$(git hash-object scripts/research-nq-series-id-pit-country-h1-2007.py)" = "483c3ee8979c9ff38c5600b071e6bd489697a32a"
+
+      - name: Download fixed H2 mapping and N-PX PIT inputs
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190421577
+          name: nq-series-id-structural-mapping-h2-2007
+          path: /tmp/mapping
+
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190105652
+          name: npx-pit-master-h2-2007
+          path: /tmp/npx
+
+      - name: Download frozen static country evidence and source catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/base /tmp/struct /tmp/source
+          cp /tmp/mapping/nq-series-id-structural-mapping-h2-2007.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-audit.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-12.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-submission-header-country-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041257985/zip > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp /tmp/source/sec-id-era-strict-series-source-h2-2007.json data/research/
+          test "$(sha256sum data/research/sec-id-era-strict-series-source-h2-2007.json | awk '{print $1}')" = "$SOURCE_CATALOG_SHA256"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nq-series-id-country-h2-2007-shard-*
+          path: data/research/series-id-country-h2-2007-shards
+          merge-multiple: true
+
+      - name: Merge strict PIT country
+        run: python3 scripts/research-nq-series-id-pit-country-h2-2007.py --mode merge
+
+      - name: Audit no-lookahead, issuer-variant PIT, and fixed lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          expected=[
+              ('2007-07','2007-07-31',465),('2007-08','2007-08-31',469),('2007-09','2007-09-28',499),
+              ('2007-10','2007-10-31',518),('2007-11','2007-11-30',531),('2007-12','2007-12-31',533),
+          ]
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h2-2007.json').read_text())
+          c=json.loads(Path('data/research/nq-series-id-country-pit-h2-2007.json').read_text())
+          d=json.loads(Path('data/research/nq-series-id-country-extension-diagnostic-h2-2007.json').read_text())
+          sha='9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631'
+          assert c['catalogSha256']==sha and c['sourceCatalogSha256']==sha
+          assert c['sourceCatalogArtifactId']==10041257985
+          assert c['mappingRunId']==34190421577 and c['mappingArtifactId']==10042002365
+          assert c['authoritativeH1CountryRunId']==34104858455 and c['authoritativeH1CountryArtifactId']==10012280475
+          assert c['baseCountryEvidenceArtifactId']==9944538015 and c['structuralCountryEvidenceArtifactId']==9944797581
+          assert c['npxPitRunId']==34190105652 and c['npxPitArtifactId']==10041975282
+          assert c['npxBaseArtifactId']==9876020712
+          assert c['periodExtensionMasterYears']==[2005,2006,2007]
+          assert d['catalogSha256']==sha and d['sourceCatalogSha256']==sha
+          assert [(s['signalMonth'],s['asOf'],s['sourceSeriesCount']) for s in c['monthSnapshots']]==expected
+          assert len(c['monthSnapshots'])==len(m['monthSnapshots'])==6
+          pit=c['npxIssuerVariantPitAudit']
+          assert pit['incrementalRecordCountInDecemberContainer']>0
+          blocked=pit['blockedFutureIssuerVariantOccurrencesBySignal']
+          assert all(date in pit['perSignalUnresolvedInput'] for _,date,_ in expected)
+          assert sum(blocked.values())>0
+          assert blocked.get('2007-12-31',0)==0
+          max_evidence='0000-00-00'; total_unknown=0
+          for ms,cs in zip(m['monthSnapshots'],c['monthSnapshots']):
+              assert (ms['signalMonth'],ms['asOf'],ms['sourceSeriesCount'])==(cs['signalMonth'],cs['asOf'],cs['sourceSeriesCount'])
+              assert ms['commonEquityHoldingCount']==cs['commonEquityHoldingCount']
+              assert cs['corpPositiveNonCorpNameCount']==0
+              counts=Counter()
+              for filing in cs['sourceFilings']:
+                  for h in filing.get('holdings',[]):
+                      if h.get('legacyAssetSection')!='COMMON_EQUITY' or h.get('mappingStatus')!='MATCHED_UNIQUE':
+                          continue
+                      cls=h.get('countryClassification')
+                      assert cls in {'US','NON_US','UNKNOWN'}
+                      counts[cls]+=1
+                      total_unknown += int(cls=='UNKNOWN')
+                      for ev in h.get('countryEvidence') or []:
+                          ed=ev.get('evidenceDateFiled')
+                          assert ed and ed<=cs['asOf']
+                          max_evidence=max(max_evidence,ed)
+                      new=h.get('countryResolutionEvidence') or {}
+                      ev=new.get('resolutionEvidence') or {}
+                      ed=ev.get('evidenceDateFiled')
+                      if new.get('classification') in {'US','NON_US'}:
+                          assert ed and ed<=cs['asOf']
+                          max_evidence=max(max_evidence,ed)
+              assert dict(counts)==cs['mappedCommonEquityCountryCounts']
+              print('MONTH_COUNTRY_AUDIT',json.dumps({'signalMonth':cs['signalMonth'],'countryCounts':cs['mappedCommonEquityCountryCounts'],'countryWeights':cs['mappedCommonEquityCountryWeights'],'corpPositiveNonCorpNameCount':cs['corpPositiveNonCorpNameCount']}))
+          assert max_evidence<='2007-12-31'
+          assert total_unknown>0
+          print('COUNTRY_AUDIT',json.dumps({'reasonCounts':c['reasonCounts'],'resolvedShardFileCount':c['resolvedShardFileCount'],'unresolvedIdentityDateInputCount':c['unresolvedIdentityDateInputCount'],'maxEvidenceDate':max_evidence,'totalUnknownRows':total_unknown,'npxIssuerVariantPitAudit':pit}))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-pit-country-h2-2007
+          path: |
+            data/research/nq-series-id-country-pit-h2-2007.json
+            data/research/nq-series-id-country-extension-diagnostic-h2-2007.json
+            data/research/nq-series-id-structural-mapping-h2-2007.json
+            data/research/npx-pit-master-h2-2007-audit.json
+            data/research/npx-pit-master-h2-2007-2007-12.json
+            data/research/sec-submission-header-country-full-merged-2006.json
+            data/research/structural-new-matches-submission-header-country-2006.json
+            data/research/series-id-country-h2-2007-shards/*.json
+          if-no-files-found: error
