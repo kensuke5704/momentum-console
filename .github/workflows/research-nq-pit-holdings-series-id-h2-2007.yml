@@ -1,0 +1,100 @@
+name: Research N-Q PIT Holdings Series-ID H2 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2007-20260908"]
+    paths:
+      - "scripts/research-nq-pit-holdings-series-id-h2-2007.py"
+      - ".github/workflows/research-nq-pit-holdings-series-id-h2-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  holdings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      SOURCE_CATALOG_ARTIFACT_ID: 10041257985
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative H1 parser blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-pit-holdings-hybrid-h1-2006.py)" = "e391aa5175d1c06dced0ee45ce45eb26b6362690"
+          test "$(git hash-object scripts/research-nq-series-segmentation-2006.py)" = "47a2ac4fe713f9f43171aa2b38a7707c386c009e"
+          test "$(git hash-object scripts/research-nq-pit-holdings-2006-corrected.py)" = "866e328e8237afb49855499e88e49e5d9d2fa914"
+          test "$(git hash-object scripts/research-nq-per-holding-ec-2006.py)" = "79d2fc427efd67f784c98d2d6d9519aea99c3927"
+          test "$(git hash-object scripts/research-sec-complete-portfolio-title-diagnostic-h2-2005.py)" = "7006a968a32994772ecaa373aeebe750c8b493bc"
+
+      - name: Download validated H2 2007 strict source v4
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34188233028
+          name: sec-id-era-strict-series-source-h2-2007-v4
+          path: data/research
+
+      - name: Verify fixed source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum data/research/sec-id-era-strict-series-source-h2-2007.json | awk '{print $1}')" = "9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631"
+
+      - name: Compile wrapper
+        run: python3 -m py_compile scripts/research-nq-pit-holdings-series-id-h2-2007.py
+
+      - name: Extract holdings using frozen parser
+        run: python3 scripts/research-nq-pit-holdings-series-id-h2-2007.py
+
+      - name: Require frozen-parser completeness invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from collections import Counter
+          from pathlib import Path
+          sp=Path('data/research/sec-id-era-strict-series-source-h2-2007.json')
+          s=json.loads(sp.read_text())
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2007.json').read_text())
+          assert h['sourceCatalogArtifactId']==10041257985
+          assert h['sourceCatalogSha256']==hashlib.sha256(sp.read_bytes()).hexdigest()=='9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631'
+          assert h['authoritativeH1HoldingsRunId']==34089965073
+          assert h['authoritativeH1HoldingsArtifactId']==10006530879
+          assert h['legacyRequestedIdentityCount']==0
+          assert h['filingFetchErrorCount']==0
+          assert h['filingFetchSuccessCount']==h['uniqueSourceFilingCount']
+          expected=[
+            ('2007-07','2007-07-31',465),('2007-08','2007-08-31',469),('2007-09','2007-09-28',499),
+            ('2007-10','2007-10-31',518),('2007-11','2007-11-30',531),('2007-12','2007-12-31',533),
+          ]
+          assert [(x['signalMonth'],x['asOf'],x['sourceSeriesCount']) for x in s['monthSnapshots']]==expected
+          assert len(s['monthSnapshots'])==len(h['monthSnapshots'])==6
+          for cs,hs in zip(s['monthSnapshots'],h['monthSnapshots']):
+              assert (cs['signalMonth'],cs['asOf'])==(hs['signalMonth'],hs['asOf'])
+              assert cs['sourceSeriesCount']==hs['catalogSourceSeriesCount']==len(hs['sourceFilings'])
+              assert hs['parsedLegacySourceCount']==0
+              assert len(hs['missingParsedSeries'])==0
+              statuses=Counter(x.get('parseStatus') for x in hs['sourceFilings'])
+              assert sum(statuses.values())==cs['sourceSeriesCount']
+              print('MONTH_AUDIT',json.dumps({'signalMonth':cs['signalMonth'],'catalog':cs['sourceSeriesCount'],'parsed':hs['parsedSourceSeriesCount'],'parseStatusCounts':dict(statuses)}))
+          assert h['uniqueParsedHoldingCount']>0
+          assert h['legacyAssetSectionCounts'].get('COMMON_EQUITY',0)>0
+          print('HOLDINGS_AUDIT',json.dumps({'sourceCatalogSha256':h['sourceCatalogSha256'],'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],'legacyAssetSectionCounts':h['legacyAssetSectionCounts']}))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-pit-holdings-series-id-h2-2007
+          path: |
+            data/research/sec-id-era-strict-series-source-h2-2007.json
+            data/research/sec-id-era-strict-series-source-h2-2007-holdings-adapter.json
+            data/research/nq-pit-holdings-series-id-h2-2007.json
+          if-no-files-found: error
