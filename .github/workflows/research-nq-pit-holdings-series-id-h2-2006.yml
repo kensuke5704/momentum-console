@@ -1,0 +1,91 @@
+name: Research N-Q PIT Holdings Series-ID H2 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2006-20260908"]
+    paths:
+      - "scripts/research-nq-pit-holdings-series-id-h2-2006.py"
+      - ".github/workflows/research-nq-pit-holdings-series-id-h2-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  holdings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative H1 parser blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-pit-holdings-hybrid-h1-2006.py)" = "e391aa5175d1c06dced0ee45ce45eb26b6362690"
+          test "$(git hash-object scripts/research-nq-series-segmentation-2006.py)" = "47a2ac4fe713f9f43171aa2b38a7707c386c009e"
+          test "$(git hash-object scripts/research-nq-pit-holdings-2006-corrected.py)" = "866e328e8237afb49855499e88e49e5d9d2fa914"
+          test "$(git hash-object scripts/research-nq-per-holding-ec-2006.py)" = "79d2fc427efd67f784c98d2d6d9519aea99c3927"
+          test "$(git hash-object scripts/research-sec-complete-portfolio-title-diagnostic-h2-2005.py)" = "7006a968a32994772ecaa373aeebe750c8b493bc"
+
+      - name: Download validated H2 strict Series source catalog
+        run: |
+          mkdir -p data/research /tmp/source
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10038284691/zip > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp /tmp/source/sec-id-era-strict-series-source-h2-2006.json data/research/
+
+      - name: Syntax-check H2 wrapper
+        run: python3 -m py_compile scripts/research-nq-pit-holdings-series-id-h2-2006.py
+
+      - name: Extract raw H2 holdings with frozen H1 parser
+        run: python3 scripts/research-nq-pit-holdings-series-id-h2-2006.py
+
+      - name: Structural holdings audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path('data/research/sec-id-era-strict-series-source-h2-2006.json').read_text())
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2006.json').read_text())
+          assert h['sourceCatalogArtifactId']==10038284691
+          assert h['authoritativeH1HoldingsRunId']==34089965073
+          assert h['legacyRequestedIdentityCount']==0
+          assert h['filingFetchErrorCount']==0
+          assert len(s['monthSnapshots'])==6==len(h['monthSnapshots'])
+          for cs,hs in zip(s['monthSnapshots'],h['monthSnapshots']):
+              assert cs['signalMonth']==hs['signalMonth']
+              assert cs['asOf']==hs['asOf']
+              assert cs['sourceSeriesCount']==hs['catalogSourceSeriesCount']
+              assert hs['parsedSourceSeriesCount']==cs['sourceSeriesCount']
+              assert hs['parsedSeriesIdSourceCount']==cs['sourceSeriesCount']
+              assert hs['parsedLegacySourceCount']==0
+              assert len(hs['missingParsedSeries'])==0
+              print('MONTH_AUDIT',json.dumps({
+                  'signalMonth':cs['signalMonth'],
+                  'catalog':cs['sourceSeriesCount'],
+                  'parsed':hs['parsedSourceSeriesCount'],
+                  'missing':0,
+              }))
+          print('HOLDINGS_AUDIT',json.dumps({
+              'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],
+              'filingFetchSuccessCount':h['filingFetchSuccessCount'],
+              'filingFetchErrorCount':h['filingFetchErrorCount'],
+              'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],
+              'legacyAssetSectionCounts':h['legacyAssetSectionCounts'],
+          }))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-pit-holdings-series-id-h2-2006
+          path: |
+            data/research/sec-id-era-strict-series-source-h2-2006-holdings-adapter.json
+            data/research/nq-pit-holdings-series-id-h2-2006.json
+          if-no-files-found: error
