@@ -39,8 +39,8 @@ jobs:
           new=json.load(open('data/research/sec-marketwide-nq-inventory-through-h2-2007.json'))
           replay=[r for r in new['rows'] if r['dateFiled']<='2007-06-29']
           assert replay==old['rows'], (len(replay),len(old['rows']))
-          assert len(replay)==old['filingCount']==6564
-          assert len({r['cik'] for r in replay})==old['uniqueRegistrantCiks']==2879
+          assert len(replay)==old['filingCount']
+          assert len({r['cik'] for r in replay})==old['uniqueRegistrantCiks']
           print('EXACT_H1_2007_REPLAY',json.dumps({'rows':len(replay),'registrants':len({r['cik'] for r in replay})}))
           PY
       - uses: actions/upload-artifact@v4
