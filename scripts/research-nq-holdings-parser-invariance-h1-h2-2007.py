@@ -39,7 +39,10 @@ def unique_holdings_records(payload: dict) -> dict[tuple[str, str, str], dict]:
 
 def unique_source_keys(payload: dict) -> set[tuple[str, str, str]]:
     out = set()
-    snapshots = list(payload.get('closedHistoryReplaySnapshots', [])) + list(payload.get('monthSnapshots', []))
+    # Parser invariance must be measured only over source snapshots actually supplied
+    # to each current-period holdings run. Closed-history replay snapshots in the H2
+    # source catalog were not inputs to the H2 holdings extraction and are excluded.
+    snapshots = list(payload.get('monthSnapshots', []))
     for snapshot in snapshots:
         for row in snapshot.get('sourceFilings', []):
             key = filing_key(row)
@@ -104,10 +107,12 @@ def main() -> None:
     report = {
         'purpose': (
             'Parser-invariance audit across validated H1-2007 and H2-2007 Series-ID raw holdings. '
-            'The expected overlap is derived independently from the two strict source catalogs; every shared '
-            'Series-ID + accession + SEC source-file key must appear in both holdings artifacts and every parser-derived '
-            'field must be exact after excluding only legacyIdentity schema metadata.'
+            'The expected overlap is derived independently from the current-period strict source snapshots actually '
+            'supplied to the two holdings runs; every shared Series-ID + accession + SEC source-file key must appear '
+            'in both holdings artifacts and every parser-derived field must be exact after excluding only '
+            'legacyIdentity schema metadata.'
         ),
+        'auditSetCorrection': 'docs/research/h2-2007-parser-invariance-audit-set-correction.md',
         'h1UniqueHoldingsFilingRecordCount': len(left),
         'h2UniqueHoldingsFilingRecordCount': len(right),
         'sourceCatalogOverlapCount': len(source_overlap),
