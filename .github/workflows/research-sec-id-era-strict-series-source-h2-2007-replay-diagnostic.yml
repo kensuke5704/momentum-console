@@ -7,6 +7,7 @@ on:
     paths:
       - "scripts/research-sec-id-era-strict-series-source-h2-2007-replay-diagnostic.py"
       - ".github/workflows/research-sec-id-era-strict-series-source-h2-2007-replay-diagnostic.yml"
+      - "docs/research/h2-2007-replay-diagnostic-trigger.md"
 
 permissions:
   contents: read
