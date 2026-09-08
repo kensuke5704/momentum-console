@@ -88,7 +88,10 @@ def main() -> None:
     result['schemaAdapterPath'] = str(ADAPTED.relative_to(ROOT))
     result['sourceCatalogPath'] = str(SOURCE.relative_to(ROOT))
     result['legacyRequestedIdentityCount'] = 0
-    result['seriesIdRequestedIdentityCount'] = sum(
+    # Keep the frozen extractor's unique filing-target count semantics. The monthly
+    # source appearances are a separate diagnostic because the same Series/source can
+    # persist across multiple month-end snapshots.
+    result['monthlySourceSeriesAppearanceCount'] = sum(
         len(s['sourceFilings']) for s in source['monthSnapshots']
     )
     OUT.write_text(json.dumps(result, indent=2) + '\n')
@@ -100,10 +103,12 @@ def main() -> None:
         'filingFetchErrorCount': result['filingFetchErrorCount'],
         'uniqueParsedHoldingCount': result['uniqueParsedHoldingCount'],
         'seriesIdRequestedIdentityCount': result['seriesIdRequestedIdentityCount'],
+        'monthlySourceSeriesAppearanceCount': result['monthlySourceSeriesAppearanceCount'],
         'monthly': [
             {
                 'signalMonth': s['signalMonth'],
                 'catalog': s['catalogSourceSeriesCount'],
+                'records': len(s['sourceFilings']),
                 'parsed': s['parsedSourceSeriesCount'],
                 'missing': len(s['missingParsedSeries']),
             }
