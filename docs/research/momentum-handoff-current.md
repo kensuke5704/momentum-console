@@ -1,7 +1,7 @@
 # Momentum Research Handoff — Current
 
 Last updated: 2026-09-08 JST  
-Branch: `research/strict-series-source-h1-2007-20260908`  
+Branch: `research/strict-series-source-h2-2007-20260908`  
 Repository: `kensuke5704/momentum-console`
 
 This is the canonical handoff for the historical-Universe reconstruction.
@@ -174,42 +174,121 @@ Strict PIT country:
 - run `34184751511`
 - artifact `10040374627`
 - all 8 shards + merge SUCCESS
-- reason counts: UNRESOLVED 1,164; CINS 333; PIT_SUBMISSION_HEADER 11,113; FROZEN_DATED_FILING 4,168; ADR_GDR 4
-- max evidence date `2007-03-19` <= every applicable signal date
-- UNKNOWN preserved: 1,164 mapped common-equity rows across H1 snapshots
-- CORP positive non-CORP-name count = 0 every month.
+- UNKNOWN preserved and CORP materiality invariant preserved
+- no-lookahead PASS.
 
 Downstream frozen-builder exact-parity validation:
-- trigger commit `1ca487fb4d0ab5faa227805446bb84536562519c`
 - run `34186786093`
 - artifact `10040774126`
-- PASS
-- exact parity 6/6 months
-- sourceSeriesCount = 303 / 303 / 417 / 417 / 432 / 433
+- PASS, exact parity 6/6 months
 - eligibleSourceSeriesCount = 22 / 23 / 20 / 20 / 19 / 18
 - Universe size = 80 / 80 / 80 / 80 / 80 / 80
-- country no-lookahead PASS
-- CORP invariant PASS
 - no Stage21 strategy outcome was read.
 
-### 5.3 Validated historical-Universe stitch through H1 2007
+Validated historical-Universe stitch through H1 2007:
+- run `34186850426`
+- artifact `10040792563` (`historical-universe-builder-through-h1-2007`)
+- 18 exact months `2006-01` through `2007-06`, PASS.
+
+## 6. 2007 H2 — CLOSED / PASS
+
+### 6.1 Source extension
+
+Authoritative corrected strict-Series source:
+- run `34188233028`
+- artifact `10041257985`
+- source SHA256 `9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631`
+- Jul–Dec source counts = 465 / 469 / 499 / 518 / 531 / 533
+- closed Jan–Jun 2007 replay exact.
+
+The closed-history candidate-discovery boundary correction was defined before the corrected result:
+- `docs/research/h2-2007-closed-history-candidate-discovery-boundary-correction.md`.
+
+### 6.2 Downstream extension
+
+Downstream definition was committed before downstream results:
+- `docs/research/h2-2007-downstream-period-extension-validation-definition.md`.
+
+Holdings:
+- run `34188353154`
+- artifact `10041300366`
+- 72/72 source filings fetched, 0 errors
+- 10,375 parsed holdings; 10,057 COMMON_EQUITY
+- missing parsed Series = 0.
+
+Parser invariance:
+- authoritative corrected run `34188697692`
+- artifact `10041408799`
+- expected/actual overlap 258 / 258
+- exact full-record matches 258
+- semantic mismatch 0
+- PASS.
+- audit-set correction: `docs/research/h2-2007-parser-invariance-audit-set-correction.md`.
+
+PIT N-PX master:
+- validation definition `docs/research/h2-2007-npx-pit-master-validation-definition.md`
+- authoritative run `34190105652`
+- artifact `10041975282`
+- 205/205 fixed selected source fetches succeeded
+- fetch errors 0; PIT violations 0
+- later annual identity data not leaked backward.
+- transport-only corrections are documented in `docs/research/h2-2007-npx-pit-master-transport-correction.md` and `docs/research/h2-2007-npx-filing-transport-correction.md`.
+
+Structural mapping:
+- validation definition `docs/research/h2-2007-structural-mapping-validation-definition.md`
+- run `34190421577`
+- artifact `10042002365`
+- only frozen mapping methods accepted; fuzzy mapping not used.
+
+Strict PIT country:
+- validation definition `docs/research/h2-2007-country-pit-issuer-variant-validation-definition.md`
+- run `34190587649`
+- artifact `10042478228`
+- all 8 shards + merge PASS
+- country evidence no-lookahead PASS
+- H2 N-PX issuer variants are visible only when both source filing and admission are public by signal date
+- master-index years exactly `[2005, 2006, 2007]`
+- UNKNOWN preserved; CORP positive non-CORP-name count 0.
+
+Downstream frozen-builder exact parity:
+- validator `scripts/research-h2-2007-downstream-period-extension-validation.py`
+- validator blob `72ae7532458d35e09b4b98bf221fbd566970aa07`
+- initial run `34192565485` failed before builder execution because of artifact-download transport only; correction documented in `docs/research/h2-2007-downstream-artifact-download-transport-correction.md`
+- authoritative corrected run `34192853738`
+- artifact `10042811090`
+- PASS, exact parity 6/6 months
+- eligible source counts Jul–Dec = 17 / 19 / 21 / 21 / 34 / 32
+- Universe size = 80 each month
+- country no-lookahead PASS
+- CORP invariant PASS
+- no Stage21 outcome was read.
+
+### 6.3 Validated historical-Universe stitch through H2 2007
+
+Validation definition:
+- `docs/research/h2-2007-24-month-stitch-validation-definition.md`.
 
 Workflow:
-- `.github/workflows/research-historical-universe-stitch-through-h1-2007.yml`
+- `.github/workflows/research-historical-universe-stitch-through-h2-2007.yml`.
 
-Run:
-- `34186850426`
-- artifact `10040792563` (`historical-universe-builder-through-h1-2007`)
+Stitch implementation:
+- `scripts/research-historical-universe-stitch-through-h2-2007.py`
+- blob `5d6c98817919277454bdf9dea76281aae6c378c0`.
+
+Authoritative result:
+- run `34193003030`
+- artifact `10042873354` (`historical-universe-builder-through-h2-2007`)
+- artifact digest `sha256:a8d1955fd406121e214af7dec4cf69058895573e0ad055b2e8a54d4101103f87`
 - PASS.
 
-The stitch mechanically concatenates validated 2006 Jan–Dec artifact `10039721939` and validated H1 2007 frozen-builder output from artifact `10040774126`, with no reconstruction or performance recomputation.
+The stitch preserves artifact `10040792563` exactly as the closed first 18 months and appends only the six validated H2 builder snapshots from artifact `10042811090`. No reconstruction step is rerun.
 
 Coverage:
-- 18 exact signal months, `2006-01` through `2007-06`
-- eligible source counts = 10 / 19 / 26 / 26 / 29 / 28 / 18 / 23 / 23 / 23 / 23 / 22 / 22 / 23 / 20 / 20 / 19 / 18
-- Universe sizes = 62, then 80 for every remaining month.
+- 24 exact signal months, `2006-01` through `2007-12`
+- eligible source counts = 10 / 19 / 26 / 26 / 29 / 28 / 18 / 23 / 23 / 23 / 23 / 22 / 22 / 23 / 20 / 20 / 19 / 18 / 17 / 19 / 21 / 21 / 34 / 32
+- Universe sizes = 62 for 2006-01 and 80 for each remaining month.
 
-## 6. Historical boundary/source rules that remain frozen
+## 7. Historical boundary/source rules that remain frozen
 
 - Series/Class IDs became usable around 2006-02-06; do not require/backfill them before they were public.
 - Pre-ID identity uses contemporaneously public document title/class evidence only.
@@ -218,11 +297,12 @@ Coverage:
 - An amendment replaces a holdings source only if the amendment itself contains a complete portfolio schedule.
 - Broad Creation-Unit/exchange language is candidate-prefilter evidence only. Final ETF evidence must describe the issuer's own Fund/Portfolio/Shares.
 - Candidate positives may be carried forward for recall only; final strict Series acceptance must be independently re-established.
+- Closed-history candidate discovery cannot retroactively admit newly discovered CIKs into an already closed prior period; newly discovered candidates begin contributing only in the open extension period unless the closed-history protocol is explicitly reopened before results.
 - Do not restore trust-global sibling binding.
 - Source eligibility is evaluated only after COMMON_EQUITY -> US -> CORP filtering.
-- For each period extension, country evidence can use only filings public by that month’s signal date.
+- For each period extension, country evidence and N-PX issuer variants can use only information public by that month’s signal date.
 
-## 7. Rejected paths — do not revive
+## 8. Rejected paths — do not revive
 
 - known-registry small samples as proof of global completeness
 - Daily SEC HTTP Range pilot as a successful route
@@ -234,16 +314,16 @@ Coverage:
 - UNKNOWN -> US imputation in primary
 - Stage21 performance-driven tuning of historical reconstruction.
 
-## 8. Next task
+## 9. Next task
 
-Proceed to **2007 H2 period extension (Jul–Dec 2007)** from the validated H1 2007 branch state.
+Proceed to **2008 H1 period extension (Jan–Jun 2008)** from the closed 24-month H2-2007 state.
 
-Recommended sequence, preserving the exact H1 extension protocol:
-1. create a new research branch from current validated H1 2007 head;
-2. rebuild cumulative N-Q and complete-portfolio inventories through the final 2007 signal date, proving exact replay of the prior closed period before using new rows;
-3. rerun the operational candidate prefilter cumulatively with recall preservation only at candidate layer;
-4. commit the H2 2007 source-period extension validation definition before observing strict-Series-source results;
-5. extend strict Series source with unchanged semantics and require exact prior Series identity/binding and prior snapshot replay;
-6. only after source PASS, run frozen parser, parser invariance, frozen mapping, strict PIT country, and pre-defined downstream exact parity;
-7. mechanically stitch validated H2 2007 onto artifact `10040792563` to close 2006-01 through 2007-12;
-8. do not run Stage21 performance.
+Required sequence:
+1. create a new research branch from the current validated H2-2007 head;
+2. extend cumulative N-Q and complete-portfolio inventories through the final H1-2008 signal date and require exact replay of all closed 2006-01 through 2007-12 inventory/history boundaries before using new rows;
+3. rerun the recall-preserved operational candidate prefilter cumulatively, with the closed-history candidate-discovery boundary retained;
+4. commit the H1-2008 source-period extension validation definition before observing strict-Series-source results;
+5. extend strict Series source with unchanged semantics and require exact closed 2007 source identity/binding and snapshot replay;
+6. only after source PASS, run frozen holdings/parser, parser invariance, PIT N-PX selected independently per signal date, frozen structural mapping, strict PIT country, and pre-defined downstream exact parity;
+7. mechanically stitch validated H1-2008 output onto artifact `10042873354` without recomputing the closed 24-month prefix;
+8. continue the same half-year extension protocol toward the historical end date; do not run broad Stage21 performance until a separate post-builder validation is explicitly defined and passed.
