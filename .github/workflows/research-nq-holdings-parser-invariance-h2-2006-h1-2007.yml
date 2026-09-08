@@ -1,0 +1,54 @@
+name: Research N-Q Holdings Parser Invariance H2 2006 H1 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2007-20260908"]
+    paths:
+      - "scripts/research-nq-holdings-parser-invariance-h2-2006-h1-2007.py"
+      - ".github/workflows/research-nq-holdings-parser-invariance-h2-2006-h1-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  invariance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download H2 2006 holdings
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34179821383
+          name: nq-pit-holdings-series-id-h2-2006
+          path: data/research
+      - name: Download H2 2006 strict source
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34178968784
+          name: sec-id-era-strict-series-source-h2-2006-v3
+          path: data/research
+      - name: Download H1 2007 holdings and source
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34184472191
+          name: nq-pit-holdings-series-id-h1-2007
+          path: data/research
+      - name: Compile audit
+        run: python3 -m py_compile scripts/research-nq-holdings-parser-invariance-h2-2006-h1-2007.py
+      - name: Require exact shared-filing parser invariance
+        run: python3 scripts/research-nq-holdings-parser-invariance-h2-2006-h1-2007.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-holdings-parser-invariance-h2-2006-h1-2007
+          path: data/research/nq-holdings-parser-invariance-h2-2006-h1-2007.json
+          if-no-files-found: error
