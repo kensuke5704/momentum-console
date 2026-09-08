@@ -1,0 +1,39 @@
+name: Research Validate Strict Series Source H2 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2006-20260908"]
+    paths:
+      - "scripts/research-validate-strict-series-source-h2-2006.py"
+      - ".github/workflows/research-validate-strict-series-source-h2-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authoritative H1 and H2 strict source catalogs
+        run: |
+          mkdir -p data/research /tmp/h1 /tmp/h2
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9963958301/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/sec-id-era-strict-series-source-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10038284691/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+          cp /tmp/h2/sec-id-era-strict-series-source-h2-2006.json data/research/
+      - name: Validate H2 period-extension invariants
+        run: python3 scripts/research-validate-strict-series-source-h2-2006.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-id-era-strict-series-source-h2-2006-validation
+          path: data/research/sec-id-era-strict-series-source-h2-2006-validation.json
+          if-no-files-found: error
