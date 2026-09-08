@@ -1,0 +1,218 @@
+name: Research N-Q Series-ID PIT Country H1 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2007-20260908"]
+    paths:
+      - "scripts/research-nq-series-id-pit-country-h1-2007.py"
+      - ".github/workflows/research-nq-series-id-pit-country-h1-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  resolve-country:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CATALOG_ARTIFACT_ID: 10040000632
+      SOURCE_CATALOG_SHA256: fcf8bd62ff1182f2d8a9dc99c2f6fd30bcf3b3a2974d04786d1a943f1c9fa21b
+      MAPPING_RUN_ID: 34184639119
+      MAPPING_ARTIFACT_ID: 10040076231
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative H1 country implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py)" = "7b830b0e851b0d5349a5c6049e8889f171b791e0"
+
+      - name: Download fixed H1 2007 mapping and source lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/mapping /tmp/source /tmp/npx /tmp/base /tmp/struct
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040076231/zip > /tmp/mapping.zip
+          unzip -q /tmp/mapping.zip -d /tmp/mapping
+          cp /tmp/mapping/nq-series-id-structural-mapping-h1-2007.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040000632/zip > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp /tmp/source/sec-id-era-strict-series-source-h1-2007.json data/research/
+          test "$(sha256sum data/research/sec-id-era-strict-series-source-h1-2007.json | awk '{print $1}')" = "$SOURCE_CATALOG_SHA256"
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp /tmp/npx/npx-security-master-2006.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-submission-header-country-2006.json data/research/
+
+      - name: Verify H1 2007 mapping lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h1-2007.json').read_text())
+          assert m['holdingsRunId']==34184472191
+          assert m['holdingsArtifactId']==10040053724
+          assert m['authoritativeH1MappingRunId']==34090287022
+          assert m['authoritativeH1MappingArtifactId']==10006580498
+          assert m['npxArtifactId']==9876020712
+          expected=[
+              ('2007-01','2007-01-31',303),('2007-02','2007-02-28',303),('2007-03','2007-03-30',417),
+              ('2007-04','2007-04-30',417),('2007-05','2007-05-31',432),('2007-06','2007-06-29',433),
+          ]
+          assert [(s['signalMonth'],s['asOf'],s['sourceSeriesCount']) for s in m['monthSnapshots']]==expected
+          print('MAPPING_INPUT',json.dumps({'months':6,'sourceSeriesCounts':[s['sourceSeriesCount'] for s in m['monthSnapshots']]}))
+          PY
+
+      - name: Compile H1 2007 country wrapper
+        run: python3 -m py_compile scripts/research-nq-series-id-pit-country-h1-2007.py
+
+      - name: Resolve strict PIT country shard
+        run: python3 scripts/research-nq-series-id-pit-country-h1-2007.py --mode resolve-shard --shard-index ${{ matrix.shard }} --shard-count 8
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-country-h1-2007-shard-${{ matrix.shard }}
+          path: data/research/series-id-country-h1-2007-shards/nq-hybrid-country-pit-shard-*.json
+          if-no-files-found: error
+
+  merge-country:
+    needs: resolve-country
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CATALOG_ARTIFACT_ID: 10040000632
+      SOURCE_CATALOG_SHA256: fcf8bd62ff1182f2d8a9dc99c2f6fd30bcf3b3a2974d04786d1a943f1c9fa21b
+      MAPPING_RUN_ID: 34184639119
+      MAPPING_ARTIFACT_ID: 10040076231
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative H1 country implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py)" = "7b830b0e851b0d5349a5c6049e8889f171b791e0"
+
+      - name: Download fixed inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/mapping /tmp/source /tmp/npx /tmp/base /tmp/struct
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040076231/zip > /tmp/mapping.zip
+          unzip -q /tmp/mapping.zip -d /tmp/mapping
+          cp /tmp/mapping/nq-series-id-structural-mapping-h1-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040000632/zip > /tmp/source.zip
+          unzip -q /tmp/source.zip -d /tmp/source
+          cp /tmp/source/sec-id-era-strict-series-source-h1-2007.json data/research/
+          test "$(sha256sum data/research/sec-id-era-strict-series-source-h1-2007.json | awk '{print $1}')" = "$SOURCE_CATALOG_SHA256"
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp /tmp/npx/npx-security-master-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944538015/zip > /tmp/base.zip
+          unzip -q /tmp/base.zip -d /tmp/base
+          cp /tmp/base/sec-submission-header-country-full-merged-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9944797581/zip > /tmp/struct.zip
+          unzip -q /tmp/struct.zip -d /tmp/struct
+          cp /tmp/struct/structural-new-matches-submission-header-country-2006.json data/research/
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nq-series-id-country-h1-2007-shard-*
+          path: data/research/series-id-country-h1-2007-shards
+          merge-multiple: true
+
+      - name: Merge strict PIT country
+        run: python3 scripts/research-nq-series-id-pit-country-h1-2007.py --mode merge
+
+      - name: Audit no-lookahead and fixed lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          expected=[
+              ('2007-01','2007-01-31',303),('2007-02','2007-02-28',303),('2007-03','2007-03-30',417),
+              ('2007-04','2007-04-30',417),('2007-05','2007-05-31',432),('2007-06','2007-06-29',433),
+          ]
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h1-2007.json').read_text())
+          c=json.loads(Path('data/research/nq-series-id-country-pit-h1-2007.json').read_text())
+          d=json.loads(Path('data/research/nq-series-id-country-extension-diagnostic-h1-2007.json').read_text())
+          sha='fcf8bd62ff1182f2d8a9dc99c2f6fd30bcf3b3a2974d04786d1a943f1c9fa21b'
+          assert c['catalogSha256']==sha and c['sourceCatalogSha256']==sha
+          assert c['sourceCatalogArtifactId']==10040000632
+          assert c['mappingRunId']==34184639119 and c['mappingArtifactId']==10040076231
+          assert c['authoritativeH1CountryRunId']==34104858455 and c['authoritativeH1CountryArtifactId']==10012280475
+          assert c['baseCountryEvidenceArtifactId']==9944538015 and c['structuralCountryEvidenceArtifactId']==9944797581
+          assert c['npxArtifactId']==9876020712
+          assert c['periodExtensionMasterYears']==[2005,2006,2007]
+          assert d['catalogSha256']==sha and d['sourceCatalogSha256']==sha
+          assert [(s['signalMonth'],s['asOf'],s['sourceSeriesCount']) for s in c['monthSnapshots']]==expected
+          assert len(c['monthSnapshots'])==len(m['monthSnapshots'])==6
+          max_evidence='0000-00-00'; total_unknown=0
+          for ms,cs in zip(m['monthSnapshots'],c['monthSnapshots']):
+              assert (ms['signalMonth'],ms['asOf'],ms['sourceSeriesCount'])==(cs['signalMonth'],cs['asOf'],cs['sourceSeriesCount'])
+              assert ms['commonEquityHoldingCount']==cs['commonEquityHoldingCount']
+              assert cs['corpPositiveNonCorpNameCount']==0
+              counts=Counter()
+              for filing in cs['sourceFilings']:
+                  for h in filing.get('holdings',[]):
+                      if h.get('legacyAssetSection')!='COMMON_EQUITY' or h.get('mappingStatus')!='MATCHED_UNIQUE':
+                          continue
+                      cls=h.get('countryClassification')
+                      assert cls in {'US','NON_US','UNKNOWN'}
+                      counts[cls]+=1
+                      total_unknown += int(cls=='UNKNOWN')
+                      for ev in h.get('countryEvidence') or []:
+                          ed=ev.get('evidenceDateFiled')
+                          assert ed and ed<=cs['asOf']
+                          max_evidence=max(max_evidence,ed)
+                      new=h.get('countryResolutionEvidence') or {}
+                      ev=new.get('resolutionEvidence') or {}
+                      ed=ev.get('evidenceDateFiled')
+                      if new.get('classification') in {'US','NON_US'}:
+                          assert ed and ed<=cs['asOf']
+                          max_evidence=max(max_evidence,ed)
+              assert dict(counts)==cs['mappedCommonEquityCountryCounts']
+              print('MONTH_COUNTRY_AUDIT',json.dumps({'signalMonth':cs['signalMonth'],'countryCounts':cs['mappedCommonEquityCountryCounts'],'countryWeights':cs['mappedCommonEquityCountryWeights'],'corpPositiveNonCorpNameCount':cs['corpPositiveNonCorpNameCount']}))
+          assert max_evidence<='2007-06-29'
+          assert total_unknown>0
+          print('COUNTRY_AUDIT',json.dumps({'reasonCounts':c['reasonCounts'],'resolvedShardFileCount':c['resolvedShardFileCount'],'unresolvedIdentityDateInputCount':c['unresolvedIdentityDateInputCount'],'maxEvidenceDate':max_evidence,'totalUnknownRows':total_unknown}))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-pit-country-h1-2007
+          path: |
+            data/research/nq-series-id-country-pit-h1-2007.json
+            data/research/nq-series-id-country-extension-diagnostic-h1-2007.json
+            data/research/nq-series-id-structural-mapping-h1-2007.json
+            data/research/npx-security-master-2006.json
+            data/research/sec-submission-header-country-full-merged-2006.json
+            data/research/structural-new-matches-submission-header-country-2006.json
+            data/research/series-id-country-h1-2007-shards/*.json
+          if-no-files-found: error
