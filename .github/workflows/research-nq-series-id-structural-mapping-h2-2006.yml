@@ -1,0 +1,113 @@
+name: Research N-Q Series-ID Structural Mapping H2 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2006-20260908"]
+    paths:
+      - "scripts/research-nq-series-id-structural-mapping-h2-2006.py"
+      - ".github/workflows/research-nq-series-id-structural-mapping-h2-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  mapping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen authoritative H1 mapping blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-catalog-structural-mapping-h1-2006.py)" = "690479017fc82dce2480ded5d1ffafbb76721722"
+          test "$(git hash-object scripts/research-nq-npx-mapping-2006.py)" = "972c1e8ebf2c829abb3b8b400dffa613c368e100"
+          test "$(git hash-object scripts/research-nq-npx-structural-mapping-2006.py)" = "d79b077887cf11784b8620220929fa936a822601"
+
+      - name: Download validated H2 holdings
+        run: |
+          mkdir -p data/research /tmp/holdings
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10038557328/zip > /tmp/holdings.zip
+          unzip -q /tmp/holdings.zip -d /tmp/holdings
+          cp /tmp/holdings/nq-pit-holdings-series-id-h2-2006.json data/research/
+
+      - name: Verify holdings input lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2006.json').read_text())
+          assert h['sourceCatalogArtifactId']==10038284691
+          assert h['authoritativeH1HoldingsRunId']==34089965073
+          assert h['filingFetchSuccessCount']==h['uniqueSourceFilingCount']==42
+          assert h['filingFetchErrorCount']==0
+          assert all(len(s['missingParsedSeries'])==0 for s in h['monthSnapshots'])
+          print('INPUT_HOLDINGS',json.dumps({
+              'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],
+              'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],
+              'commonEquityCount':h['legacyAssetSectionCounts'].get('COMMON_EQUITY'),
+          }))
+          PY
+
+      - name: Download frozen N-PX security master
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/npx
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          npx=$(find /tmp/npx -type f -name 'npx-security-master-2006.json' | head -n1)
+          test -n "$npx"
+          cp "$npx" data/research/npx-security-master-2006.json
+
+      - name: Apply frozen structural mapping rules
+        run: python3 scripts/research-nq-series-id-structural-mapping-h2-2006.py
+
+      - name: Audit deterministic mapping output
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2006.json').read_text())
+          d=json.loads(Path('data/research/nq-series-id-structural-mapping-h2-2006.json').read_text())
+          assert d['holdingsArtifactId']==10038557328
+          assert d['npxArtifactId']==9876020712
+          assert len(d['monthSnapshots'])==6==len(h['monthSnapshots'])
+          for hs,ms in zip(h['monthSnapshots'],d['monthSnapshots']):
+              assert hs['signalMonth']==ms['signalMonth']
+              assert hs['asOf']==ms['asOf']
+              assert len(hs['sourceFilings'])==ms['sourceSeriesCount']
+              assert ms['commonEquityHoldingCount']>=ms['uniqueMappedCount']+ms['ambiguousCount']+ms['unmappedCount']
+              print('MONTH_MAPPING',json.dumps({
+                  'signalMonth':ms['signalMonth'],
+                  'sourceSeriesCount':ms['sourceSeriesCount'],
+                  'commonEquityHoldingCount':ms['commonEquityHoldingCount'],
+                  'uniqueMappedCount':ms['uniqueMappedCount'],
+                  'uniqueMappedCountRate':ms['uniqueMappedCountRate'],
+                  'uniqueMappedWeightRate':ms['uniqueMappedWeightRate'],
+                  'ambiguousCount':ms['ambiguousCount'],
+                  'unmappedCount':ms['unmappedCount'],
+              }))
+          allowed={'BASELINE_EXACT','BASELINE_ADR_BASE_UNIQUE','STRUCTURAL_SUFFIX_EXACT','UNIQUE_LONG_PREFIX'}
+          assert set(d['matchMethodCounts']).issubset(allowed)
+          print('MAPPING_METHODS',json.dumps(d['matchMethodCounts']))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-structural-mapping-h2-2006
+          path: |
+            data/research/nq-series-id-structural-mapping-h2-2006.json
+            data/research/nq-pit-holdings-series-id-h2-2006.json
+            data/research/npx-security-master-2006.json
+          if-no-files-found: error
