@@ -1,0 +1,89 @@
+name: Research Historical Universe Stitch Through H1 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2007-20260908"]
+    paths:
+      - "docs/research/h1-2007-stitch-run-trigger.md"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  stitch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      H1_2007_VALIDATION_ARTIFACT_ID: 10040774126
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen stitch and builder lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-historical-universe-builder.py)" = "1357402f34dfea1c1dbdcaac7de5078b680eb5c3"
+          python3 -m py_compile scripts/research-historical-universe-stitch-through-h1-2007.py
+
+      - name: Download validated 2006 full-year Universe
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34183543393
+          name: historical-universe-builder-2006
+          path: data/research
+
+      - name: Download validated H1 2007 downstream output
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34186786093
+          name: h1-2007-downstream-period-extension-validation
+          path: data/research
+
+      - name: Require H1 2007 validation PASS before stitch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('data/research/h1-2007-downstream-period-extension-validation.json').read_text())
+          assert p['passed'] is True
+          assert p['checks']['frozenBuilderExactParitySixOfSix'] is True
+          assert p['checks']['countryNoLookahead'] is True
+          assert p['checks']['corpBridgeMaterialityInvariant'] is True
+          assert len(p['monthly']) == 6
+          PY
+
+      - name: Stitch validated historical Universe without recomputation
+        run: python3 scripts/research-historical-universe-stitch-through-h1-2007.py
+
+      - name: Audit exact 18-month coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('data/research/historical-universe-builder-through-h1-2007.json').read_text())
+          expected=[f'2006-{m:02d}' for m in range(1,13)]+[f'2007-{m:02d}' for m in range(1,7)]
+          rows=p['monthSnapshots']
+          assert [r['signalMonth'] for r in rows] == expected
+          assert len(rows) == 18
+          assert p['builderGitBlob'] == '1357402f34dfea1c1dbdcaac7de5078b680eb5c3'
+          assert p['segments'][0]['artifactId'] == 10039721939
+          assert p['segments'][1]['artifactId'] == 10040774126
+          assert all(len(r.get('symbols', [])) <= 80 for r in rows)
+          print('STITCH_AUDIT', json.dumps({'passed':True,'months':18,'first':rows[0]['signalMonth'],'last':rows[-1]['signalMonth'],'universeSizes':[len(r.get('symbols',[])) for r in rows]}, separators=(',',':')))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-universe-builder-through-h1-2007
+          path: data/research/historical-universe-builder-through-h1-2007.json
+          if-no-files-found: error
