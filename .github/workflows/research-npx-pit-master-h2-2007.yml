@@ -5,7 +5,9 @@ on:
     branches: ["research/strict-series-source-h2-2007-20260908"]
     paths:
       - "docs/research/h2-2007-npx-pit-master-validation-definition.md"
+      - "docs/research/h2-2007-npx-pit-master-transport-correction.md"
       - "scripts/research-npx-pit-master-h2-2007.py"
+      - "scripts/research-npx-pit-master-h2-2007-v2.py"
       - ".github/workflows/research-npx-pit-master-h2-2007.yml"
   workflow_dispatch:
 
@@ -40,7 +42,7 @@ jobs:
           sha256sum data/research/npx-security-master-2006.json
 
       - name: Build and validate monthly PIT N-PX masters
-        run: python3 scripts/research-npx-pit-master-h2-2007.py
+        run: python3 scripts/research-npx-pit-master-h2-2007-v2.py
 
       - uses: actions/upload-artifact@v4
         if: always()
