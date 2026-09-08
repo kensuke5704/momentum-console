@@ -1,0 +1,47 @@
+name: Research N-Q Holdings Parser Invariance H1-H2 2006
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2006-20260908"]
+    paths:
+      - "scripts/research-nq-holdings-parser-invariance-h1-h2-2006.py"
+      - ".github/workflows/research-nq-holdings-parser-invariance-h1-h2-2006.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  invariance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download fixed authoritative H1 and H2 holdings artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/h1 /tmp/h2
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10006530879/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/nq-pit-holdings-hybrid-h1-2006.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10038557328/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+          cp /tmp/h2/nq-pit-holdings-series-id-h2-2006.json data/research/
+
+      - name: Compile invariance audit
+        run: python3 -m py_compile scripts/research-nq-holdings-parser-invariance-h1-h2-2006.py
+
+      - name: Require exact parser semantics on overlapping historical filings
+        run: python3 scripts/research-nq-holdings-parser-invariance-h1-h2-2006.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-holdings-parser-invariance-h1-h2-2006
+          path: data/research/nq-holdings-parser-invariance-h1-h2-2006.json
+          if-no-files-found: error
