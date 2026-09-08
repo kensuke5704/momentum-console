@@ -1,0 +1,117 @@
+name: Research SEC ID Era Strict Series Source H1 2007 V3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2007-20260908"]
+    paths:
+      - "scripts/research-sec-id-era-strict-series-source-base-through-h1-2007.py"
+      - "scripts/research-sec-id-era-strict-series-source-shard-h1-2007-v3.py"
+      - "scripts/research-sec-id-era-strict-series-source-merge-h1-2007.py"
+      - "docs/research/h1-2007-source-period-extension-validation-definition.md"
+      - ".github/workflows/research-sec-id-era-strict-series-source-h1-2007-v3.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed cumulative complete-portfolio and recall-preserved prefilter inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/inv /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10039815625/zip > /tmp/inv.zip
+          unzip -q /tmp/inv.zip -d /tmp/inv
+          cp /tmp/inv/sec-complete-portfolio-inventory-through-h1-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10039881783/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-through-h1-2007.json data/research/
+      - name: Build strict Series source shard through H1 2007
+        run: python3 scripts/research-sec-id-era-strict-series-source-shard-h1-2007-v3.py --shard ${{ matrix.shard }} --shards 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: id-era-strict-v3-series-source-h1-2007-shard-${{ matrix.shard }}
+          path: data/research/sec-id-era-strict-series-source-h1-2007-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  merge:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: id-era-strict-v3-series-source-h1-2007-shard-*
+          path: data/research/id-era-strict-h1-2007-shards
+          merge-multiple: true
+      - name: Merge H1 2007 strict Series source
+        run: python3 scripts/research-sec-id-era-strict-series-source-merge-h1-2007.py
+      - name: Download authoritative H2 2006 strict source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/h2
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10038284691/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+      - name: Require pre-defined source period-extension invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          old=json.load(open('/tmp/h2/sec-id-era-strict-series-source-h2-2006.json'))
+          new=json.load(open('data/research/sec-id-era-strict-series-source-h1-2007.json'))
+          assert new['seriesIdMandatoryDate']=='2006-02-06'
+          assert new['seriesIdentityConflictCount']==0
+          assert new['prospectusErrorCount']==0
+          assert new['sourceErrorCount']==0
+          expected=[
+            ('2007-01','2007-01-31'),('2007-02','2007-02-28'),('2007-03','2007-03-30'),
+            ('2007-04','2007-04-30'),('2007-05','2007-05-31'),('2007-06','2007-06-29')]
+          assert [(x['signalMonth'],x['asOf']) for x in new['monthSnapshots']]==expected
+          counts=[x['sourceSeriesCount'] for x in new['monthSnapshots']]
+          assert counts==sorted(counts), counts
+          for snap in new['monthSnapshots']:
+            for row in snap['sourceFilings']:
+              assert row['filingDate']<=snap['asOf'], (snap['signalMonth'],row)
+              assert row['evidenceDateFiled']<=snap['asOf'], (snap['signalMonth'],row)
+          assert new['closedHistoryReplaySnapshots']==old['monthSnapshots']
+          old_by={x['seriesId']:x for x in old['positiveSeries']}
+          new_by={x['seriesId']:x for x in new['positiveSeries']}
+          assert set(old_by)<=set(new_by)
+          drift=[]
+          for sid,row in old_by.items():
+            if new_by[sid]!=row: drift.append(sid)
+          assert not drift, drift[:20]
+          print('SOURCE_PERIOD_EXTENSION_PASS',json.dumps({
+            'candidateRegistrants':new['candidateRegistrantCount'],
+            'positiveSeries':new['positiveSeriesCount'],
+            'sourceOccurrences':new['sourceOccurrenceCount'],
+            'sourceNoSchedule':new['sourceNoScheduleCount'],
+            'monthlySourceSeriesCounts':counts,
+            'closedHistoryReplayMonths':len(new['closedHistoryReplaySnapshots']),
+            'retainedPriorSeries':len(old_by),
+          }))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-id-era-strict-series-source-h1-2007-v3
+          path: data/research/sec-id-era-strict-series-source-h1-2007.json
+          if-no-files-found: error
