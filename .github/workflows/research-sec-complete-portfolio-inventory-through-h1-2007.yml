@@ -1,0 +1,51 @@
+name: Research SEC Complete Portfolio Inventory Through H1 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2007-20260908"]
+    paths:
+      - "scripts/research-sec-complete-portfolio-inventory-through-h1-2007.py"
+      - ".github/workflows/research-sec-complete-portfolio-inventory-through-h1-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build cumulative complete-portfolio inventory through H1 2007
+        run: python3 scripts/research-sec-complete-portfolio-inventory-through-h1-2007.py
+      - name: Download authoritative through-H2-2006 complete-portfolio inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/h2
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10025472099/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+      - name: Require exact 2006 row replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          old=json.load(open('/tmp/h2/sec-complete-portfolio-inventory-through-h2-2006.json'))
+          new=json.load(open('data/research/sec-complete-portfolio-inventory-through-h1-2007.json'))
+          replay=[r for r in new['rows'] if r['dateFiled']<='2006-12-29']
+          assert replay==old['rows'], (len(replay),len(old['rows']))
+          assert len(replay)==13610
+          assert len({r['cik'] for r in replay})==2928
+          print('EXACT_2006_REPLAY',json.dumps({'rows':len(replay),'registrants':len({r['cik'] for r in replay})}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-complete-portfolio-inventory-through-h1-2007
+          path: data/research/sec-complete-portfolio-inventory-through-h1-2007.json
+          if-no-files-found: error
