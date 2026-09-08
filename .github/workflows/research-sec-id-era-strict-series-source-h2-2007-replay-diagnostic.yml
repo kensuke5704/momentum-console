@@ -1,0 +1,56 @@
+name: Research H2 2007 Strict Source Replay Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2007-20260908"]
+    paths:
+      - "scripts/research-sec-id-era-strict-series-source-h2-2007-replay-diagnostic.py"
+      - ".github/workflows/research-sec-id-era-strict-series-source-h2-2007-replay-diagnostic.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download completed H2 2007 strict source shards
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34187436415
+          pattern: id-era-strict-v3-series-source-h2-2007-shard-*
+          path: data/research/id-era-strict-h2-2007-shards
+          merge-multiple: true
+      - name: Rebuild merged H2 source exactly from fixed shards
+        run: python3 scripts/research-sec-id-era-strict-series-source-merge-h2-2007.py
+      - name: Download closed H1 source and candidate-review artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/h1source /tmp/h1pref /tmp/h2pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040000632/zip > /tmp/h1source.zip
+          unzip -q /tmp/h1source.zip -d /tmp/h1source
+          cp /tmp/h1source/sec-id-era-strict-series-source-h1-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10039881783/zip > /tmp/h1pref.zip
+          unzip -q /tmp/h1pref.zip -d /tmp/h1pref
+          cp /tmp/h1pref/sec-etf-registrant-operational-prefilter-through-h1-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040955486/zip > /tmp/h2pref.zip
+          unzip -q /tmp/h2pref.zip -d /tmp/h2pref
+          cp /tmp/h2pref/sec-etf-registrant-operational-prefilter-through-h2-2007.json data/research/
+      - name: Diagnose closed-history replay mismatch without changing semantics
+        run: python3 scripts/research-sec-id-era-strict-series-source-h2-2007-replay-diagnostic.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-id-era-strict-series-source-h2-2007-replay-diagnostic
+          path: |
+            data/research/sec-id-era-strict-series-source-h2-2007.json
+            data/research/sec-id-era-strict-series-source-h2-2007-replay-diagnostic.json
+          if-no-files-found: error
