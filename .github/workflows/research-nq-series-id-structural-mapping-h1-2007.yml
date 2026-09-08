@@ -1,0 +1,82 @@
+name: Research N-Q Series-ID Structural Mapping H1 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2007-20260908"]
+    paths:
+      - "scripts/research-nq-series-id-structural-mapping-h1-2007.py"
+      - ".github/workflows/research-nq-series-id-structural-mapping-h1-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  mapping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HOLDINGS_RUN_ID: 34184472191
+      HOLDINGS_ARTIFACT_ID: 10040053724
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert frozen mapping implementation blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-catalog-structural-mapping-h1-2006.py)" = "690479017fc82dce2480ded5d1ffafbb76721722"
+          test "$(git hash-object scripts/research-nq-npx-mapping-2006.py)" = "972c1e8ebf2c829abb3b8b400dffa613c368e100"
+          test "$(git hash-object scripts/research-nq-npx-structural-mapping-2006.py)" = "d79b077887cf11784b8620220929fa936a822601"
+      - name: Download validated H1 2007 holdings
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34184472191
+          name: nq-pit-holdings-series-id-h1-2007
+          path: data/research
+      - name: Download frozen 2006 N-PX security master
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/npx data/research
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9876020712/zip > /tmp/npx.zip
+          unzip -q /tmp/npx.zip -d /tmp/npx
+          cp /tmp/npx/npx-security-master-2006.json data/research/
+      - name: Compile wrapper
+        run: python3 -m py_compile scripts/research-nq-series-id-structural-mapping-h1-2007.py
+      - name: Map H1 2007 holdings with frozen structural rules
+        run: python3 scripts/research-nq-series-id-structural-mapping-h1-2007.py
+      - name: Require frozen mapping invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h1-2007.json').read_text())
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h1-2007.json').read_text())
+          allowed={'BASELINE_EXACT','BASELINE_ADR_BASE_UNIQUE','STRUCTURAL_SUFFIX_EXACT','UNIQUE_LONG_PREFIX'}
+          assert m['holdingsRunId']==34184472191
+          assert m['holdingsArtifactId']==10040053724
+          assert m['authoritativeH1MappingRunId']==34090287022
+          assert m['authoritativeH1MappingArtifactId']==10006580498
+          assert m['npxArtifactId']==9876020712
+          assert set(m['matchMethodCounts']) <= allowed
+          assert len(m['monthSnapshots'])==len(h['monthSnapshots'])==6
+          for hs,ms in zip(h['monthSnapshots'],m['monthSnapshots']):
+              assert (hs['signalMonth'],hs['asOf'])==(ms['signalMonth'],ms['asOf'])
+              assert hs['catalogSourceSeriesCount']==ms['sourceSeriesCount']
+              assert ms['commonEquityHoldingCount']>=ms['uniqueMappedCount']
+              assert ms['ambiguousCount']>=0 and ms['unmappedCount']>=0
+              print('MAPPING_MONTH',json.dumps({'signalMonth':ms['signalMonth'],'sources':ms['sourceSeriesCount'],'commonEquity':ms['commonEquityHoldingCount'],'mapped':ms['uniqueMappedCount'],'mappedWeightRate':ms['uniqueMappedWeightRate'],'ambiguous':ms['ambiguousCount'],'unmapped':ms['unmappedCount']}))
+          print('MAPPING_PASS',json.dumps({'matchMethodCounts':m['matchMethodCounts']}))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-structural-mapping-h1-2007
+          path: data/research/nq-series-id-structural-mapping-h1-2007.json
+          if-no-files-found: error
