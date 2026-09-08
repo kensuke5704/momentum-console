@@ -44,12 +44,13 @@ jobs:
       - name: Extract raw H2 holdings with frozen H1 parser
         run: python3 scripts/research-nq-pit-holdings-series-id-h2-2006.py
 
-      - name: Structural holdings audit
+      - name: Structural holdings audit using frozen H1 completeness semantics
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
+          from collections import Counter
           from pathlib import Path
           s=json.loads(Path('data/research/sec-id-era-strict-series-source-h2-2006.json').read_text())
           h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2006.json').read_text())
@@ -57,25 +58,33 @@ jobs:
           assert h['authoritativeH1HoldingsRunId']==34089965073
           assert h['legacyRequestedIdentityCount']==0
           assert h['filingFetchErrorCount']==0
+          assert h['filingFetchSuccessCount']==h['uniqueSourceFilingCount']
           assert len(s['monthSnapshots'])==6==len(h['monthSnapshots'])
           for cs,hs in zip(s['monthSnapshots'],h['monthSnapshots']):
               assert cs['signalMonth']==hs['signalMonth']
               assert cs['asOf']==hs['asOf']
               assert cs['sourceSeriesCount']==hs['catalogSourceSeriesCount']
-              assert hs['parsedSourceSeriesCount']==cs['sourceSeriesCount']
-              assert hs['parsedSeriesIdSourceCount']==cs['sourceSeriesCount']
+              assert len(hs['sourceFilings'])==cs['sourceSeriesCount']
               assert hs['parsedLegacySourceCount']==0
               assert len(hs['missingParsedSeries'])==0
+              statuses=Counter(x.get('parseStatus') for x in hs['sourceFilings'])
+              assert sum(statuses.values())==cs['sourceSeriesCount']
               print('MONTH_AUDIT',json.dumps({
                   'signalMonth':cs['signalMonth'],
                   'catalog':cs['sourceSeriesCount'],
+                  'records':len(hs['sourceFilings']),
                   'parsed':hs['parsedSourceSeriesCount'],
+                  'parseStatusCounts':dict(statuses),
                   'missing':0,
               }))
+          assert h['uniqueParsedHoldingCount']>0
+          assert h['legacyAssetSectionCounts'].get('COMMON_EQUITY',0)>0
           print('HOLDINGS_AUDIT',json.dumps({
               'uniqueSourceFilingCount':h['uniqueSourceFilingCount'],
               'filingFetchSuccessCount':h['filingFetchSuccessCount'],
               'filingFetchErrorCount':h['filingFetchErrorCount'],
+              'seriesIdRequestedIdentityCount':h['seriesIdRequestedIdentityCount'],
+              'monthlySourceSeriesAppearanceCount':h['monthlySourceSeriesAppearanceCount'],
               'uniqueParsedHoldingCount':h['uniqueParsedHoldingCount'],
               'legacyAssetSectionCounts':h['legacyAssetSectionCounts'],
           }))
