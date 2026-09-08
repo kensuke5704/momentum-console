@@ -17,8 +17,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,21 +35,23 @@ jobs:
           test "$(git hash-object scripts/research-nq-per-holding-ec-2006.py)" = "79d2fc427efd67f784c98d2d6d9519aea99c3927"
           test "$(git hash-object scripts/research-sec-complete-portfolio-title-diagnostic-h2-2005.py)" = "7006a968a32994772ecaa373aeebe750c8b493bc"
 
-      - name: Download fixed parser-invariance and H2 country artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p data/research /tmp/parser /tmp/country
+      - name: Download fixed parser-invariance artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34188697692
+          name: nq-holdings-parser-invariance-h1-h2-2007
+          path: data/research
 
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041408799/zip > /tmp/parser.zip
-          unzip -q /tmp/parser.zip -d /tmp/parser
-          cp /tmp/parser/nq-holdings-parser-invariance-h1-h2-2007.json data/research/
-
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10042478228/zip > /tmp/country.zip
-          unzip -q /tmp/country.zip -d /tmp/country
-          cp /tmp/country/nq-series-id-country-pit-h2-2007.json data/research/
-          cp /tmp/country/nq-series-id-country-extension-diagnostic-h2-2007.json data/research/
-          cp /tmp/country/nq-series-id-structural-mapping-h2-2007.json data/research/
+      - name: Download fixed H2 PIT country artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190587649
+          name: nq-series-id-pit-country-h2-2007
+          path: data/research
 
       - name: Verify fixed downstream artifact lineage
         shell: bash
