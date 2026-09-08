@@ -6,8 +6,10 @@ on:
     paths:
       - "docs/research/h2-2007-npx-pit-master-validation-definition.md"
       - "docs/research/h2-2007-npx-pit-master-transport-correction.md"
+      - "docs/research/h2-2007-npx-filing-transport-correction.md"
       - "scripts/research-npx-pit-master-h2-2007.py"
       - "scripts/research-npx-pit-master-h2-2007-v2.py"
+      - "scripts/research-npx-pit-master-h2-2007-v3.py"
       - ".github/workflows/research-npx-pit-master-h2-2007.yml"
   workflow_dispatch:
 
@@ -18,7 +20,7 @@ permissions:
 jobs:
   validate-pit-npx-master:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +44,7 @@ jobs:
           sha256sum data/research/npx-security-master-2006.json
 
       - name: Build and validate monthly PIT N-PX masters
-        run: python3 scripts/research-npx-pit-master-h2-2007-v2.py
+        run: python3 scripts/research-npx-pit-master-h2-2007-v3.py
 
       - uses: actions/upload-artifact@v4
         if: always()
