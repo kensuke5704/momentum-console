@@ -1,0 +1,88 @@
+name: Research SEC ID Era Strict Series Source H2 2007 V3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2007-20260908"]
+    paths:
+      - "scripts/research-sec-id-era-strict-series-source-base-through-h2-2007.py"
+      - "scripts/research-sec-id-era-strict-series-source-shard-h2-2007-v3.py"
+      - "scripts/research-sec-id-era-strict-series-source-merge-h2-2007.py"
+      - "scripts/research-sec-id-era-strict-series-source-validation-h2-2007.py"
+      - "docs/research/h2-2007-source-period-extension-validation-definition.md"
+      - ".github/workflows/research-sec-id-era-strict-series-source-h2-2007-v3.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed cumulative complete-portfolio and recall-preserved prefilter inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/inv /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040863522/zip > /tmp/inv.zip
+          unzip -q /tmp/inv.zip -d /tmp/inv
+          cp /tmp/inv/sec-complete-portfolio-inventory-through-h2-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040955486/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-through-h2-2007.json data/research/
+      - name: Build strict Series source shard through H2 2007
+        run: python3 scripts/research-sec-id-era-strict-series-source-shard-h2-2007-v3.py --shard ${{ matrix.shard }} --shards 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: id-era-strict-v3-series-source-h2-2007-shard-${{ matrix.shard }}
+          path: data/research/sec-id-era-strict-series-source-h2-2007-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  merge:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: id-era-strict-v3-series-source-h2-2007-shard-*
+          path: data/research/id-era-strict-h2-2007-shards
+          merge-multiple: true
+      - name: Merge H2 2007 strict Series source
+        run: python3 scripts/research-sec-id-era-strict-series-source-merge-h2-2007.py
+      - name: Download authoritative H1 2007 strict source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/h1
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040000632/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/sec-id-era-strict-series-source-h1-2007.json data/research/
+      - name: Run pre-defined H2 2007 source period-extension validation
+        run: python3 scripts/research-sec-id-era-strict-series-source-validation-h2-2007.py
+      - name: Compute source catalog SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum data/research/sec-id-era-strict-series-source-h2-2007.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-id-era-strict-series-source-h2-2007-v3
+          path: |
+            data/research/sec-id-era-strict-series-source-h2-2007.json
+            data/research/sec-id-era-strict-series-source-h2-2007-validation.json
+          if-no-files-found: error
