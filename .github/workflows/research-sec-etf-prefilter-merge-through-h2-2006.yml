@@ -16,6 +16,8 @@ jobs:
   merge:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - name: Download fixed H2 prefilter shards
@@ -27,6 +29,12 @@ jobs:
           pattern: sec-etf-registrant-operational-prefilter-through-h2-2006-shard-*
           path: data/research
           merge-multiple: true
+      - name: Download authoritative H1 prefilter input for recall carry-forward
+        run: |
+          mkdir -p /tmp/h1
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/9962972058/zip > /tmp/h1.zip
+          unzip -q /tmp/h1.zip -d /tmp/h1
+          cp /tmp/h1/sec-etf-registrant-operational-prefilter-h1-2006.json data/research/
       - name: Merge deterministic H2 prefilter shards
         run: python3 scripts/research-sec-etf-prefilter-merge-through-h2-2006.py
       - uses: actions/upload-artifact@v4
