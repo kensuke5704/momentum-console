@@ -1,0 +1,132 @@
+name: Research N-Q Series-ID Structural Mapping H2 2007
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2007-20260908"]
+    paths:
+      - "docs/research/h2-2007-structural-mapping-validation-definition.md"
+      - "scripts/research-nq-series-id-structural-mapping-h2-2007.py"
+      - ".github/workflows/research-nq-series-id-structural-mapping-h2-2007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  map-h2-2007:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NPX_PIT_RUN_ID: 34190105652
+      NPX_PIT_ARTIFACT_ID: 10041975282
+      SOURCE_CATALOG_ARTIFACT_ID: 10041257985
+      SOURCE_CATALOG_SHA256: 9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631
+      HOLDINGS_RUN_ID: 34188353154
+      HOLDINGS_ARTIFACT_ID: 10041300366
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen accepted mapping implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-catalog-structural-mapping-h1-2006.py)" = "690479017fc82dce2480ded5d1ffafbb76721722"
+          test "$(git hash-object scripts/research-nq-npx-mapping-2006.py)" = "972c1e8ebf2c829abb3b8b400dffa613c368e100"
+          test "$(git hash-object scripts/research-nq-npx-structural-mapping-2006.py)" = "d79b077887cf11784b8620220929fa936a822601"
+
+      - name: Download fixed H2 holdings
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34188353154
+          name: nq-pit-holdings-series-id-h2-2007
+          path: /tmp/holdings
+
+      - name: Download authoritative H2 PIT N-PX masters
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190105652
+          name: npx-pit-master-h2-2007
+          path: /tmp/npx
+
+      - name: Stage and verify pinned inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research
+          cp /tmp/holdings/nq-pit-holdings-series-id-h2-2007.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-audit.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-07.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-08.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-09.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-10.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-11.json data/research/
+          cp /tmp/npx/npx-pit-master-h2-2007-2007-12.json data/research/
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2007.json').read_text())
+          a=json.loads(Path('data/research/npx-pit-master-h2-2007-audit.json').read_text())
+          assert h['sourceCatalogArtifactId']==10041257985
+          assert h['sourceCatalogSha256']=='9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631'
+          assert a['status']=='PASS' and a['fetchErrorCount']==0 and a['violations']==[]
+          assert a['baseArtifactId']==9876020712
+          expected=[
+              ('2007-07','2007-07-31',465),('2007-08','2007-08-31',469),('2007-09','2007-09-28',499),
+              ('2007-10','2007-10-31',518),('2007-11','2007-11-30',531),('2007-12','2007-12-31',533),
+          ]
+          assert [(s['signalMonth'],s['asOf'],s['catalogSourceSeriesCount']) for s in h['monthSnapshots']]==expected
+          assert [(m['signalMonth'],m['asOf']) for m in a['monthly']]==[(x[0],x[1]) for x in expected]
+          print('PINNED_INPUT_AUDIT',{'holdingsArtifactId':10041300366,'npxPitArtifactId':10041975282,'npxPitRunId':34190105652})
+          PY
+
+      - name: Compile H2 PIT mapping wrapper
+        run: python3 -m py_compile scripts/research-nq-series-id-structural-mapping-h2-2007.py
+
+      - name: Map each H2 month against its matching PIT N-PX master
+        run: python3 scripts/research-nq-series-id-structural-mapping-h2-2007.py
+
+      - name: Audit mapped output boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/research/nq-series-id-structural-mapping-h2-2007.json')
+          m=json.loads(p.read_text())
+          assert m['sourceCatalogArtifactId']==10041257985
+          assert m['sourceCatalogSha256']=='9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631'
+          assert m['holdingsRunId']==34188353154 and m['holdingsArtifactId']==10041300366
+          assert m['npxPitRunId']==34190105652 and m['npxPitArtifactId']==10041975282
+          assert m['npxBaseArtifactId']==9876020712
+          assert m['mappingImplementationBlob']=='690479017fc82dce2480ded5d1ffafbb76721722'
+          expected=[
+              ('2007-07','2007-07-31',465),('2007-08','2007-08-31',469),('2007-09','2007-09-28',499),
+              ('2007-10','2007-10-31',518),('2007-11','2007-11-30',531),('2007-12','2007-12-31',533),
+          ]
+          assert [(s['signalMonth'],s['asOf'],s['sourceSeriesCount']) for s in m['monthSnapshots']]==expected
+          assert [x['signalMonth'] for x in m['monthlyNpxLineage']]==[x[0] for x in expected]
+          allowed={'BASELINE_EXACT','BASELINE_ADR_BASE_UNIQUE','STRUCTURAL_SUFFIX_EXACT','UNIQUE_LONG_PREFIX'}
+          assert set(m['matchMethodCounts'])<=allowed
+          for snap in m['monthSnapshots']:
+              for filing in snap['sourceFilings']:
+                  for h in filing.get('holdings',[]):
+                      if h.get('mappingStatus')=='MATCHED_UNIQUE':
+                          assert h.get('matchMethod') in allowed
+                          assert h.get('mappedTicker') and h.get('mappedSecurityId')
+          print('MAPPING_AUDIT',json.dumps({'months':len(m['monthSnapshots']),'matchMethodCounts':m['matchMethodCounts'],'monthlyNpxLineage':m['monthlyNpxLineage']}))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-structural-mapping-h2-2007
+          path: |
+            data/research/nq-series-id-structural-mapping-h2-2007.json
+            data/research/npx-pit-master-h2-2007-audit.json
+          if-no-files-found: error
