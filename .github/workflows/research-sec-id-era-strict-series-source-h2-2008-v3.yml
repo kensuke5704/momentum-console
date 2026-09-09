@@ -20,7 +20,8 @@ jobs:
   shard:
     strategy:
       fail-fast: false
-      max-parallel: 4
+      # Keep SEC archive reads below the public-service request ceiling.
+      max-parallel: 1
       matrix:
         shard: [0,1,2,3]
     runs-on: ubuntu-latest

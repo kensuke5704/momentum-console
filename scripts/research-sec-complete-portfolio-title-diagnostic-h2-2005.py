@@ -5,6 +5,7 @@ import argparse
 import html
 import json
 import re
+import time
 import urllib.request
 from pathlib import Path
 
@@ -26,19 +27,30 @@ TYPE = re.compile(r"(?im)^\s*<TYPE>\s*([^\s<]+)")
 FILENAME = re.compile(r"(?im)^\s*<FILENAME>\s*([^\s<]+)")
 DESCRIPTION = re.compile(r"(?im)^\s*<DESCRIPTION>\s*(.*?)\s*$")
 TEXT_BLOCK = re.compile(r"(?is)<TEXT>(.*)</TEXT>")
+_LAST_REQUEST_AT = 0.0
 
 
 def fetch(filename: str) -> tuple[str, str]:
+    global _LAST_REQUEST_AT
     url = "https://www.sec.gov/Archives/" + filename.lstrip("/")
     errors = []
-    for target in (url, "https://r.jina.ai/" + url):
-        try:
-            req = urllib.request.Request(target, headers=UA)
-            with urllib.request.urlopen(req, timeout=35) as r:
-                data = r.read(25_000_000)
-            return data.decode("latin-1", "replace"), target
-        except Exception as exc:
-            errors.append(f"{type(exc).__name__}:{target}")
+    for attempt in range(1, 4):
+        for target in (url, "https://r.jina.ai/" + url):
+            try:
+                delay = 0.25 - (time.monotonic() - _LAST_REQUEST_AT)
+                if delay > 0:
+                    time.sleep(delay)
+                req = urllib.request.Request(target, headers=UA)
+                try:
+                    with urllib.request.urlopen(req, timeout=35) as r:
+                        data = r.read(25_000_000)
+                finally:
+                    _LAST_REQUEST_AT = time.monotonic()
+                return data.decode("latin-1", "replace"), target
+            except Exception as exc:
+                errors.append(f"attempt={attempt}:{type(exc).__name__}:{target}")
+        if attempt < 3:
+            time.sleep(2 * attempt)
     raise RuntimeError(";".join(errors))
 
 
