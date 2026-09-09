@@ -1,0 +1,85 @@
+name: Research N-PX PIT Master H1 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - "docs/research/h1-2008-npx-pit-master-validation-definition.md"
+      - "scripts/research-npx-pit-master-h1-2008.py"
+      - ".github/workflows/research-npx-pit-master-h1-2008.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate-pit-npx-master:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-npx-security-master-2006.py)" = "bc2d44dda6bfae00ebba22a81ba867a18bbd7ba5"
+          test "$(git hash-object scripts/research-npx-security-master-build-2006.py)" = "ad977557eb7f48fc0c0d71a2c369b0d61f6c1239"
+          test "$(git hash-object scripts/research-nq-catalog-structural-mapping-h1-2006.py)" = "690479017fc82dce2480ded5d1ffafbb76721722"
+
+      - name: Download validated H2 2007 PIT N-PX base
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/npx-base
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041975282/zip > /tmp/npx-base.zip
+          unzip -q /tmp/npx-base.zip -d /tmp/npx-base
+          cp /tmp/npx-base/npx-pit-master-h2-2007-2007-12.json data/research/
+          test -f data/research/npx-pit-master-h2-2007-2007-12.json
+
+      - name: Compile H1 PIT master extension
+        run: python3 -m py_compile scripts/research-npx-pit-master-h1-2008.py
+
+      - name: Build and validate H1 2008 monthly PIT N-PX masters
+        run: python3 scripts/research-npx-pit-master-h1-2008.py
+
+      - name: Require pre-defined PIT invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('data/research/npx-pit-master-h1-2008-audit.json').read_text())
+          assert a['status']=='PASS' and a['fetchErrorCount']==0 and a['violations']==[]
+          assert a['baseRunId']==34190105652 and a['baseArtifactId']==10041975282
+          expected=[('2008-01','2008-01-31'),('2008-02','2008-02-29'),('2008-03','2008-03-31'),('2008-04','2008-04-30'),('2008-05','2008-05-30'),('2008-06','2008-06-30')]
+          assert [(m['signalMonth'],m['asOf']) for m in a['monthly']]==expected
+          prior=0
+          base=a['baseRecordCount']
+          for m in a['monthly']:
+              assert m['activeIncrementalSources']>=prior
+              prior=m['activeIncrementalSources']
+              assert m['maxIncrementalSourceFilingDate'] is None or m['maxIncrementalSourceFilingDate']<=m['asOf']
+              p=Path(m['output'])
+              o=json.loads(p.read_text())
+              assert o['baseRecordCount']==base and o['records'][:base]==json.loads(Path('data/research/npx-pit-master-h2-2007-2007-12.json').read_text())['records']
+          print('H1_2008_NPX_PIT_VALIDATION_PASS')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npx-pit-master-h1-2008
+          path: |
+            data/research/npx-pit-master-h1-2008-audit.json
+            data/research/npx-pit-master-h1-2008-2008-01.json
+            data/research/npx-pit-master-h1-2008-2008-02.json
+            data/research/npx-pit-master-h1-2008-2008-03.json
+            data/research/npx-pit-master-h1-2008-2008-04.json
+            data/research/npx-pit-master-h1-2008-2008-05.json
+            data/research/npx-pit-master-h1-2008-2008-06.json
+          if-no-files-found: error
