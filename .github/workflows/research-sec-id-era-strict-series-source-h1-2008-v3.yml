@@ -1,0 +1,107 @@
+name: Research SEC ID Era Strict Series Source H1 2008 V3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - "scripts/research-sec-id-era-strict-series-source-base-through-h1-2008.py"
+      - "scripts/research-sec-id-era-strict-series-source-shard-h1-2008-v3.py"
+      - "scripts/research-sec-id-era-strict-series-source-merge-h1-2008.py"
+      - "scripts/research-sec-id-era-strict-series-source-validation-h1-2008.py"
+      - "docs/research/h1-2008-source-period-extension-validation-definition.md"
+      - ".github/workflows/research-sec-id-era-strict-series-source-h1-2008-v3.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0,1,2,3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed H1 2008 cumulative complete-portfolio and candidate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/inv /tmp/pref
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085863572/zip > /tmp/inv.zip
+          unzip -q /tmp/inv.zip -d /tmp/inv
+          cp /tmp/inv/sec-complete-portfolio-inventory-through-h1-2008.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085971852/zip > /tmp/pref.zip
+          unzip -q /tmp/pref.zip -d /tmp/pref
+          cp /tmp/pref/sec-etf-registrant-operational-prefilter-through-h1-2008.json data/research/
+      - name: Compile strict Series source shard
+        run: |
+          python3 -m py_compile scripts/research-sec-id-era-strict-series-source-base-through-h1-2008.py
+          python3 -m py_compile scripts/research-sec-id-era-strict-series-source-shard-h1-2008-v3.py
+      - name: Build strict Series source shard through H1 2008
+        run: python3 scripts/research-sec-id-era-strict-series-source-shard-h1-2008-v3.py --shard ${{ matrix.shard }} --shards 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: id-era-strict-v3-series-source-h1-2008-shard-${{ matrix.shard }}
+          path: data/research/sec-id-era-strict-series-source-h1-2008-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  merge:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: id-era-strict-v3-series-source-h1-2008-shard-*
+          path: data/research/id-era-strict-h1-2008-shards
+          merge-multiple: true
+      - name: Download authoritative closed source lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/h12006 /tmp/h22006 /tmp/h22007
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10006530879/zip > /tmp/h12006.zip
+          unzip -q /tmp/h12006.zip -d /tmp/h12006
+          cp /tmp/h12006/sec-hybrid-etf-source-catalog-h1-2006.json data/research/
+          echo "e2405277fe03a4208e163a43d724fd7364e139ad229caa70251b151f1d53b801  data/research/sec-hybrid-etf-source-catalog-h1-2006.json" | sha256sum -c -
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10038284691/zip > /tmp/h22006.zip
+          unzip -q /tmp/h22006.zip -d /tmp/h22006
+          cp /tmp/h22006/sec-id-era-strict-series-source-h2-2006.json data/research/
+
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041257985/zip > /tmp/h22007.zip
+          unzip -q /tmp/h22007.zip -d /tmp/h22007
+          cp /tmp/h22007/sec-id-era-strict-series-source-h2-2007.json data/research/
+          echo "9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631  data/research/sec-id-era-strict-series-source-h2-2007.json" | sha256sum -c -
+      - name: Compile merge and pre-defined validator
+        run: |
+          python3 -m py_compile scripts/research-sec-id-era-strict-series-source-merge-h1-2008.py
+          python3 -m py_compile scripts/research-sec-id-era-strict-series-source-validation-h1-2008.py
+      - name: Merge H1 2008 strict Series source
+        run: python3 scripts/research-sec-id-era-strict-series-source-merge-h1-2008.py
+      - name: Require pre-defined H1 2008 source period-extension invariants
+        run: python3 scripts/research-sec-id-era-strict-series-source-validation-h1-2008.py
+      - name: Compute fixed source catalog SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SOURCE_SHA256=$(sha256sum data/research/sec-id-era-strict-series-source-h1-2008.json | awk '{print $1}')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-id-era-strict-series-source-h1-2008-v3
+          path: |
+            data/research/sec-id-era-strict-series-source-h1-2008.json
+            data/research/sec-id-era-strict-series-source-h1-2008-validation.json
+          if-no-files-found: error
