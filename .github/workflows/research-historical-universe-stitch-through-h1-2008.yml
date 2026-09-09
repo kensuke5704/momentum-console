@@ -1,0 +1,108 @@
+name: Research Historical Universe Stitch Through H1 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - ".github/workflows/research-historical-universe-stitch-through-h1-2008.yml"
+      - "scripts/research-historical-universe-stitch-through-h1-2008.py"
+      - "docs/research/h1-2008-30-month-stitch-validation-definition.md"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  stitch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen stitch lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-historical-universe-builder.py)" = "1357402f34dfea1c1dbdcaac7de5078b680eb5c3"
+          test "$(git hash-object scripts/research-historical-universe-stitch-through-h1-2008.py)" = "c233b0c1fccb5ef1727cf2703841a485525c1db0"
+          test "$(git hash-object scripts/research-h1-2008-downstream-period-extension-validation.py)" = "79529399552a9c4520b5e6ce205944038da1b370"
+          python3 -m py_compile scripts/research-historical-universe-stitch-through-h1-2008.py
+
+      - name: Verify fixed artifact metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api /repos/kensuke5704/momentum-console/actions/artifacts/10042873354 --jq .digest)" = "sha256:a8d1955fd406121e214af7dec4cf69058895573e0ad055b2e8a54d4101103f87"
+          test "$(gh api /repos/kensuke5704/momentum-console/actions/artifacts/10105210114 --jq .digest)" = "sha256:b264b54551771cfcb3fb0832fa8f6ef293d435f15db98c0f3170b8848bdf6906"
+
+      - name: Download closed 24-month historical Universe prefix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/prefix
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10042873354/zip > /tmp/prefix.zip
+          unzip -q /tmp/prefix.zip -d /tmp/prefix
+          cp /tmp/prefix/historical-universe-builder-through-h2-2007.json data/research/
+
+      - name: Download validated H1 2008 downstream suffix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/suffix
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10105210114/zip > /tmp/suffix.zip
+          unzip -q /tmp/suffix.zip -d /tmp/suffix
+          cp /tmp/suffix/historical-universe-builder-h1-2008.json data/research/
+          cp /tmp/suffix/h1-2008-downstream-period-extension-validation.json data/research/
+
+      - name: Require fixed downstream PASS before stitch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('data/research/h1-2008-downstream-period-extension-validation.json').read_text())
+          assert p['passed'] is True
+          assert p['sourceCatalogSha256']=='31ac8ca8df99093cbcf98b916e599969481a77fcfda7cea915b3f415f8c09fbc'
+          assert p['checks']['parserInvariancePassed'] is True
+          assert p['checks']['countryNoLookahead'] is True
+          assert p['checks']['corpBridgeMaterialityInvariant'] is True
+          assert p['checks']['frozenBuilderExactParitySixOfSix'] is True
+          assert p['checks']['top80RankInvariant'] is True
+          assert len(p['monthly'])==6
+          PY
+
+      - name: Stitch validated historical Universe without recomputation
+        run: python3 scripts/research-historical-universe-stitch-through-h1-2008.py
+
+      - name: Audit exact 24-month prefix and exact six-month suffix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          prefix=json.loads(Path('data/research/historical-universe-builder-through-h2-2007.json').read_text())
+          suffix=json.loads(Path('data/research/historical-universe-builder-h1-2008.json').read_text())
+          out=json.loads(Path('data/research/historical-universe-builder-through-h1-2008.json').read_text())
+          rows=out['monthSnapshots']
+          expected=[f'2006-{m:02d}' for m in range(1,13)]+[f'2007-{m:02d}' for m in range(1,13)]+[f'2008-{m:02d}' for m in range(1,7)]
+          assert [r['signalMonth'] for r in rows]==expected
+          assert len(rows)==30
+          assert rows[:24]==prefix['monthSnapshots']
+          assert rows[24:]==suffix['monthSnapshots']
+          assert out['builderGitBlob']=='1357402f34dfea1c1dbdcaac7de5078b680eb5c3'
+          assert out['segments'][0]['runId']==34193003030 and out['segments'][0]['artifactId']==10042873354
+          assert out['segments'][1]['runId']==34354704856 and out['segments'][1]['artifactId']==10105210114
+          assert all(len(r.get('symbols',[]))<=80 for r in rows)
+          print('STITCH_H1_2008_AUDIT',json.dumps({'passed':True,'months':30,'first':rows[0]['signalMonth'],'last':rows[-1]['signalMonth']},separators=(',',':')))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-universe-builder-through-h1-2008
+          path: data/research/historical-universe-builder-through-h1-2008.json
+          if-no-files-found: error
