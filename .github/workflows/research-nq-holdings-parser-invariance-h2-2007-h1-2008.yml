@@ -31,7 +31,7 @@ jobs:
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/10088832684/zip > /tmp/rs.zip
           unzip -q /tmp/rs.zip -d /tmp/rs
           cp /tmp/rs/sec-id-era-strict-series-source-h1-2008.json data/research/
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041300366/zip > /tmp/lh.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041328876/zip > /tmp/lh.zip
           unzip -q /tmp/lh.zip -d /tmp/lh
           cp /tmp/lh/nq-pit-holdings-series-id-h2-2007.json data/research/
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/10091627801/zip > /tmp/rh.zip
