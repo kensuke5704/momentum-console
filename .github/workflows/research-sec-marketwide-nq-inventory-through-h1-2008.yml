@@ -1,0 +1,53 @@
+name: Research SEC Market-wide N-Q Inventory Through H1 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - "scripts/research-sec-marketwide-nq-inventory-through-h1-2008.py"
+      - ".github/workflows/research-sec-marketwide-nq-inventory-through-h1-2008.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build official SEC cumulative N-Q inventory through H1 2008
+        run: python3 scripts/research-sec-marketwide-nq-inventory-through-h1-2008.py
+      - name: Download authoritative through-H2-2007 inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/h2
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040860433/zip > /tmp/h2.zip
+          unzip -q /tmp/h2.zip -d /tmp/h2
+      - name: Require exact H2 2007 cumulative row replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          old=json.load(open('/tmp/h2/sec-marketwide-nq-inventory-through-h2-2007.json'))
+          new=json.load(open('data/research/sec-marketwide-nq-inventory-through-h1-2008.json'))
+          replay=[r for r in new['rows'] if r['dateFiled']<='2007-12-31']
+          assert replay==old['rows'], (len(replay),len(old['rows']))
+          assert len(replay)==old['filingCount']
+          assert len({r['cik'] for r in replay})==old['uniqueRegistrantCiks']
+          print('EXACT_H2_2007_REPLAY',json.dumps({
+              'rows':len(replay),'registrants':len({r['cik'] for r in replay})
+          }))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-marketwide-nq-inventory-through-h1-2008
+          path: data/research/sec-marketwide-nq-inventory-through-h1-2008.json
+          if-no-files-found: error
