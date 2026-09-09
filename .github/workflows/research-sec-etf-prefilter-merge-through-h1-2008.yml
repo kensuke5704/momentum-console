@@ -1,0 +1,66 @@
+name: Research SEC ETF Prefilter Merge Through H1 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - ".github/workflows/research-sec-etf-prefilter-merge-through-h1-2008.yml"
+      - "docs/research/h1-2008-prefilter-merge-run-trigger.md"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed H1 2008 prefilter shards
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34303793542
+          pattern: sec-etf-registrant-operational-prefilter-through-h1-2008-shard-*
+          path: data/research
+          merge-multiple: true
+      - name: Download authoritative H2 2007 prefilter for recall carry-forward
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/prior
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10040955486/zip > /tmp/prior.zip
+          unzip -q /tmp/prior.zip -d /tmp/prior
+          cp /tmp/prior/sec-etf-registrant-operational-prefilter-through-h2-2007.json data/research/
+      - name: Merge deterministic H1 2008 prefilter shards
+        run: python3 scripts/research-sec-etf-prefilter-merge-through-h1-2008.py
+      - name: Require monotone prior candidate recall only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          prior=json.load(open('data/research/sec-etf-registrant-operational-prefilter-through-h2-2007.json'))
+          new=json.load(open('data/research/sec-etf-registrant-operational-prefilter-through-h1-2008.json'))
+          assert set(prior['positiveCiks']) <= set(new['positiveCiks'])
+          assert new['priorPositiveCandidateRegistrantCount']==len(prior['positiveCiks'])
+          assert new['priorInputArtifactId']==10040955486
+          assert new['inventoryArtifactId']==10085851582
+          assert new['sourceRunId']==34303793542
+          print('PREFILTER_RECALL',json.dumps({
+              'prior':len(prior['positiveCiks']),
+              'current':new['currentPositiveCandidateRegistrantCount'],
+              'carryForward':new['priorCarryForwardRegistrantCount'],
+              'merged':new['positiveCandidateRegistrantCount'],
+          }))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sec-etf-registrant-operational-prefilter-through-h1-2008
+          path: data/research/sec-etf-registrant-operational-prefilter-through-h1-2008.json
+          if-no-files-found: error
