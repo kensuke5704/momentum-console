@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p data/research /tmp/inv /tmp/pref
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085863572/zip > /tmp/inv.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085863522/zip > /tmp/inv.zip
           unzip -q /tmp/inv.zip -d /tmp/inv
           cp /tmp/inv/sec-complete-portfolio-inventory-through-h1-2008.json data/research/
           gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085971852/zip > /tmp/pref.zip
