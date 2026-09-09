@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/h2
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085863572/zip > /tmp/h2.zip
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10085863522/zip > /tmp/h2.zip
           unzip -q /tmp/h2.zip -d /tmp/h2
       - name: Require exact H1 2008 cumulative row replay
         shell: bash
