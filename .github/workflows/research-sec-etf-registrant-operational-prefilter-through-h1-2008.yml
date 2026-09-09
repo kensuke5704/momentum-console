@@ -1,0 +1,44 @@
+name: Research SEC ETF Registrant Operational Prefilter Through H1 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - "scripts/research-sec-etf-registrant-operational-prefilter-shard-through-h1-2008.py"
+      - ".github/workflows/research-sec-etf-registrant-operational-prefilter-through-h1-2008.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prefilter:
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed cumulative N-Q inventory through H1 2008
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34303684929
+          name: sec-marketwide-nq-inventory-through-h1-2008
+          path: data/research
+      - name: Prefilter cumulative registrants by unchanged PIT operational ETF evidence
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_COUNT: 12
+        run: python3 scripts/research-sec-etf-registrant-operational-prefilter-shard-through-h1-2008.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sec-etf-registrant-operational-prefilter-through-h1-2008-shard-${{ matrix.shard }}
+          path: data/research/sec-etf-registrant-operational-prefilter-through-h1-2008-shard-*.json
+          if-no-files-found: error
