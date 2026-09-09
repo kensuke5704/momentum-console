@@ -37,7 +37,7 @@ def fetch(filename: str) -> tuple[str, str]:
     for attempt in range(1, 4):
         for target in (url, "https://r.jina.ai/" + url):
             try:
-                delay = 0.25 - (time.monotonic() - _LAST_REQUEST_AT)
+                delay = 0.5 - (time.monotonic() - _LAST_REQUEST_AT)
                 if delay > 0:
                     time.sleep(delay)
                 req = urllib.request.Request(target, headers=UA)

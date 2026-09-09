@@ -30,7 +30,7 @@ def fb(url,limit=4_000_000,timeout=20):
     # hygiene only: callers still receive the identical document bytes and
     # parser/acceptance semantics are unchanged.
     global _LAST_REQUEST_AT
-    delay=0.25-(time.monotonic()-_LAST_REQUEST_AT)
+    delay=0.5-(time.monotonic()-_LAST_REQUEST_AT)
     if delay>0: time.sleep(delay)
     req=urllib.request.Request(url,headers=UA)
     try:
