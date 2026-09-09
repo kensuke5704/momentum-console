@@ -1,0 +1,97 @@
+name: Research H1 2008 Downstream Period Extension Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - "docs/research/h1-2008-downstream-period-extension-validation-definition.md"
+      - "scripts/research-h1-2008-downstream-period-extension-validation.py"
+      - ".github/workflows/research-h1-2008-downstream-period-extension-validation.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate-downstream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert frozen builder and fixed validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-historical-universe-builder.py)" = "1357402f34dfea1c1dbdcaac7de5078b680eb5c3"
+          test "$(git hash-object scripts/research-h1-2008-downstream-period-extension-validation.py)" = "79529399552a9c4520b5e6ce205944038da1b370"
+          python3 -m py_compile scripts/research-historical-universe-builder.py
+          python3 -m py_compile scripts/research-h1-2008-downstream-period-extension-validation.py
+
+      - name: Download fixed H1 2008 country output
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/country
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10092132620/zip > /tmp/country.zip
+          unzip -q /tmp/country.zip -d /tmp/country
+          cp /tmp/country/nq-series-id-country-pit-h1-2008.json data/research/
+          cp /tmp/country/nq-series-id-country-extension-diagnostic-h1-2008.json data/research/
+          cp /tmp/country/nq-series-id-structural-mapping-h1-2008.json data/research/
+
+      - name: Download fixed parser-invariance audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/parser
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10091932913/zip > /tmp/parser.zip
+          unzip -q /tmp/parser.zip -d /tmp/parser
+          cp /tmp/parser/nq-holdings-parser-invariance-h2-2007-h1-2008.json data/research/
+
+      - name: Verify pinned downstream inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('data/research/nq-series-id-country-pit-h1-2008.json').read_text())
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h1-2008.json').read_text())
+          p=json.loads(Path('data/research/nq-holdings-parser-invariance-h2-2007-h1-2008.json').read_text())
+          assert c['sourceCatalogArtifactId']==10088832684
+          assert c['sourceCatalogSha256']=='31ac8ca8df99093cbcf98b916e599969481a77fcfda7cea915b3f415f8c09fbc'
+          assert c['mappingRunId']==34320498530 and c['mappingArtifactId']==10091673514
+          assert c['npxPitRunId']==34320224950 and c['npxPitArtifactId']==10091573844
+          assert m['holdingsRunId']==34320051180 and m['holdingsArtifactId']==10091627801
+          assert p['passed'] is True
+          assert p['sourceCatalogOverlapCount']==342
+          assert p['holdingsOverlapCount']==342
+          assert p['exactFullRecordMatchCount']==342
+          assert p['semanticMismatchCount']==0
+          PY
+
+      - name: Build H1 2008 historical Universe with frozen builder
+        run: |
+          python3 scripts/research-historical-universe-builder.py \
+            --input data/research/nq-series-id-country-pit-h1-2008.json \
+            --output data/research/historical-universe-builder-h1-2008.json \
+            --expected-catalog-sha 31ac8ca8df99093cbcf98b916e599969481a77fcfda7cea915b3f415f8c09fbc
+
+      - name: Require pre-defined H1 2008 downstream exact-parity invariants
+        run: python3 scripts/research-h1-2008-downstream-period-extension-validation.py
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: h1-2008-downstream-period-extension-validation
+          path: |
+            data/research/historical-universe-builder-h1-2008.json
+            data/research/h1-2008-downstream-period-extension-validation.json
+            data/research/nq-series-id-country-pit-h1-2008.json
+            data/research/nq-series-id-country-extension-diagnostic-h1-2008.json
+            data/research/nq-series-id-structural-mapping-h1-2008.json
+            data/research/nq-holdings-parser-invariance-h2-2007-h1-2008.json
+          if-no-files-found: error
