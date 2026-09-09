@@ -64,7 +64,7 @@ def main()->None:
         'purpose':'Parser-invariance audit across validated H2-2007 and H1-2008 Series-ID raw holdings. The overlap is derived independently from the current-period strict source snapshots supplied to both holdings runs. Every shared Series-ID + accession + SEC source-file key must occur in both holdings artifacts with exact parser-derived semantics, excluding only legacyIdentity schema metadata.',
         'leftPeriod':'H2-2007','rightPeriod':'H1-2008',
         'leftSourceArtifactId':10041257985,'rightSourceArtifactId':10088832684,
-        'leftHoldingsArtifactId':10041300366,'rightHoldingsArtifactId':10091627801,
+        'leftHoldingsArtifactId':10041328876,'rightHoldingsArtifactId':10091627801,
         'leftUniqueHoldingsFilingRecordCount':len(left),'rightUniqueHoldingsFilingRecordCount':len(right),
         'sourceCatalogOverlapCount':len(source_overlap),'holdingsOverlapCount':len(holdings_overlap),'exactFullRecordMatchCount':exact,
         'legacyIdentityOnlyDifferenceCount':len(legacy_only),'semanticMismatchCount':len(semantic),
