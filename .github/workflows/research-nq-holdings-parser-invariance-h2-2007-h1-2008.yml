@@ -1,0 +1,64 @@
+name: Research N-Q Holdings Parser Invariance H2 2007 H1 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h1-2008-20260908"]
+    paths:
+      - "scripts/research-nq-holdings-parser-invariance-h2-2007-h1-2008.py"
+      - ".github/workflows/research-nq-holdings-parser-invariance-h2-2007-h1-2008.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  parser-invariance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage fixed validated source and holdings artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/ls /tmp/rs /tmp/lh /tmp/rh
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041257985/zip > /tmp/ls.zip
+          unzip -q /tmp/ls.zip -d /tmp/ls
+          cp /tmp/ls/sec-id-era-strict-series-source-h2-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10088832684/zip > /tmp/rs.zip
+          unzip -q /tmp/rs.zip -d /tmp/rs
+          cp /tmp/rs/sec-id-era-strict-series-source-h1-2008.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10041300366/zip > /tmp/lh.zip
+          unzip -q /tmp/lh.zip -d /tmp/lh
+          cp /tmp/lh/nq-pit-holdings-series-id-h2-2007.json data/research/
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10091627801/zip > /tmp/rh.zip
+          unzip -q /tmp/rh.zip -d /tmp/rh
+          cp /tmp/rh/nq-pit-holdings-series-id-h1-2008.json data/research/
+      - name: Verify fixed lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631  data/research/sec-id-era-strict-series-source-h2-2007.json" | sha256sum -c -
+          echo "31ac8ca8df99093cbcf98b916e599969481a77fcfda7cea915b3f415f8c09fbc  data/research/sec-id-era-strict-series-source-h1-2008.json" | sha256sum -c -
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          l=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2007.json').read_text())
+          r=json.loads(Path('data/research/nq-pit-holdings-series-id-h1-2008.json').read_text())
+          assert l['sourceCatalogArtifactId']==10041257985 and l['sourceCatalogSha256']=='9ffed81a42044f7388221a60450a24967ea61f108eb63f66464699ada1849631'
+          assert r['sourceCatalogArtifactId']==10088832684 and r['sourceCatalogSha256']=='31ac8ca8df99093cbcf98b916e599969481a77fcfda7cea915b3f415f8c09fbc'
+          assert l['authoritativeH1HoldingsRunId']==r['authoritativeH1HoldingsRunId']==34089965073
+          assert l['authoritativeH1HoldingsArtifactId']==r['authoritativeH1HoldingsArtifactId']==10006530879
+          PY
+      - run: python3 -m py_compile scripts/research-nq-holdings-parser-invariance-h2-2007-h1-2008.py
+      - name: Require exact parser semantic invariance on independently derived overlap
+        run: python3 scripts/research-nq-holdings-parser-invariance-h2-2007-h1-2008.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-holdings-parser-invariance-h2-2007-h1-2008
+          path: data/research/nq-holdings-parser-invariance-h2-2007-h1-2008.json
+          if-no-files-found: error
