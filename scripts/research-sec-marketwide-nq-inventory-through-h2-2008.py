@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import time
 import urllib.request
 import zipfile
 from collections import Counter
@@ -36,13 +37,24 @@ QUARTERS = [
 def fetch_master(year: int, quarter: int):
     base = f'https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{quarter}'
     zip_url = base + '/master.zip'
-    req = urllib.request.Request(zip_url, headers=UA)
-    with urllib.request.urlopen(req, timeout=50) as response:
-        payload = response.read(25_000_000)
-    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
-        member = next(name for name in archive.namelist() if name.lower().endswith('master.idx'))
-        text = archive.read(member).decode('latin-1', 'replace')
-    return text, zip_url, len(payload)
+    last_error = None
+    for attempt in range(1, 4):
+        try:
+            req = urllib.request.Request(zip_url, headers=UA)
+            with urllib.request.urlopen(req, timeout=120) as response:
+                payload = response.read(25_000_000)
+            with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                member = next(name for name in archive.namelist() if name.lower().endswith('master.idx'))
+                text = archive.read(member).decode('latin-1', 'replace')
+            return text, zip_url, len(payload)
+        except (TimeoutError, OSError, urllib.error.URLError, zipfile.BadZipFile) as exc:
+            last_error = exc
+            print('TRANSPORT_RETRY', json.dumps({
+                'year': year, 'quarter': quarter, 'attempt': attempt, 'error': type(exc).__name__,
+            }), flush=True)
+            if attempt < 3:
+                time.sleep(5 * attempt)
+    raise last_error
 
 
 def accession_from_filename(filename: str):
