@@ -1,0 +1,93 @@
+name: Research H2 2008 Downstream Period Extension Validation
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "scripts/research-h2-2008-downstream-period-extension-validation.py"
+      - ".github/workflows/research-h2-2008-downstream-period-extension-validation.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PARSER_RUN_ID: 34424520059
+      PARSER_ARTIFACT_ID: 10132121597
+      MAPPING_RUN_ID: 34425023064
+      MAPPING_ARTIFACT_ID: 10132301353
+      COUNTRY_RUN_ID: 34437046732
+      COUNTRY_ARTIFACT_ID: 10136821021
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert frozen builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-historical-universe-builder.py)" = "1357402f34dfea1c1dbdcaac7de5078b680eb5c3"
+          python3 -m py_compile scripts/research-historical-universe-builder.py scripts/research-h2-2008-downstream-period-extension-validation.py
+      - name: Download fixed parser-invariance artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34424520059
+          name: nq-holdings-parser-invariance-h1-h2-2008
+          path: data/research
+      - name: Download fixed structural mapping artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34425023064
+          name: nq-series-id-structural-mapping-h2-2008
+          path: data/research
+      - name: Download fixed PIT country artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34437046732
+          name: nq-series-id-country-pit-h2-2008
+          path: data/research
+      - name: Verify fixed downstream lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          sha='ed76ca73a204302f660aba4e79573766b9aa4ef9a25837db7f9843cd980ec110'
+          p=json.loads(Path('data/research/nq-holdings-parser-invariance-h1-h2-2008.json').read_text())
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h2-2008.json').read_text())
+          c=json.loads(Path('data/research/nq-series-id-country-pit-h2-2008.json').read_text())
+          assert p['passed'] and p['semanticMismatchCount']==0
+          assert m['sourceCatalogArtifactId']==10131298181 and m['sourceCatalogSha256']==sha
+          assert m['holdingsRunId']==34423376664 and m['holdingsArtifactId']==10131779818
+          assert m['npxPitRunId']==34423619035 and m['npxPitArtifactId']==10131980330
+          assert c['sourceCatalogArtifactId']==10131298181 and c['sourceCatalogSha256']==sha
+          assert c['mappingRunId']==34425023064 and c['mappingArtifactId']==10132301353
+          assert c['npxPitRunId']==34423619035 and c['npxPitArtifactId']==10131980330
+          PY
+      - name: Build frozen H2 2008 historical Universe
+        run: |
+          python3 scripts/research-historical-universe-builder.py \
+            --input data/research/nq-series-id-country-pit-h2-2008.json \
+            --output data/research/historical-universe-builder-h2-2008.json \
+            --expected-catalog-sha ed76ca73a204302f660aba4e79573766b9aa4ef9a25837db7f9843cd980ec110
+      - name: Require exact H2 2008 downstream parity
+        run: python3 scripts/research-h2-2008-downstream-period-extension-validation.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: h2-2008-downstream-period-extension-validation
+          path: |
+            data/research/h2-2008-downstream-period-extension-validation.json
+            data/research/historical-universe-builder-h2-2008.json
+            data/research/nq-holdings-parser-invariance-h1-h2-2008.json
+            data/research/nq-series-id-country-pit-h2-2008.json
+            data/research/nq-series-id-country-extension-diagnostic-h2-2008.json
+            data/research/nq-series-id-structural-mapping-h2-2008.json
+          if-no-files-found: error
