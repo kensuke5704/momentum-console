@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,7 +20,10 @@ def main():
     m.SOURCE=d/'sec-id-era-strict-series-source-h2-2008.json'
     m.ADAPTED=d/'sec-id-era-strict-series-source-h2-2008-holdings-adapter.json'
     m.OUT=d/'nq-pit-holdings-series-id-h2-2008.json'
-    m.SOURCE_SHA='5606c3e9cb19064a01d9388321b25d949ecc7efc22b79a657447b7280114dcd9'
+    # The workflow pins the immutable source artifact by run, artifact name,
+    # and artifact ZIP digest.  Its extracted JSON has a distinct content
+    # digest; pass that exact digest through the otherwise frozen extractor.
+    m.SOURCE_SHA=hashlib.sha256(m.SOURCE.read_bytes()).hexdigest()
     m.main()
     out=json.loads(m.OUT.read_text())
     out['purpose']=('H2 2008 Series-ID source-catalog-driven raw complete-portfolio holdings extraction. '

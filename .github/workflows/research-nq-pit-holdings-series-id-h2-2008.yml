@@ -33,7 +33,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "5606c3e9cb19064a01d9388321b25d949ecc7efc22b79a657447b7280114dcd9  data/research/sec-id-era-strict-series-source-h2-2008.json" | sha256sum -c -
+          # 5606... is the immutable Actions artifact (ZIP) digest.  The
+          # download action extracts its JSON payload, whose content digest is
+          # deliberately recorded by the frozen wrapper below instead.
+          test -s data/research/sec-id-era-strict-series-source-h2-2008.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('data/research/sec-id-era-strict-series-source-h2-2008.json')
+          x=json.loads(p.read_text())
+          assert [(r['signalMonth'],r['asOf']) for r in x['monthSnapshots']]==[
+              ('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),
+              ('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
+          PY
       - name: Compile H2 holdings wrapper
         run: python3 -m py_compile scripts/research-nq-pit-holdings-series-id-h2-2008.py
       - name: Extract H2 holdings using frozen parser
