@@ -1,0 +1,62 @@
+name: Research N-Q PIT Holdings Series-ID H2 2008
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "scripts/research-nq-pit-holdings-series-id-h2-2008.py"
+      - ".github/workflows/research-nq-pit-holdings-series-id-h2-2008.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  holdings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_CATALOG_ARTIFACT_ID: 10131298181
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed validated H2 strict source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/research /tmp/h2source
+          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10131298181/zip > /tmp/h2source.zip
+          unzip -q /tmp/h2source.zip -d /tmp/h2source
+          cp /tmp/h2source/sec-id-era-strict-series-source-h2-2008.json data/research/
+          echo "5606c3e9cb19064a01d9388321b25d949ecc7efc22b79a657447b7280114dcd9  data/research/sec-id-era-strict-series-source-h2-2008.json" | sha256sum -c -
+      - name: Compile H2 holdings wrapper
+        run: python3 -m py_compile scripts/research-nq-pit-holdings-series-id-h2-2008.py
+      - name: Extract H2 holdings using frozen parser
+        run: python3 scripts/research-nq-pit-holdings-series-id-h2-2008.py
+      - name: Require PIT parser completeness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          s=json.loads(Path('data/research/sec-id-era-strict-series-source-h2-2008.json').read_text())
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2008.json').read_text())
+          assert h['sourceCatalogArtifactId']==10131298181
+          assert h['filingFetchErrorCount']==0
+          assert h['filingFetchSuccessCount']==h['uniqueSourceFilingCount']
+          expected=[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
+          assert [(x['signalMonth'],x['asOf']) for x in s['monthSnapshots']]==expected
+          assert [(x['signalMonth'],x['asOf']) for x in h['monthSnapshots']]==expected
+          assert all(not x['missingParsedSeries'] for x in h['monthSnapshots'])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-pit-holdings-series-id-h2-2008
+          path: |
+            data/research/sec-id-era-strict-series-source-h2-2008.json
+            data/research/sec-id-era-strict-series-source-h2-2008-holdings-adapter.json
+            data/research/nq-pit-holdings-series-id-h2-2008.json
+          if-no-files-found: error
