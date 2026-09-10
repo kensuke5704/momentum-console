@@ -11,6 +11,7 @@ ROOT=Path(__file__).resolve().parents[1]
 DATA=ROOT/'data/research'
 DATES=[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
 SOURCE_ARTIFACT=10131298181
+SOURCE_SHA='ed76ca73a204302f660aba4e79573766b9aa4ef9a25837db7f9843cd980ec110'
 MAPPING_BLOB='690479017fc82dce2480ded5d1ffafbb76721722'
 ALLOWED={'BASELINE_EXACT','BASELINE_ADR_BASE_UNIQUE','STRUCTURAL_SUFFIX_EXACT','UNIQUE_LONG_PREFIX'}
 
@@ -21,7 +22,7 @@ def load():
 def main():
     m=load(); holdings=json.loads((DATA/'nq-pit-holdings-series-id-h2-2008.json').read_text())
     source_sha=holdings.get('sourceCatalogSha256')
-    if not source_sha: raise RuntimeError('missing fixed H2 source content digest')
+    if source_sha!=SOURCE_SHA: raise RuntimeError('unexpected fixed H2 source content digest')
     def holdings_lineage(x):
         if x.get('sourceCatalogArtifactId')!=SOURCE_ARTIFACT or x.get('sourceCatalogSha256')!=source_sha: raise RuntimeError('unexpected H2 holdings source lineage')
         observed=[(s.get('signalMonth'),s.get('asOf'),s.get('catalogSourceSeriesCount')) for s in x.get('monthSnapshots',[])]

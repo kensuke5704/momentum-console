@@ -16,6 +16,7 @@ jobs:
     env:
       HOLDINGS_RUN_ID: 34423376664
       HOLDINGS_ARTIFACT_ID: 10131779818
+      SOURCE_CATALOG_SHA256: ed76ca73a204302f660aba4e79573766b9aa4ef9a25837db7f9843cd980ec110
       NPX_PIT_RUN_ID: 34423619035
       NPX_PIT_ARTIFACT_ID: 10131980330
     steps:
@@ -54,6 +55,7 @@ jobs:
           a=json.loads(Path('data/research/npx-pit-master-h2-2008-audit.json').read_text())
           expected=[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
           assert h['sourceCatalogArtifactId']==10131298181
+          assert h['sourceCatalogSha256']=='ed76ca73a204302f660aba4e79573766b9aa4ef9a25837db7f9843cd980ec110'
           assert [(x['signalMonth'],x['asOf']) for x in h['monthSnapshots']]==expected
           assert a['status']=='PASS' and a['fetchErrorCount']==0 and a['violations']==[]
           assert a['baseRunId']==34320224950 and a['baseArtifactId']==10091573844
