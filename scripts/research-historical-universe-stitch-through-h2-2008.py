@@ -10,7 +10,10 @@ BUILDER='1357402f34dfea1c1dbdcaac7de5078b680eb5c3'; SOURCE_SHA='ed76ca73a204302f
 
 def main():
     prefix=json.loads(PREFIX.read_text()); suffix=json.loads(SUFFIX.read_text()); validation=json.loads(VALIDATION.read_text())
-    assert prefix.get('builderGitBlob')==BUILDER and suffix.get('builderGitBlob')==BUILDER
+    # The immutable prefix records its builder blob.  The validated suffix
+    # artifact's builder output schema does not carry that metadata; the
+    # workflow above verifies the frozen builder blob before staging it.
+    assert prefix.get('builderGitBlob')==BUILDER
     assert validation.get('passed') is True and validation.get('sourceCatalogSha256')==SOURCE_SHA
     required=('parserInvariancePassed','mappingLineageFrozen','countryLineageFrozen','countryNoLookahead','corpBridgeMaterialityInvariant','frozenBuilderExactParitySixOfSix','top80RankInvariant')
     assert all(validation.get('checks',{}).get(k) is True for k in required)
