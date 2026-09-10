@@ -22,13 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download fixed validated H2 strict source
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34419962359
+          name: sec-id-era-strict-series-source-h2-2008-v3
+          path: data/research
+      - name: Verify fixed source digest
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p data/research /tmp/h2source
-          gh api /repos/kensuke5704/momentum-console/actions/artifacts/10131298181/zip > /tmp/h2source.zip
-          unzip -q /tmp/h2source.zip -d /tmp/h2source
-          cp /tmp/h2source/sec-id-era-strict-series-source-h2-2008.json data/research/
           echo "5606c3e9cb19064a01d9388321b25d949ecc7efc22b79a657447b7280114dcd9  data/research/sec-id-era-strict-series-source-h2-2008.json" | sha256sum -c -
       - name: Compile H2 holdings wrapper
         run: python3 -m py_compile scripts/research-nq-pit-holdings-series-id-h2-2008.py
