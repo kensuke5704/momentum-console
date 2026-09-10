@@ -1,0 +1,84 @@
+name: Research N-Q Series-ID Structural Mapping H2 2008
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "scripts/research-nq-series-id-structural-mapping-h2-2008.py"
+      - ".github/workflows/research-nq-series-id-structural-mapping-h2-2008.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  map-h2-2008:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      HOLDINGS_RUN_ID: 34423376664
+      HOLDINGS_ARTIFACT_ID: 10131779818
+      NPX_PIT_RUN_ID: 34423619035
+      NPX_PIT_ARTIFACT_ID: 10131980330
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert frozen accepted mapping implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-catalog-structural-mapping-h1-2006.py)" = "690479017fc82dce2480ded5d1ffafbb76721722"
+          test "$(git hash-object scripts/research-nq-npx-mapping-2006.py)" = "972c1e8ebf2c829abb3b8b400dffa613c368e100"
+          test "$(git hash-object scripts/research-nq-npx-structural-mapping-2006.py)" = "d79b077887cf11784b8620220929fa936a822601"
+      - name: Download fixed H2 holdings
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34423376664
+          name: nq-pit-holdings-series-id-h2-2008
+          path: data/research
+      - name: Download validated H2 PIT N-PX masters
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34423619035
+          name: npx-pit-master-h2-2008
+          path: data/research
+      - name: Verify fixed inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          h=json.loads(Path('data/research/nq-pit-holdings-series-id-h2-2008.json').read_text())
+          a=json.loads(Path('data/research/npx-pit-master-h2-2008-audit.json').read_text())
+          expected=[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
+          assert h['sourceCatalogArtifactId']==10131298181
+          assert [(x['signalMonth'],x['asOf']) for x in h['monthSnapshots']]==expected
+          assert a['status']=='PASS' and a['fetchErrorCount']==0 and a['violations']==[]
+          assert a['baseRunId']==34320224950 and a['baseArtifactId']==10091573844
+          assert [(x['signalMonth'],x['asOf']) for x in a['monthly']]==expected
+          PY
+      - name: Map each H2 month against matching PIT N-PX master
+        run: python3 scripts/research-nq-series-id-structural-mapping-h2-2008.py
+      - name: Audit mapped output boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('data/research/nq-series-id-structural-mapping-h2-2008.json').read_text())
+          assert m['holdingsRunId']==34423376664 and m['holdingsArtifactId']==10131779818
+          assert m['npxPitRunId']==34423619035 and m['npxPitArtifactId']==10131980330
+          assert m['npxBaseArtifactId']==10091573844 and m['mappingImplementationBlob']=='690479017fc82dce2480ded5d1ffafbb76721722'
+          assert [(x['signalMonth'],x['asOf']) for x in m['monthSnapshots']]==[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
+          allowed={'BASELINE_EXACT','BASELINE_ADR_BASE_UNIQUE','STRUCTURAL_SUFFIX_EXACT','UNIQUE_LONG_PREFIX'}
+          assert set(m['matchMethodCounts'])<=allowed
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-structural-mapping-h2-2008
+          path: data/research/nq-series-id-structural-mapping-h2-2008.json
+          if-no-files-found: error
