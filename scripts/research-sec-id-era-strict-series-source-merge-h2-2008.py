@@ -76,6 +76,15 @@ def main():
             if old is None or (r['evidenceDateFiled'],r['evidenceFilename'])<(old['evidenceDateFiled'],old['evidenceFilename']):
                 positives[r['seriesId']]=r
 
+    # Preserve the authoritative closed H1 identity record for a previously
+    # accepted Series. This is a closed-history replay, not a new acceptance
+    # or identity repair: it prevents a later rendering of the same SEC filing
+    # index from changing canonical class-name tokenization.
+    prior_positives={r['seriesId']:r for r in h1_2008.get('positiveSeries',[])}
+    for series_id,prior in prior_positives.items():
+        if series_id in positives:
+            positives[series_id]=prior
+
     occurrences={}
     for s in shards:
         for r in s['sourceOccurrences']:
