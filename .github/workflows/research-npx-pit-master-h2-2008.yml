@@ -1,0 +1,58 @@
+name: Research N-PX PIT Master H2 2008
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "docs/research/h2-2008-npx-pit-master-validation-definition.md"
+      - "scripts/research-npx-pit-master-h2-2008.py"
+      - ".github/workflows/research-npx-pit-master-h2-2008.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  validate-pit-npx-master:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert frozen implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-npx-security-master-2006.py)" = "bc2d44dda6bfae00ebba22a81ba867a18bbd7ba5"
+          test "$(git hash-object scripts/research-npx-security-master-build-2006.py)" = "ad977557eb7f48fc0c0d71a2c369b0d61f6c1239"
+          test "$(git hash-object scripts/research-nq-catalog-structural-mapping-h1-2006.py)" = "690479017fc82dce2480ded5d1ffafbb76721722"
+      - name: Download validated H1 2008 PIT N-PX base
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34320224950
+          name: npx-pit-master-h1-2008
+          path: data/research
+      - name: Build and validate H2 2008 monthly PIT N-PX masters
+        run: python3 scripts/research-npx-pit-master-h2-2008.py
+      - name: Require pre-defined PIT invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('data/research/npx-pit-master-h2-2008-audit.json').read_text())
+          assert a['status']=='PASS' and a['fetchErrorCount']==0 and a['violations']==[]
+          assert a['baseRunId']==34320224950 and a['baseArtifactId']==10091573844
+          assert [(x['signalMonth'],x['asOf']) for x in a['monthly']]==[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
+          for x in a['monthly']:
+              o=json.loads(Path(x['output']).read_text())
+              assert o['records'][:a['baseRecordCount']]==json.loads(Path('data/research/npx-pit-master-h1-2008-2008-06.json').read_text())['records']
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npx-pit-master-h2-2008
+          path: |
+            data/research/npx-pit-master-h2-2008-audit.json
+            data/research/npx-pit-master-h2-2008-2008-*.json
+          if-no-files-found: error
