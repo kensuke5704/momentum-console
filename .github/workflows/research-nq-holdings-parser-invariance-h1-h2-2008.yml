@@ -1,0 +1,40 @@
+name: Research N-Q Holdings Parser Invariance H1 H2 2008
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "scripts/research-nq-holdings-parser-invariance-h1-h2-2008.py"
+      - ".github/workflows/research-nq-holdings-parser-invariance-h1-h2-2008.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  parser-invariance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download fixed H1 source and holdings
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34320051180
+          name: nq-pit-holdings-series-id-h1-2008
+          path: data/research
+      - name: Download fixed H2 source and holdings
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34423376664
+          name: nq-pit-holdings-series-id-h2-2008
+          path: data/research
+      - name: Require exact parser semantic invariance
+        run: python3 scripts/research-nq-holdings-parser-invariance-h1-h2-2008.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-holdings-parser-invariance-h1-h2-2008
+          path: data/research/nq-holdings-parser-invariance-h1-h2-2008.json
+          if-no-files-found: error
