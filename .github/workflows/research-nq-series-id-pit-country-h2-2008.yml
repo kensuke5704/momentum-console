@@ -1,0 +1,134 @@
+name: Research N-Q Series-ID PIT Country H2 2008
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "scripts/research-nq-series-id-pit-country-h2-2008.py"
+      - ".github/workflows/research-nq-series-id-pit-country-h2-2008.yml"
+permissions:
+  contents: read
+  actions: read
+env:
+  SOURCE_CATALOG_ARTIFACT_ID: 10131298181
+  MAPPING_RUN_ID: 34424265204
+  MAPPING_ARTIFACT_ID: 10132036267
+  NPX_PIT_RUN_ID: 34423619035
+  NPX_PIT_ARTIFACT_ID: 10131980330
+jobs:
+  resolve:
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0,1,2,3,4,5,6,7]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert frozen country implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-nq-hybrid-pit-country-gate-b-h1-2006.py)" = "7b830b0e851b0d5349a5c6049e8889f171b791e0"
+          test "$(git hash-object scripts/research-nq-series-id-pit-country-h1-2007.py)" = "483c3ee8979c9ff38c5600b071e6bd489697a32a"
+      - name: Stage fixed inputs
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34424265204
+          name: nq-series-id-structural-mapping-h2-2008
+          path: data/research
+      - name: Stage fixed H2 N-PX master
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34423619035
+          name: npx-pit-master-h2-2008
+          path: data/research
+      - name: Stage frozen country evidence
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190587649
+          name: nq-series-id-pit-country-h2-2007
+          path: data/research
+      - name: Resolve strict PIT country shard
+        run: python3 scripts/research-nq-series-id-pit-country-h2-2008.py --mode resolve-shard --shard-index ${{ matrix.shard }} --shard-count 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: h2-2008-country-shard-${{ matrix.shard }}
+          path: data/research/series-id-country-h2-2008-shards
+          if-no-files-found: error
+  merge:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: h2-2008-country-shard-*
+          path: data/research/series-id-country-h2-2008-shards
+          merge-multiple: true
+      - name: Stage fixed inputs
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34424265204
+          name: nq-series-id-structural-mapping-h2-2008
+          path: data/research
+      - name: Stage fixed H2 N-PX master
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34423619035
+          name: npx-pit-master-h2-2008
+          path: data/research
+      - name: Stage frozen country evidence
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34190587649
+          name: nq-series-id-pit-country-h2-2007
+          path: data/research
+      - name: Merge strict PIT country
+        run: python3 scripts/research-nq-series-id-pit-country-h2-2008.py --mode merge
+      - name: Require frozen PIT country invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('data/research/nq-series-id-country-pit-h2-2008.json').read_text())
+          d=json.loads(Path('data/research/nq-series-id-country-extension-diagnostic-h2-2008.json').read_text())
+          expected=[('2008-07','2008-07-31'),('2008-08','2008-08-29'),('2008-09','2008-09-30'),('2008-10','2008-10-31'),('2008-11','2008-11-28'),('2008-12','2008-12-31')]
+          for p in (c,d):
+              assert p['sourceCatalogArtifactId']==10131298181 and len(p['sourceCatalogSha256'])==64
+              assert p['mappingRunId']==34424265204 and p['mappingArtifactId']==10132036267
+              assert p['npxPitRunId']==34423619035 and p['npxPitArtifactId']==10131980330 and p['npxBaseArtifactId']==10091573844
+              assert p['periodExtensionMasterYears']==[2005,2006,2007,2008]
+              assert [(s['signalMonth'],s['asOf']) for s in p['monthSnapshots']]==expected
+          assert set(c.get('reasonCounts',{})) <= {'NQ_EXPLICIT','CINS','ADR_GDR','FROZEN_DATED_FILING','PIT_SUBMISSION_HEADER','UNRESOLVED'}
+          for snap in c['monthSnapshots']:
+              for filing in snap['sourceFilings']:
+                  for h in filing.get('holdings',[]):
+                      for ev in h.get('countryEvidence') or []:
+                          if ev.get('evidenceDateFiled'): assert ev['evidenceDateFiled']<=snap['asOf']
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nq-series-id-country-pit-h2-2008
+          path: |
+            data/research/nq-series-id-country-pit-h2-2008.json
+            data/research/nq-series-id-country-extension-diagnostic-h2-2008.json
+          if-no-files-found: error
