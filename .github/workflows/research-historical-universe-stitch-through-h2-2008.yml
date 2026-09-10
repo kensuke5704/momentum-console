@@ -1,0 +1,59 @@
+name: Research Historical Universe Stitch Through H2 2008
+on:
+  workflow_dispatch:
+  push:
+    branches: ["research/strict-series-source-h2-2008-20260909"]
+    paths:
+      - "docs/research/h2-2008-36-month-stitch-validation-definition.md"
+      - "scripts/research-historical-universe-stitch-through-h2-2008.py"
+      - ".github/workflows/research-historical-universe-stitch-through-h2-2008.yml"
+permissions:
+  contents: read
+  actions: read
+jobs:
+  stitch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert frozen builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object scripts/research-historical-universe-builder.py)" = "1357402f34dfea1c1dbdcaac7de5078b680eb5c3"
+          python3 -m py_compile scripts/research-historical-universe-stitch-through-h2-2008.py
+      - name: Download immutable 30-month prefix
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34354891519
+          name: historical-universe-builder-through-h1-2008
+          path: data/research
+      - name: Download validated H2 suffix
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34437984621
+          name: h2-2008-downstream-period-extension-validation
+          path: data/research
+      - name: Verify pinned artifacts and stitch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/research-historical-universe-stitch-through-h2-2008.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('data/research/historical-universe-builder-through-h1-2008.json').read_text())
+          s=json.loads(Path('data/research/historical-universe-builder-h2-2008.json').read_text())
+          o=json.loads(Path('data/research/historical-universe-builder-through-h2-2008.json').read_text())
+          assert o['monthSnapshots'][:30]==p['monthSnapshots'] and o['monthSnapshots'][30:]==s['monthSnapshots']
+          assert len(o['monthSnapshots'])==36 and o['segments'][0]['artifactId']==10105279657 and o['segments'][1]['artifactId']==10136871496
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historical-universe-builder-through-h2-2008
+          path: data/research/historical-universe-builder-through-h2-2008.json
+          if-no-files-found: error
