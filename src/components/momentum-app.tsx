@@ -39,6 +39,7 @@ type CombinedSortKey =
   | "etfCount"
   | "universeScore"
   | "momentumRank"
+  | "twentyDay"
   | "threeMonth"
   | "sixMonth"
   | "score"
@@ -419,6 +420,7 @@ function UniverseRanking({ data }: { data: DashboardPayload }) {
   const sortedRows = useMemo(() => {
     const valueFor = (row: CombinedRow): string | number | null => {
       if (sortKey === "momentumRank") return row.momentumRank;
+      if (sortKey === "twentyDay") return row.candidate?.twentyDay ?? null;
       if (sortKey === "threeMonth") return row.candidate?.threeMonth ?? null;
       if (sortKey === "sixMonth") return row.candidate?.sixMonth ?? null;
       if (sortKey === "score") return row.candidate?.score ?? null;
@@ -447,13 +449,14 @@ function UniverseRanking({ data }: { data: DashboardPayload }) {
       <SortHeader label="ETF Count" sortKey="etfCount" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="Universe Score" sortKey="universeScore" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="Momentum" sortKey="momentumRank" activeKey={sortKey} direction={direction} onSort={changeSort} />
+      <SortHeader label="20D" sortKey="twentyDay" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="3M" sortKey="threeMonth" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="6M" sortKey="sixMonth" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="Score" sortKey="score" activeKey={sortKey} direction={direction} onSort={changeSort} />
       <SortHeader label="Status" sortKey="status" activeKey={sortKey} direction={direction} onSort={changeSort} />
     </tr></thead>
     <tbody>{sortedRows.map((row) => <tr key={row.symbol}>
-      <td>{row.universeRank}</td><td><strong>{row.symbol}</strong></td><td>{row.etfCount}</td><td>{row.universeScore.toFixed(2)}</td><td>{row.momentumRank ?? "—"}</td><td>{pct(row.candidate?.threeMonth)}</td><td>{pct(row.candidate?.sixMonth)}</td><td>{row.candidate?.score == null ? "—" : row.candidate.score.toFixed(3)}</td><td>{row.status}</td>
+      <td>{row.universeRank}</td><td><strong>{row.symbol}</strong></td><td>{row.etfCount}</td><td>{row.universeScore.toFixed(2)}</td><td>{row.momentumRank ?? "—"}</td><td>{pct(row.candidate?.twentyDay)}</td><td>{pct(row.candidate?.threeMonth)}</td><td>{pct(row.candidate?.sixMonth)}</td><td>{row.candidate?.score == null ? "—" : row.candidate.score.toFixed(3)}</td><td>{row.status}</td>
     </tr>)}</tbody>
   </table></div></Section>;
 }
