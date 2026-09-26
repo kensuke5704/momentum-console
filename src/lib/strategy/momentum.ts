@@ -17,6 +17,14 @@ function returnAt(points: PricePoint[], signalDate: string, months: number): num
   return current && prior ? current / prior - 1 : null;
 }
 
+function trailingSessionReturn(points: PricePoint[], signalDate: string, sessions: number): number | null {
+  const closes = [...points].sort((a, b) => a.date.localeCompare(b.date)).filter((point) => point.date <= signalDate);
+  if (closes.length <= sessions) return null;
+  const current = closes.at(-1)?.close;
+  const prior = closes.at(-(sessions + 1))?.close;
+  return current && prior ? current / prior - 1 : null;
+}
+
 function average(values: number[]): number { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
 function populationStdDev(values: number[]): number {
   if (!values.length) return 0;
@@ -55,12 +63,13 @@ export function buildMonthlySignal(args: {
   const candidates: MomentumCandidate[] = args.universe.symbols.map(({ symbol }) => {
     const history = args.histories[symbol] ?? [];
     const oneMonth = returnAt(history, signalDate, 1);
+    const twentyDay = trailingSessionReturn(history, signalDate, 20);
     const threeMonth = returnAt(history, signalDate, 3);
     const sixMonth = returnAt(history, signalDate, 6);
-    if (oneMonth === null || threeMonth === null || sixMonth === null || qqqScore === null) return { symbol, oneMonth, threeMonth, sixMonth, score: null, qqqScore, scoreSpread: null, eligible: false, exclusionReason: "INSUFFICIENT_PRICE_HISTORY", rank: null };
+    if (oneMonth === null || threeMonth === null || sixMonth === null || qqqScore === null) return { symbol, oneMonth, twentyDay, threeMonth, sixMonth, score: null, qqqScore, scoreSpread: null, eligible: false, exclusionReason: "INSUFFICIENT_PRICE_HISTORY", rank: null };
     const score = momentumScore(oneMonth, threeMonth, sixMonth, config);
     const exclusionReason = oneMonth >= config.momentum.surgeLimit ? "ONE_MONTH_SURGE" : config.momentum.requireAboveQqqScore && score <= qqqScore ? "NOT_ABOVE_QQQ" : null;
-    return { symbol, oneMonth, threeMonth, sixMonth, score, qqqScore, scoreSpread: score - qqqScore, eligible: exclusionReason === null, exclusionReason, rank: null };
+    return { symbol, oneMonth, twentyDay, threeMonth, sixMonth, score, qqqScore, scoreSpread: score - qqqScore, eligible: exclusionReason === null, exclusionReason, rank: null };
   });
   const eligible = candidates.filter((row): row is MomentumCandidate & { score: number } => row.eligible && row.score !== null).sort((a, b) => b.score - a.score || a.symbol.localeCompare(b.symbol));
   eligible.forEach((row, index) => { row.rank = index + 1; });

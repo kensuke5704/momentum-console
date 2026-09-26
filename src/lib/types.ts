@@ -41,6 +41,7 @@ export type UniverseMonth = {
 export type MomentumCandidate = {
   symbol: string;
   oneMonth: number | null;
+  twentyDay: number | null;
   threeMonth: number | null;
   sixMonth: number | null;
   score: number | null;

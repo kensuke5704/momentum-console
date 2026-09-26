@@ -38,6 +38,15 @@ test("production config contains no fixed TICKERS or genre controls", () => {
   assert.ok(!("tickers" in PRODUCTION_STRATEGY)); assert.ok(!("genreMax" in PRODUCTION_STRATEGY)); assert.ok(!("frontierMax" in PRODUCTION_STRATEGY));
 });
 test("Momentum score is exactly 0/20/80", () => assert.ok(Math.abs(momentumScore(9, .2, .5) - .44) < 1e-12));
+test("candidate exposes a trailing 20-session return without affecting the score", () => {
+  const dates = Array.from({ length: 230 }, (_, index) => new Date(Date.UTC(2024, 0, index + 1)).toISOString().slice(0, 10));
+  const history = dates.map((date, index) => point(date, 100 + index));
+  const dailyUniverse: UniverseMonth = { ...universe(["AAA"]), asOf: dates.at(-1)! };
+  const result = buildMonthlySignal({ universe: dailyUniverse, histories: { AAA: history }, qqq: history, nextSessionDate: null });
+  const candidate = result.candidates[0];
+  assert.equal(candidate.twentyDay, history.at(-1)!.close / history.at(-21)!.close - 1);
+  assert.equal(candidate.score, momentumScore(candidate.oneMonth!, candidate.threeMonth!, candidate.sixMonth!));
+});
 
 function monthlyHistory(multiplier: number, lastMultiplier = multiplier): PricePoint[] {
   return Array.from({ length: 12 }, (_, index) => point(`2024-${String(index + 1).padStart(2, "0")}-28`, 100 * (1 + multiplier * index) * (index === 11 ? lastMultiplier / multiplier || 1 : 1)));
