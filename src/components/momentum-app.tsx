@@ -31,7 +31,7 @@ import type { PortfolioConfigView, PortfolioTarget } from "@/lib/portfolio-types
 import type { DashboardPayload, EquityPoint, MomentumCandidate, UniverseMember } from "@/lib/types";
 
 type Tab = "overview" | "universe" | "portfolio" | "oos" | "backtest" | "schedule";
-type DetailKey = "regime" | "action" | "execution" | "nport" | "target" | "cftc" | "m3" | "fixed60" | "oos";
+type DetailKey = "regime" | "action" | "execution" | "nport" | "target" | "cftc" | "m3" | "m3gap" | "fixed60" | "oos";
 type SortDirection = "asc" | "desc";
 type CombinedSortKey =
   | "universeRank"
@@ -312,7 +312,7 @@ function Overview({ data }: { data: DashboardPayload }) {
     return () => window.removeEventListener("keydown", close);
   }, [detail]);
 
-  const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "nport" ? "N-PORT Deadline" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "fixed60" ? "Fixed60" : "OOS Gate";
+  const title = detail === "regime" ? "Regime" : detail === "action" ? "Action" : detail === "execution" ? "Execution" : detail === "nport" ? "N-PORT Deadline" : detail === "target" ? "Target" : detail === "cftc" ? "CFTC" : detail === "m3" ? "M3 Deep" : detail === "m3gap" ? "M3 Gap" : detail === "fixed60" ? "Fixed60" : "OOS Gate";
 
   return <div className="dynamic-stack">
     <Section title="Next Action" className="next-action-section">
@@ -340,7 +340,7 @@ function Overview({ data }: { data: DashboardPayload }) {
       <Metric label="CFTC Used (PIT)" value={dateLabel(portfolio.cftc.reportDate)} nowrap />
       <Metric label="CFTC Net" value={portfolio.cftc.net == null ? "—" : Math.round(portfolio.cftc.net).toLocaleString()} />
       <Metric label="Prior 4W" value={portfolio.cftc.priorNet == null ? "—" : Math.round(portfolio.cftc.priorNet).toLocaleString()} />
-      <Metric label="M3 Gap" value={pct(portfolio.m3.gap)} />
+      <StatusMetric label="M3 Gap" value={pct(portfolio.m3.gap)} onClick={() => setDetail("m3gap")} />
     </div>
 
     {detail && <div className="modal-backdrop" onMouseDown={() => setDetail(null)}>
@@ -379,6 +379,10 @@ function Overview({ data }: { data: DashboardPayload }) {
             { name: "OFF", meaning: "The defensive M3 condition is inactive." },
             { name: "ON", meaning: "Core 20-session return is negative and trails QQQ by at least 10 percentage points. Exit requires five confirmations above the -3 point recovery gap." },
           ]} />}
+          {detail === "m3gap" && <div className="dynamic-metric-grid two detail-metric-grid">
+            <Metric label="Fixed60 (20D)" value={pct(portfolio.m3.coreReturn20)} />
+            <Metric label="QQQ (20D)" value={pct(portfolio.m3.qqqReturn20)} />
+          </div>}
           {detail === "fixed60" && <DefinitionList current={portfolio.fixed60.riskState} items={[
             { name: "INVESTED", meaning: "The inner momentum portfolio is invested." },
             { name: "LOCKED_MARKET", meaning: "The QQQ monthly gate is Risk Off. Portfolio remains locked in Cash." },
