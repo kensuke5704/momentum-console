@@ -2,7 +2,7 @@
   "activeQuarter": "2026q2",
   "lastImportedAt": "2026-08-23T17:01:18.161Z",
   "nextImportDeadlineAt": "2026-10-01T09:00:00+09:00",
-  "universeMode": "CURRENT",
-  "fallbackReason": null,
+  "universeMode": "FALLBACK",
+  "fallbackReason": "Quarter 2026q3 is not imported; previous valid Top80 retained",
   "extraordinaryRebalance": null
 }
