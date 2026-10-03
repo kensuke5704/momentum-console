@@ -101,7 +101,7 @@ export type BacktestResult = {
   equityCurve: EquityPoint[];
   stats: PerformanceStats;
   benchmark: { label: "TQQQ Buy & Hold" | "Synthetic 3x QQQ proxy"; equityCurve: EquityPoint[]; stats: PerformanceStats } | null;
-  events: Array<{ date: string; type: string; symbols: string[]; reason: string }>;
+  events: Array<{ date: string; type: string; symbols: string[]; reason: string; targets?: PortfolioTarget[] }>;
 };
 export type OosRecord = {
   strategyId: string;
