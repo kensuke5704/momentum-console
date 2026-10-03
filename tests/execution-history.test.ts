@@ -33,3 +33,27 @@ test("only the latest five changes are returned, including transitions to cash",
   assert.deepEqual(events, original);
   assert.deepEqual(recentAllocationChanges([event("2026-09-01", targets(0))], "2026-09-01"), []);
 });
+
+test("history shows the formal recovery or circuit reason without mutating events", () => {
+  const events = [
+    { ...event("2026-09-03", targets(.225)), reason: "Initial frozen Stage21 allocation" },
+    { ...event("2026-09-03"), type: "EXIT_OPEN", reason: "Portfolio close breached -15% circuit" },
+    { ...event("2026-10-01", targets(.3, "MU")), reason: "Fixed60 funded target changed" },
+    { ...event("2026-10-01"), type: "ENTRY_OPEN", reason: "10 recovery closes confirmed" },
+  ];
+  const original = structuredClone(events);
+  assert.deepEqual(recentAllocationChanges(events, "2026-09-02").map((entry) => entry.reason),
+    ["10 recovery closes confirmed", "Portfolio close breached -15% circuit"]);
+  assert.deepEqual(events, original);
+});
+
+test("simultaneous regime and Fixed60 reasons are retained; placeholder reasons are ignored", () => {
+  const events = [
+    { ...event("2026-09-08", targets(.3)), reason: "Regime changed YELLOW -> DEEP" },
+    { ...event("2026-09-08"), type: "ENTRY_OPEN", reason: "No pending order" },
+    { ...event("2026-10-01", targets(.4)), reason: "Regime changed DEEP -> NORMAL" },
+    { ...event("2026-10-01"), type: "ENTRY_OPEN", reason: "10 recovery closes confirmed" },
+  ];
+  assert.deepEqual(recentAllocationChanges(events, "2026-09-02").map((entry) => entry.reason),
+    ["Regime changed DEEP -> NORMAL; 10 recovery closes confirmed", "Regime changed YELLOW -> DEEP"]);
+});
