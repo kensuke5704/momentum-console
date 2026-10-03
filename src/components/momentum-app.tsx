@@ -25,6 +25,7 @@ import {
   YAxis,
 } from "recharts";
 import { contrastingTextColor } from "@/lib/color-contrast";
+import { recentAllocationChanges } from "@/lib/execution-history";
 import { latestCompletedUsTradingSession } from "@/lib/latest-session";
 import { evaluateOosActionGate } from "@/lib/oos-action-gate";
 import type { PortfolioConfigView, PortfolioTarget } from "@/lib/portfolio-types";
@@ -266,10 +267,7 @@ function Portfolio({ data }: { data: DashboardPayload }) {
       return { ...holding, currentPrice, pnl: holding.entryPrice == null || currentPrice == null ? null : currentPrice / holding.entryPrice - 1, priceAsOf: latest?.asOf ?? data.portfolioState.asOf };
     });
   const latestAsOf = positions.map((position) => position.priceAsOf).filter(Boolean).sort().at(-1) ?? data.portfolioState.asOf;
-  const executions = [...data.oosBacktest.events]
-    .filter((event) => event.type === "PORTFOLIO_REBALANCE_OPEN" && event.date >= data.portfolioConfig.oosStartDate)
-    .sort((left, right) => right.date.localeCompare(left.date))
-    .slice(0, 5);
+  const executions = recentAllocationChanges(data.oosBacktest.events, data.portfolioConfig.oosStartDate);
 
   return <div className="dynamic-stack"><Section title="Current Positions" asOf={asOfLabel(latestAsOf)}>
     <div className="table-scroll portfolio-table">
@@ -284,14 +282,14 @@ function Portfolio({ data }: { data: DashboardPayload }) {
     </div>
   </Section>
     <Section title="Recent Executions">
-      <p className="page-note">Strategy executions based on market data.</p>
+      <p className="page-note">Allocation changes only. Strategy executions based on market data.</p>
       <div className="table-scroll portfolio-table">
         {executions.length ? <table className="dynamic-table executions-table"><thead><tr><th>Execution (JST)</th><th>Allocation</th><th>Reason</th></tr></thead>
           <tbody>{executions.map((event, index) => <tr key={`${event.date}-${index}`}>
             <td data-label="Execution (JST)">{usOpenJst(event.date)}</td>
             <td data-label="Allocation">{event.targets ? targetText(event.targets) : event.symbols.join(" / ") || "CASH"}</td>
             <td data-label="Reason">{event.reason}</td>
-          </tr>)}</tbody></table> : <div className="empty-state">No executions yet</div>}
+          </tr>)}</tbody></table> : <div className="empty-state">No allocation changes yet</div>}
       </div>
     </Section>
   </div>;
