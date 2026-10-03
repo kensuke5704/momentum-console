@@ -193,6 +193,15 @@
 .positions-table td,
 .positions-table th { width: 20%; }
 
+.executions-table { min-width: 640px; }
+.executions-table th:first-child { width: 25%; }
+.executions-table th:nth-child(2) { width: 40%; }
+.executions-table td { white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  .portfolio-table .executions-table tr { grid-template-columns: minmax(0, 1fr); }
+}
+
 .simple-table { display: block !important; padding: 0 !important; }
 .simple-table > div {
   align-items: center;

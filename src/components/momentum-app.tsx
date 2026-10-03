@@ -266,6 +266,10 @@ function Portfolio({ data }: { data: DashboardPayload }) {
       return { ...holding, currentPrice, pnl: holding.entryPrice == null || currentPrice == null ? null : currentPrice / holding.entryPrice - 1, priceAsOf: latest?.asOf ?? data.portfolioState.asOf };
     });
   const latestAsOf = positions.map((position) => position.priceAsOf).filter(Boolean).sort().at(-1) ?? data.portfolioState.asOf;
+  const executions = [...data.oosBacktest.events]
+    .filter((event) => event.type === "PORTFOLIO_REBALANCE_OPEN" && event.date >= data.portfolioConfig.oosStartDate)
+    .sort((left, right) => right.date.localeCompare(left.date))
+    .slice(0, 5);
 
   return <div className="dynamic-stack"><Section title="Current Positions" asOf={asOfLabel(latestAsOf)}>
     <div className="table-scroll portfolio-table">
@@ -278,7 +282,19 @@ function Portfolio({ data }: { data: DashboardPayload }) {
           <td data-label="P/L"><strong className={position.pnl != null && position.pnl < 0 ? "tone-bad" : "tone-good"}>{pct(position.pnl, 2)}</strong></td>
         </tr>)}</tbody></table> : <div className="empty-state">No open positions</div>}
     </div>
-  </Section></div>;
+  </Section>
+    <Section title="Recent Executions">
+      <p className="page-note">Strategy executions based on market data.</p>
+      <div className="table-scroll portfolio-table">
+        {executions.length ? <table className="dynamic-table executions-table"><thead><tr><th>Execution (JST)</th><th>Allocation</th><th>Reason</th></tr></thead>
+          <tbody>{executions.map((event, index) => <tr key={`${event.date}-${index}`}>
+            <td data-label="Execution (JST)">{usOpenJst(event.date)}</td>
+            <td data-label="Allocation">{event.targets ? targetText(event.targets) : event.symbols.join(" / ") || "CASH"}</td>
+            <td data-label="Reason">{event.reason}</td>
+          </tr>)}</tbody></table> : <div className="empty-state">No executions yet</div>}
+      </div>
+    </Section>
+  </div>;
 }
 
 function Overview({ data }: { data: DashboardPayload }) {
