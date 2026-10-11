@@ -137,6 +137,8 @@ export type ForwardOosResult = {
   provisionalDates?: string[];
 };
 export type NportOperations = {
+  executionUniverseHistory?: UniverseMonth[];
+  signalActivations?: { receivedAt: string; executionDate: string; signal: MonthlySignal }[];
   activeQuarter: string | null;
   lastImportedAt: string | null;
   nextImportDeadlineAt: string;

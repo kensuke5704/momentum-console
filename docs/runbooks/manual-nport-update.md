@@ -49,6 +49,22 @@ lint
 build
 ```
 
+Universe/Ranking consistency is checked after the first data-generation pass.
+OOS identity and as-of checks run only after `sync:oos`, against the Stage21
+portfolio strategy ID (not the Fixed60 inner-engine ID). Final checks remain
+inside the rollback transaction. The prior valid Top80 is evaluated with the
+same refreshed official month-end prices; a stale repository dashboard is not
+used as the delayed-receipt comparison signal.
+Already-executed Forward OOS allocations before the receipt's next-session
+open must remain unchanged. The importer compares old/new Universe replays
+with identical price/CFTC inputs and rolls back if a historical trade changes.
+Execution Universe history is retained separately from the current selection
+Universe. Delayed signals are recorded with their receipt and next-open dates,
+and replayed by the same Stage21 engine for Console, OOS and historical audit.
+Before that open, holdings and completed OOS trades remain on the old Universe.
+Circuit/Stop exits and recovery locks take priority over delayed re-selection;
+the new signal can become the candidate for a later normal recovery entry.
+
 Success is indicated by:
 
 ```text

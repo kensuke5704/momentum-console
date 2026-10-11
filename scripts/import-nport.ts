@@ -4,8 +4,13 @@ import { resolve } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
 import type { DashboardPayload, ForwardOosResult, NportFiling, UniverseMonth } from "../src/lib/types";
 import type { NportOperations, PricePoint } from "../src/lib/types";
-import { buildDelayedNportRebalance, nextNportImportDeadline } from "../src/lib/nport-operations";
+import { buildDelayedNportRebalance, executionUniverseHistory, nextNportImportDeadline } from "../src/lib/nport-operations";
 import { restoreFileSet, snapshotFileSet } from "../src/lib/file-transaction";
+import { validateImportedExecutionHistory, validateImportedOosIdentity } from "../src/lib/manual-nport-validation";
+import { buildStage21Portfolio } from "../src/lib/portfolio/stage21";
+import { fetchNasdaqAssetManagerPositions } from "../src/lib/cftc";
+import { buildMonthlySignal } from "../src/lib/strategy/momentum";
+import { nextUsTradingSession } from "../src/lib/trading-calendar";
 import { parseQuarterlyNportZip, quarterForDate } from "../src/lib/universe/nport-quarterly";
 
 const OUTPUT = resolve("data/sec-nport/filings.json");
@@ -54,10 +59,9 @@ async function currentUniverseSymbols(): Promise<string[]> {
   } catch { return []; }
 }
 
-async function validateGeneratedOutputs(): Promise<{ dashboard: DashboardPayload; current: UniverseMonth }> {
+async function validateGeneratedOutputs(includeOos = true): Promise<{ dashboard: DashboardPayload; current: UniverseMonth }> {
   const universe = JSON.parse(await readFile(resolve("public/data/universe-current.json"), "utf8")) as { current?: UniverseMonth | null };
   const dashboardFile = JSON.parse(await readFile(resolve("public/data/dashboard.json"), "utf8")) as { dashboard: DashboardPayload };
-  const oos = JSON.parse(await readFile(resolve("public/data/oos-performance.json"), "utf8")) as ForwardOosResult;
   const current = universe.current;
   const dashboard = dashboardFile.dashboard;
   if (!current || current.symbols.length !== dashboard.config.universe.size) throw new Error("Generated current Universe is missing or is not Top 80");
@@ -66,7 +70,11 @@ async function validateGeneratedOutputs(): Promise<{ dashboard: DashboardPayload
     throw new Error("Generated Top2 contains a symbol outside the current Universe");
   }
   if ((dashboard.currentSignal?.selectedSymbols.length ?? 0) > dashboard.config.selection.topN) throw new Error("Generated selection exceeds configured TopN");
-  if (oos.strategyId !== dashboard.config.strategyId) throw new Error("OOS and Dashboard strategy IDs are inconsistent");
+  if (includeOos) {
+    const oos = JSON.parse(await readFile(resolve("public/data/oos-performance.json"), "utf8")) as ForwardOosResult;
+    validateImportedOosIdentity(dashboard.portfolioConfig.strategyId, oos.strategyId);
+    if (oos.asOf !== dashboard.portfolioState.asOf) throw new Error("OOS and Dashboard as-of values are inconsistent");
+  }
   return { dashboard, current };
 }
 
@@ -74,7 +82,7 @@ async function main() {
   const zipPath = process.argv[2];
   if (!zipPath) throw new Error("Usage: npm run import:nport -- /absolute/path/YYYYqN_nport.zip");
   const beforeSymbols = await currentUniverseSymbols();
-  const previousDashboard = (JSON.parse(await readFile(resolve("public/data/dashboard.json"), "utf8")) as { dashboard: DashboardPayload }).dashboard;
+  const previousUniverse = (JSON.parse(await readFile(resolve("public/data/universe-current.json"), "utf8")) as { current: UniverseMonth | null }).current;
   const transaction = await snapshotFileSet(TRANSACTION_FILES);
   const parsed = await parseQuarterlyNportZip(resolve(zipPath));
   const existing = await loadExisting();
@@ -96,6 +104,7 @@ async function main() {
     endQuarter: quarters.at(-1),
     snapshots: filings,
   };
+  let generated!: Awaited<ReturnType<typeof validateGeneratedOutputs>>;
   try {
     await mkdir(resolve("data/sec-nport"), { recursive: true });
     const temporary = `${OUTPUT}.${process.pid}.tmp`;
@@ -107,12 +116,24 @@ async function main() {
     console.log(`Validated ${parsed.quarter}: ${parsed.zipBytes} bytes, sha256=${parsed.sha256}, ${parsed.submissions} submissions, ${parsed.filings.length} eligible ETF filings`);
 
     for (const script of ["sync:universe", "sync:atlas", "sync:data"]) await run("npm", ["run", script]);
-    const firstPass = await validateGeneratedOutputs();
+    // Validate the new Universe now; OOS still belongs to the pre-import snapshot.
+    const firstPass = await validateGeneratedOutputs(false);
     const market = JSON.parse(await readFile(resolve("public/data/market-data.json"), "utf8")) as { histories: Record<string, PricePoint[]> };
+    // Compare identical fresh prices/CFTC inputs, changing only Universe history.
+    // An updated Universe must not retroactively replace already-executed OOS trades.
+    const previousHistory = JSON.parse(transaction.get(resolve("data/universe-history.json"))!.toString("utf8")) as { history: UniverseMonth[] };
+    const newHistory = JSON.parse(await readFile(resolve("data/universe-history.json"), "utf8")) as { history: UniverseMonth[] };
+    const cftc = await fetchNasdaqAssetManagerPositions();
+    const previousOperations = JSON.parse(transaction.get(resolve("data/nport-operations.json"))!.toString("utf8")) as NportOperations;
+    const recordedHistory = executionUniverseHistory(previousHistory.history, previousOperations);
     let extraordinaryRebalance: NportOperations["extraordinaryRebalance"] = null;
-    if (previousDashboard.currentSignal && firstPass.dashboard.currentSignal?.signalMonth === previousDashboard.currentSignal.signalMonth) {
+    if (previousUniverse && firstPass.dashboard.currentSignal) {
+      // Repository dashboard snapshots may be stale. Recompute the old valid
+      // Universe with the same fresh month-end prices as the replacement.
+      const oldUniverse = { ...previousUniverse, signalMonth: firstPass.current.signalMonth, asOf: firstPass.current.asOf };
+      const previousSignal = buildMonthlySignal({ universe: oldUniverse, histories: market.histories, qqq: market.histories.QQQ ?? [], nextSessionDate: nextUsTradingSession(oldUniverse.asOf) });
       extraordinaryRebalance = buildDelayedNportRebalance({
-        previousSignal: previousDashboard.currentSignal,
+        previousSignal,
         newUniverse: firstPass.current,
         histories: market.histories,
         qqq: market.histories.QQQ ?? [],
@@ -126,18 +147,26 @@ async function main() {
       universeMode: "CURRENT",
       fallbackReason: null,
       extraordinaryRebalance,
+      executionUniverseHistory: recordedHistory,
+      signalActivations: [...(previousOperations.signalActivations ?? []), ...(extraordinaryRebalance?.changed && extraordinaryRebalance.executionDate ? [{ receivedAt: payload.generatedAt, executionDate: extraordinaryRebalance.executionDate, signal: extraordinaryRebalance.signal }] : [])],
     };
+    validateImportedExecutionHistory(
+      buildStage21Portfolio(market.histories, recordedHistory, cftc, previousOperations.signalActivations).backtest,
+      buildStage21Portfolio(market.histories, executionUniverseHistory(newHistory.history, operations), cftc, operations.signalActivations).backtest,
+      nextUsTradingSession(payload.generatedAt.slice(0, 10)),
+    );
     const operationsTemporary = `${resolve("data/nport-operations.json")}.${process.pid}.tmp`;
     await writeFile(operationsTemporary, `${JSON.stringify(operations, null, 2)}\n`);
     await rename(operationsTemporary, resolve("data/nport-operations.json"));
     for (const script of ["sync:data", "sync:oos", "check"]) await run("npm", ["run", script]);
+    generated = await validateGeneratedOutputs();
     await run("git", ["diff", "--quiet", "--", "src/lib/config.ts", "src/lib/strategy"]);
   } catch (error) {
     await restoreFileSet(transaction);
     throw new Error(`N-PORT import failed; previous Universe restored with no partial activation: ${error instanceof Error ? error.message : String(error)}`);
   }
 
-  const { dashboard, current } = await validateGeneratedOutputs();
+  const { dashboard, current } = generated;
   const afterSymbols = current.symbols.map((member) => member.symbol);
   const before = new Set(beforeSymbols), after = new Set(afterSymbols);
   const added = afterSymbols.filter((symbol) => !before.has(symbol));

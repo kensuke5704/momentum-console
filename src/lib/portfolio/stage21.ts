@@ -6,8 +6,8 @@ import type {PortfolioHolding,PortfolioLiveState,PortfolioTarget} from "../portf
 import {buildMonthlySignal} from "../strategy/momentum";
 import {runBreakoutShadow} from "../strategy/breakout-shadow";
 import {initialEngineState,transitionDay,type EngineState} from "../strategy/state-machine";
-import {nextUsTradingSession} from "../trading-calendar";
-import type {BacktestResult,EquityPoint,LiveStrategyState,PricePoint,UniverseMonth} from "../types";
+import {nextUsTradingSession,previousUsTradingSession} from "../trading-calendar";
+import type {BacktestResult,EquityPoint,LiveStrategyState,PricePoint,UniverseMonth,NportOperations} from "../types";
 
 type FixedTarget={symbols:string[];weights:number[]};
 type FixedSnap={date:string;equity:number;target:FixedTarget};
@@ -16,7 +16,7 @@ const START=PRODUCTION_STRATEGY.backtestStart;
 const returns=(curve:EquityPoint[])=>{const out=new Map<string,number>();for(let i=1;i<curve.length;i++)out.set(curve[i].date,curve[i].equity/curve[i-1].equity-1);return out};
 const targetKey=(target:FixedTarget)=>target.symbols.map((symbol,index)=>`${symbol}:${(target.weights[index]??0).toFixed(6)}`).join("|");
 
-function fixedSnapshots(histories:Record<string,PricePoint[]>,universeHistory:UniverseMonth[]):{snaps:FixedSnap[];state:EngineState}{
+function fixedSnapshots(histories:Record<string,PricePoint[]>,universeHistory:UniverseMonth[],activations:NonNullable<NportOperations["signalActivations"]>=[]):{snaps:FixedSnap[];state:EngineState}{
  const qqq=[...(histories.QQQ??[])].sort((a,b)=>a.date.localeCompare(b.date));
  const dates=qqq.map(point=>point.date),dateIndex=new Map(dates.map((date,index)=>[date,index]));
  const priceMaps=Object.fromEntries(Object.entries(histories).map(([symbol,points])=>[symbol,new Map(points.map(point=>[point.date,point]))]));
@@ -27,7 +27,19 @@ function fixedSnapshots(histories:Record<string,PricePoint[]>,universeHistory:Un
   const signal=universe?buildMonthlySignal({universe,histories,qqq,nextSessionDate,config:PRODUCTION_STRATEGY}):null;
   const symbols=new Set(["QQQ",...state.currentPositions.map(position=>position.symbol),...(state.pendingSignal?.selectedSymbols??[]),...state.nextAction.symbols,...(signal?.selectedSymbols??[])]);
   const prices=Object.fromEntries([...symbols].map(symbol=>[symbol,priceMaps[symbol]?.get(date)]));
+  const executionReason=state.nextAction.executionDate===date?state.nextAction.reason:null,eventCount=state.events.length;
   state=transitionDay(state,{date,prices,qqqHistoryThroughClose:qqq.slice(0,(dateIndex.get(date)??index)+1),monthlySignal:signal,nextSessionDate},PRODUCTION_STRATEGY);
+  // A rebalance sell clears the action before the inner buy records its event.
+  // Retain the formal trigger in event metadata without changing execution.
+  if(executionReason)for(const event of state.events.slice(eventCount))if(event.type==="ENTRY_OPEN"&&event.reason==="No pending order")event.reason=executionReason;
+  for(const activation of activations.filter(entry=>previousUsTradingSession(entry.executionDate)===date)){
+   state.pendingSignal=activation.signal;
+   const allowed=["INVESTED","READY_NEXT_OPEN","CASH"].includes(state.state)&&state.nextAction.type!=="SELL_ALL_NEXT_OPEN";
+   if(allowed&&state.marketRiskOn&&activation.signal.marketRiskOn&&activation.signal.selectedSymbols.length===2){
+    state.nextAction={type:state.currentPositions.length?"MONTH_END_REBALANCE_NEXT_OPEN":"BUY_NEXT_OPEN",executionDate:activation.executionDate,symbols:activation.signal.selectedSymbols,targetWeights:activation.signal.targetWeights,reason:`Delayed N-PORT Universe activated; Momentum remains fixed at ${activation.signal.signalDate} close`};
+    if(!state.currentPositions.length)state.state="READY_NEXT_OPEN";
+   }
+  }
   let target:FixedTarget;
   if(state.nextAction.executionDate===nextSessionDate&&(state.nextAction.type==="BUY_NEXT_OPEN"||state.nextAction.type==="MONTH_END_REBALANCE_NEXT_OPEN")) target={symbols:[...state.nextAction.symbols],weights:[...state.nextAction.targetWeights]};
   else if(state.nextAction.executionDate===nextSessionDate&&state.nextAction.type==="SELL_ALL_NEXT_OPEN") target={symbols:[],weights:[]};
@@ -91,9 +103,9 @@ function simulateStage21(histories:Record<string,PricePoint[]>,snaps:FixedSnap[]
  return{backtest:{strategyId:PRODUCTION_PORTFOLIO.strategyId,equityCurve:curve,stats:performanceStats(curve),benchmark:null,events:state.events},state,holdings};
 }
 
-export function buildStage21Portfolio(histories:Record<string,PricePoint[]>,universeHistory:UniverseMonth[],cftcRows:CftcPositionRow[]):{backtest:BacktestResult;portfolioState:PortfolioLiveState;innerState:LiveStrategyState}{
+export function buildStage21Portfolio(histories:Record<string,PricePoint[]>,universeHistory:UniverseMonth[],cftcRows:CftcPositionRow[],activations:NonNullable<NportOperations["signalActivations"]>=[]):{backtest:BacktestResult;portfolioState:PortfolioLiveState;innerState:LiveStrategyState}{
  if(!(histories.GLDM??[]).length)throw new Error("Stage21 requires GLDM history");
- const {snaps,state:innerState}=fixedSnapshots(histories,universeHistory);if(snaps.length<2)throw new Error("Stage21 fixed snapshots are empty");
+ const {snaps,state:innerState}=fixedSnapshots(histories,universeHistory,activations);if(snaps.length<2)throw new Error("Stage21 fixed snapshots are empty");
  const base=snaps[0].equity||1,fixedCurve=snaps.map(snap=>({date:snap.date,equity:snap.equity/base,drawdown:0}));let peak=0;for(const point of fixedCurve){peak=Math.max(peak,point.equity);point.drawdown=point.equity/peak-1}
  const g=runBreakoutShadow(histories,universeHistory,START,snaps.at(-1)!.date),regimes=regimeRows(fixedCurve,g,histories.QQQ??[],cftcRows),simulation=simulateStage21(histories,snaps,regimes),backtest={...simulation.backtest,events:[...simulation.backtest.events,...innerState.events].sort((left,right)=>left.date.localeCompare(right.date)||left.type.localeCompare(right.type))};
  const latest=snaps.at(-1)!,regime=regimes.at(-1)!,targets=combinedTargets(regime.regime,latest.target),latestDate=latest.date,eligible=latestDate>=PRODUCTION_PORTFOLIO.oosStartDate,pending=simulation.state.pending;

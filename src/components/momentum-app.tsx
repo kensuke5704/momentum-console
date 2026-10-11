@@ -258,9 +258,7 @@ const asOfLabel = (value: string) => {
 };
 
 function Portfolio({ data }: { data: DashboardPayload }) {
-  const positions = [...data.portfolioState.holdings, ...data.portfolioState.targets
-    .filter((target) => target.symbol !== "CASH" && !data.portfolioState.holdings.some((holding) => holding.symbol === target.symbol))
-    .map((target) => ({ symbol: target.symbol, entryPrice: null, currentPrice: null, stopLevel: null, targetWeight: target.weight, role: target.role }))]
+  const positions = [...data.portfolioState.holdings]
     .map((holding) => {
       const latest = data.latestPrices?.[holding.symbol];
       const currentPrice = latest?.price ?? holding.currentPrice;
