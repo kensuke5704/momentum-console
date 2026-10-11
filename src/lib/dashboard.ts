@@ -1,6 +1,6 @@
 import { PRODUCTION_STRATEGY } from "./config";
 import { emptyForwardOos, OOS_START_DATE } from "./oos";
-import { applyExtraordinaryRebalance } from "./nport-operations";
+import { applyExtraordinaryRebalance, executionUniverseHistory } from "./nport-operations";
 import { PRODUCTION_PORTFOLIO } from "./portfolio-config";
 import { buildStage21Portfolio } from "./portfolio/stage21";
 import { buildMonthlySignal } from "./strategy/momentum";
@@ -11,7 +11,7 @@ import type { BacktestResult, DashboardPayload, ForwardOosResult, LatestPrice, N
 const mean = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 
 export function buildDashboardPayload(histories: Record<string, PricePoint[]>, universeHistory: UniverseMonth[], cftcRows: CftcPositionRow[], source: "live" | "snapshot" = "live", persisted?: { oos?: ForwardOosResult; frozenBacktest?: BacktestResult; nportOperations?: NportOperations; latestPrices?: Record<string, LatestPrice> }): DashboardPayload {
-  const stage21 = buildStage21Portfolio(histories, universeHistory, cftcRows);
+  const stage21 = buildStage21Portfolio(histories, executionUniverseHistory(universeHistory, persisted?.nportOperations), cftcRows, persisted?.nportOperations?.signalActivations);
   const currentUniverse = universeHistory.at(-1) ?? null;
   const qqq = histories.QQQ ?? [];
   const signalIndex = currentUniverse ? qqq.findIndex((point) => point.date === currentUniverse.asOf) : -1;

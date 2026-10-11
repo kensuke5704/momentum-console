@@ -5,6 +5,13 @@ import { nextUsTradingSession } from "./trading-calendar";
 import type { PortfolioLiveState, PortfolioTarget } from "./portfolio-types";
 import type { LiveStrategyState, MonthlySignal, NportOperations, PricePoint, UniverseMonth } from "./types";
 
+export function executionUniverseHistory(current: UniverseMonth[], operations?: NportOperations): UniverseMonth[] {
+  const recorded = operations?.executionUniverseHistory;
+  if (!recorded?.length) return current;
+  const lastDate = recorded.at(-1)!.asOf;
+  return [...recorded, ...current.filter(month => month.asOf > lastDate)];
+}
+
 const quarterNumber = (quarter: string) => Number(quarter.slice(0, 4)) * 4 + Number(quarter.at(-1));
 
 export function latestCompletedNportQuarter(signalMonth: string): string {
@@ -74,6 +81,8 @@ function stage21Targets(portfolio: PortfolioLiveState, symbols:string[], innerWe
 export function applyExtraordinaryRebalance<T extends { liveState: LiveStrategyState; portfolioState?: PortfolioLiveState }>(dashboard: T, operations: NportOperations): T {
   const rebalance = operations.extraordinaryRebalance;
   if (!rebalance?.changed || !rebalance.signal.marketRiskOn || rebalance.signal.selectedSymbols.length !== PRODUCTION_STRATEGY.selection.topN) return dashboard;
+  if (!rebalance.executionDate || dashboard.liveState.asOf >= rebalance.executionDate) return dashboard;
+  if (!["INVESTED", "READY_NEXT_OPEN", "CASH"].includes(dashboard.liveState.state) || dashboard.liveState.nextAction.type === "SELL_ALL_NEXT_OPEN") return dashboard;
   const liveState = structuredClone(dashboard.liveState);
   liveState.pendingSignal = rebalance.signal;
   if (liveState.state === "INVESTED" || liveState.state === "READY_NEXT_OPEN" || liveState.state === "CASH") {
@@ -82,7 +91,7 @@ export function applyExtraordinaryRebalance<T extends { liveState: LiveStrategyS
   }
   if (!dashboard.portfolioState) return { ...dashboard, liveState };
   const portfolioState=structuredClone(dashboard.portfolioState),targets=stage21Targets(portfolioState,rebalance.nextSymbols,rebalance.nextWeights);
-  portfolioState.fixed60.symbols=[...rebalance.nextSymbols];portfolioState.fixed60.innerWeights=[...rebalance.nextWeights];portfolioState.targets=targets;
+  portfolioState.targets=targets;
   portfolioState.nextAction={type:"REBALANCE_NEXT_OPEN",executionDate:rebalance.executionDate,targets,reason:`Delayed N-PORT Universe activated; Stage21 funded target updated from ${rebalance.priceAsOf} close`};
   return { ...dashboard, liveState, portfolioState };
 }

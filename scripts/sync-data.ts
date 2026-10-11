@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildDashboardPayload } from "../src/lib/dashboard";
-import { runStrategySimulation } from "../src/lib/backtest";
+import { buildStage21Portfolio } from "../src/lib/portfolio/stage21";
+import { executionUniverseHistory } from "../src/lib/nport-operations";
 import { fetchNasdaqAssetManagerPositions } from "../src/lib/cftc";
 import { fetchCompanyProfiles, type CompanyProfile } from "../src/lib/company-profile";
 import { previousUsTradingSession } from "../src/lib/trading-calendar";
@@ -24,9 +25,12 @@ async function main() {
   const universeFile = JSON.parse(await readFile(resolve("data/universe-history.json"), "utf8")) as UniverseFile;
   const universeHistory = universeFile.history;
   if (!universeHistory.length) throw new Error("Dynamic Universe history is empty; run npm run sync:universe first");
-  const symbols = [...new Set(["QQQ", "TQQQ", "GLDM", ...universeHistory.flatMap((month) => month.symbols.map((member) => member.symbol))])];
+  const nportOperations = await optionalJson<NportOperations>(resolve("data/nport-operations.json"));
+  const recordedHistory = executionUniverseHistory(universeHistory, nportOperations);
+  const activatedSymbols = nportOperations?.signalActivations?.flatMap(entry => entry.signal.selectedSymbols) ?? [];
+  const symbols = [...new Set(["QQQ", "TQQQ", "GLDM", ...universeHistory.flatMap((month) => month.symbols.map((member) => member.symbol)), ...recordedHistory.flatMap(month => month.symbols.map(member => member.symbol)), ...activatedSymbols])];
   const currentSymbols = [...new Set(universeHistory.at(-1)?.symbols.map((member) => member.symbol) ?? [])];
-  const intradaySymbols = [...new Set(["QQQ", "TQQQ", "GLDM", ...currentSymbols])];
+  const intradaySymbols = [...new Set(["QQQ", "TQQQ", "GLDM", ...currentSymbols, ...(recordedHistory.at(-1)?.symbols.map(member => member.symbol) ?? []), ...activatedSymbols])];
   console.log(`Fetching adjusted OHLC for ${symbols.length} Stage21/Fixed60 symbols`);
   const outputPath = resolve("public/data/market-data.json"), profilePath = resolve("public/data/company-profiles.json");
   const existing = await existingMarketData(outputPath), existingProfiles = await existingCompanyProfiles(profilePath);
@@ -61,13 +65,12 @@ async function main() {
   const latestPrices = Object.fromEntries(intradaySymbols.flatMap((symbol) => { const point=fetchedIntraday[symbol]?.at(-1);return point?[[symbol,{price:point.close,asOf:point.timestamp}]]:[]; }));
   const oos = await optionalJson<ForwardOosResult>(resolve("public/data/oos-performance.json"));
   const frozen = await optionalJson<{ backtest?: BacktestResult }>(resolve("public/data/backtest-frozen.json"));
-  const nportOperations = await optionalJson<NportOperations>(resolve("data/nport-operations.json"));
 
   const candidateDate = histories.QQQ?.at(-1)?.date;
   let warning: string | undefined;
   if (candidateDate) {
     const priorHistories = Object.fromEntries(Object.entries(histories).map(([symbol, points]) => [symbol, points.filter((point) => point.date < candidateDate)]));
-    const priorState = runStrategySimulation({ histories: priorHistories, universeHistory }).state;
+    const priorState = buildStage21Portfolio(priorHistories, recordedHistory, cftcRows, nportOperations?.signalActivations).innerState;
     const monthlyUniverse = universeHistory.find((month) => month.asOf === candidateDate);
     const required = new Set<string>(["QQQ", "GLDM", ...priorState.currentPositions.map((position) => position.symbol)]);
     if (priorState.nextAction.executionDate === candidateDate) for (const symbol of priorState.nextAction.symbols) required.add(symbol);
